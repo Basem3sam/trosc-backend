@@ -129,6 +129,7 @@ npm start
 **Basem Esam Omar**  
 Backend Engineer — Node.js | MongoDB | Express.js  
 [GitHub Profile](https://github.com/basem3sam)
+[LinkedIN Profile](https://linkedin/in/basemesam)
 
 ---
 
