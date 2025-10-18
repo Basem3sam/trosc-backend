@@ -1,6 +1,6 @@
 # 🎓 Trosc Backend
 
-> Backend server for **Trosc**, the student club at [Your College Name], powering authentication, course streaming, events, and more.
+> Backend server for **Trosc**, the student club at **facility of computer science and informatics @ suez canal university**, powering authentication, course streaming, events, and more.
 
 ---
 
