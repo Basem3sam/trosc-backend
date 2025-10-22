@@ -6,8 +6,11 @@ const signToken = require('../utils/generateToken');
 
 // Create and send token (with cookie)
 const createSendToken = (user) => {
+  if (!user || !user._id) {
+    throw new AppError('Invalid user for token generation', 500);
+  }
   const token = signToken(user._id);
-  user.password = undefined;
+  user.password = undefined; // Remove password from output
   return token;
 };
 
@@ -25,6 +28,9 @@ exports.signUp = async (data, url) => {
 
   if (data.photo) {
     allowedData.photo = data.photo;
+  }
+  if (data.bio) {
+    allowedData.bio = data.bio;
   }
 
   // Create user with ONLY allowed fields
@@ -52,7 +58,7 @@ exports.login = async (email, password) => {
   }
 
   // Update last login time
-  user.lastLoginAt = new Date();
+  user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
 
   // If everything ok, send token to client
@@ -105,7 +111,7 @@ exports.resetPassword = async (token, password, passwordConfirm) => {
 
   // 3) Log user in, send JWT
   const jwtToken = createSendToken(user);
-  return { jwtToken, user };
+  return { token: jwtToken, user }; // Changed from jwtToken to token for consistency
 };
 
 exports.updatePassword = async (
@@ -114,6 +120,11 @@ exports.updatePassword = async (
   newPassword,
   passwordConfirm,
 ) => {
+  // simple validation
+  if (!currentPassword || !newPassword || !passwordConfirm) {
+    throw new AppError('All password fields are required', 400);
+  }
+
   // 1) Get user from collection
   const user = await User.findById(userId).select('+password');
 

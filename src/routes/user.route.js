@@ -1,142 +1,12 @@
 /**
  * @swagger
- * tags:
- *   - name: Auth
- *     description: Authentication and password management
- *   - name: Users
- *     description: User profile and admin management
- *
- * components:
- *   securitySchemes:
- *     bearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
- *
- *   schemas:
- *     UserBase:
- *       type: object
- *       properties:
- *         name:
- *           type: string
- *           example: Basem Esam
- *         email:
- *           type: string
- *           format: email
- *           example: basem@example.com
- *         photo:
- *           type: string
- *           example: default.jpg
- *         role:
- *           type: string
- *           enum: [student, admin, instructor]
- *           example: student
- *         enrolledTracks:
- *           type: array
- *           items:
- *             type: string
- *           example: ["66f5d42e2d4a3a7b8c5e9f21"]
- *         active:
- *           type: boolean
- *           example: true
- *
- *     UserCreate:
- *       allOf:
- *         - $ref: '#/components/schemas/UserBase'
- *         - type: object
- *           required:
- *             - name
- *             - email
- *             - password
- *             - passwordConfirm
- *           properties:
- *             password:
- *               type: string
- *               format: password
- *               example: StrongP@ssw0rd
- *             passwordConfirm:
- *               type: string
- *               format: password
- *               example: StrongP@ssw0rd
- *
- *     UserAdminCreate:
- *       allOf:
- *         - $ref: '#/components/schemas/UserCreate'
- *         - type: object
- *           properties:
- *             role:
- *               type: string
- *               enum: [student, admin, instructor]
- *               example: instructor
- *             enrollment:
- *               type: string
- *               example: 2025-ENG-CS
- *
- *     AuthLogin:
- *       type: object
- *       required:
- *         - email
- *         - password
- *       properties:
- *         email:
- *           type: string
- *           format: email
- *           example: basem@example.com
- *         password:
- *           type: string
- *           format: password
- *           example: StrongP@ssw0rd
- *
- *     TokenResponse:
- *       type: object
- *       properties:
- *         status:
- *           type: string
- *           example: success
- *         token:
- *           type: string
- *           description: JWT access token
- *
- *     StandardError:
- *       type: object
- *       properties:
- *         status:
- *           type: string
- *           example: fail
- *         message:
- *           type: string
- *           example: Error description here
- *
- *   responses:
- *     Unauthorized:
- *       description: Authentication required / invalid token
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/StandardError'
- *     NotFound:
- *       description: Resource not found
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/StandardError'
- *     ValidationError:
- *       description: Validation failed
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/StandardError'
- */
-
-/**
- * @swagger
  * /users/signup:
  *   post:
- *     summary: Register a new user (public)
+ *     summary: Register a new user account
+ *     description: Creates a new user account with student role by default
  *     tags: [Auth]
  *     requestBody:
  *       required: true
- *       description: New user data (passwordConfirm must match password)
  *       content:
  *         application/json:
  *           schema:
@@ -147,25 +17,19 @@
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     user:
- *                       $ref: '#/components/schemas/UserBase'
+ *               $ref: '#/components/schemas/TokenResponse'
  *       400:
  *         $ref: '#/components/responses/ValidationError'
+ *       409:
+ *         description: Email already registered
  */
 
 /**
  * @swagger
  * /users/login:
  *   post:
- *     summary: Log in an existing user (public)
+ *     summary: Authenticate user and return JWT token
+ *     description: Verifies user credentials and returns JWT token
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -175,39 +39,37 @@
  *             $ref: '#/components/schemas/AuthLogin'
  *     responses:
  *       200:
- *         description: Login successful, returns JWT token (also set in cookie if implemented)
+ *         description: Login successful
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/TokenResponse'
  *       401:
- *         $ref: '#/components/responses/Unauthorized'
+ *         description: Invalid credentials
  */
 
 /**
  * @swagger
  * /users/logout:
  *   get:
- *     summary: Log out the current user (clears cookie/token)
+ *     summary: Log out current user
+ *     description: Clears authentication token
  *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Logged out successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 
 /**
  * @swagger
  * /users/forgotPassword:
  *   post:
- *     summary: Send password reset link to user email (public)
+ *     summary: Send password reset token to user's email
+ *     description: Generates and sends password reset token via email
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -224,22 +86,22 @@
  *                 example: basem@example.com
  *     responses:
  *       200:
- *         description: Password reset email sent (if email exists)
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Password reset email sent
+ *       404:
+ *         description: No user found with provided email
  */
 
 /**
  * @swagger
  * /users/resetPassword/{token}:
  *   patch:
- *     summary: Reset user password using the token from email (public)
+ *     summary: Reset password using token from email
+ *     description: Resets user password using valid reset token
  *     tags: [Auth]
  *     parameters:
  *       - name: token
  *         in: path
  *         required: true
- *         description: Password reset token (plain token)
  *         schema:
  *           type: string
  *     requestBody:
@@ -247,33 +109,20 @@
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - password
- *               - passwordConfirm
- *             properties:
- *               password:
- *                 type: string
- *                 format: password
- *                 example: NewP@ssw0rd
- *               passwordConfirm:
- *                 type: string
- *                 format: password
- *                 example: NewP@ssw0rd
+ *             $ref: '#/components/schemas/PasswordReset'
  *     responses:
  *       200:
  *         description: Password reset successfully
  *       400:
- *         $ref: '#/components/responses/ValidationError'
- *       404:
- *         $ref: '#/components/responses/NotFound'
+ *         description: Invalid or expired token
  */
 
 /**
  * @swagger
  * /users/updateMyPassword:
  *   patch:
- *     summary: Update the current user's password (logged-in users)
+ *     summary: Update current user's password
+ *     description: Change password for authenticated user
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -282,21 +131,7 @@
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - passwordCurrent
- *               - password
- *               - passwordConfirm
- *             properties:
- *               passwordCurrent:
- *                 type: string
- *                 format: password
- *               password:
- *                 type: string
- *                 format: password
- *               passwordConfirm:
- *                 type: string
- *                 format: password
+ *             $ref: '#/components/schemas/PasswordUpdate'
  *     responses:
  *       200:
  *         description: Password updated successfully
@@ -308,13 +143,14 @@
  * @swagger
  * /users/me:
  *   get:
- *     summary: Get the currently logged-in user's profile
+ *     summary: Get current user's profile
+ *     description: Returns profile of authenticated user
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Current user profile returned
+ *         description: User profile retrieved
  *         content:
  *           application/json:
  *             schema:
@@ -336,7 +172,8 @@
  * @swagger
  * /users/updateMe:
  *   patch:
- *     summary: Update current user's info (name, email, photo)
+ *     summary: Update current user's profile information
+ *     description: Update user profile (name, email, photo, bio)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -356,10 +193,13 @@
  *                 example: basem.updated@example.com
  *               photo:
  *                 type: string
- *                 example: avatar.jpg
+ *                 example: new-avatar.jpg
+ *               bio:
+ *                 type: string
+ *                 example: Senior Backend Engineer
  *     responses:
  *       200:
- *         description: User updated successfully
+ *         description: Profile updated successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
@@ -371,6 +211,7 @@
  * /users/deleteMe:
  *   delete:
  *     summary: Deactivate current user account (soft delete)
+ *     description: Soft deletes user account by setting active=false
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -386,16 +227,20 @@
  * /users:
  *   get:
  *     summary: Get all users (admin only)
+ *     description: Retrieves list of all active users
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: List of users returned
+ *         description: List of users retrieved
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
  *   post:
- *     summary: Create a user as admin (admin only) — allows role & enrollment
+ *     summary: Create a new user (admin only)
+ *     description: Admin endpoint to create users with specific roles
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -411,38 +256,42 @@
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
- *         description: Forbidden (not admin)
+ *         $ref: '#/components/responses/Forbidden'
  */
 
 /**
  * @swagger
  * /users/{id}:
  *   get:
- *     summary: Get a specific user by ID (admin only)
+ *     summary: Get user by ID (admin only)
+ *     description: Retrieve specific user details by ID
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - name: id
  *         in: path
- *         description: User ObjectId
  *         required: true
  *         schema:
  *           type: string
  *     responses:
  *       200:
  *         description: User found
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
  *       404:
  *         $ref: '#/components/responses/NotFound'
  *   patch:
- *     summary: Update a specific user by ID (admin only)
+ *     summary: Update user by ID (admin only)
+ *     description: Update user information including role
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - name: id
  *         in: path
- *         description: User ObjectId
  *         required: true
  *         schema:
  *           type: string
@@ -457,15 +306,17 @@
  *         description: User updated successfully
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
  *   delete:
- *     summary: Delete a specific user by ID (admin only)
+ *     summary: Delete user by ID (admin only)
+ *     description: Permanently delete user from database
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - name: id
  *         in: path
- *         description: User ObjectId
  *         required: true
  *         schema:
  *           type: string
@@ -474,6 +325,8 @@
  *         description: User deleted successfully
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
  */
 
 const express = require('express');
@@ -489,51 +342,152 @@ const {
   resetPasswordSchema,
   updatePasswordSchema,
   updateMeSchema,
+  userIdSchema,
+  adminCreateUserSchema,
 } = require('../validations/user.validation');
 
 const router = express.Router();
 
-// ───────────── AUTH ROUTES ─────────────
-router.post('/signup', validate(signupSchema), authController.signup);
-router.post('/login', validate(loginSchema), authController.login);
-router.get('/logout', authController.logout);
+// ===================================================================
+// 🔓 PUBLIC AUTH ROUTES - No authentication required
+// ===================================================================
 
+/**
+ * @route   POST /users/signup
+ * @desc    Register a new user account
+ * @access  Public
+ */
+router.post('/signup', validate(signupSchema), authController.signup);
+
+/**
+ * @route   POST /users/login
+ * @desc    Authenticate user and return JWT token
+ * @access  Public
+ */
+router.post('/login', validate(loginSchema), authController.login);
+
+/**
+ * @route   POST /users/forgotPassword
+ * @desc    Send password reset token to user's email
+ * @access  Public
+ */
 router.post(
   '/forgotPassword',
   validate(forgotPasswordSchema),
   authController.forgotPassword,
 );
+
+/**
+ * @route   PATCH /users/resetPassword/:token
+ * @desc    Reset password using token from email
+ * @access  Public
+ */
 router.patch(
   '/resetPassword/:token',
   validate(resetPasswordSchema),
   authController.resetPassword,
 );
 
-// ───────────── PROTECTED USER ROUTES ─────────────
-router.use(authMiddleware.protect); // all routes below are protected
+// ===================================================================
+// 🔐 PROTECTED USER ROUTES - Authentication required
+// ===================================================================
 
+// Apply authentication middleware to all routes below
+router.use(authMiddleware.protect);
+
+/**
+ * @route   GET /users/logout
+ * @desc    Log out current user (clear JWT cookie)
+ * @access  Private
+ */
+router.get('/logout', authController.logout);
+
+/**
+ * @route   PATCH /users/updateMyPassword
+ * @desc    Update current user's password
+ * @access  Private
+ */
 router.patch(
   '/updateMyPassword',
   validate(updatePasswordSchema),
   authController.updatePassword,
 );
 
-router.get('/me', userController.getMe, userController.getUser);
+/**
+ * @route   GET /users/me
+ * @desc    Get current user's profile
+ * @access  Private
+ */
+router.get('/me', userController.getMe);
+
+/**
+ * @route   PATCH /users/updateMe
+ * @desc    Update current user's profile information
+ * @access  Private
+ */
 router.patch('/updateMe', validate(updateMeSchema), userController.updateMe);
+
+/**
+ * @route   DELETE /users/deleteMe
+ * @desc    Deactivate current user account (soft delete)
+ * @access  Private
+ */
 router.delete('/deleteMe', userController.deleteMe);
 
-// ───────────── ADMIN ROUTES ─────────────
+// ===================================================================
+// 👑 ADMIN ONLY ROUTES - Admin role required
+// ===================================================================
+
+// Apply admin restriction to all routes below
 router.use(authMiddleware.restrictTo('admin'));
 
+/**
+ * @route   GET /users
+ * @desc    Get all users (admin only)
+ * @access  Private/Admin
+ * @returns {Array} List of all users
+ */
 router
   .route('/')
   .get(userController.getAllUsers)
-  .post(userController.createUser);
+  /**
+   * @route   POST /users
+   * @desc    Create a new user (admin only)
+   * @access  Private/Admin
+   * @body    {Object} User data including role assignment
+   */
+  .post(validate(adminCreateUserSchema), userController.createUser);
 
+/**
+ * @route   /users/:id
+ * @desc    User management by ID (admin only)
+ * @access  Private/Admin
+ */
 router
   .route('/:id')
-  .get(userController.getUser)
-  .patch(userController.updateUser)
-  .delete(userController.deleteUser);
+  /**
+   * @route   GET /users/:id
+   * @desc    Get user by ID
+   * @access  Private/Admin
+   * @param   {string} id - User MongoDB ObjectId
+   */
+  .get(validate(userIdSchema, 'params'), userController.getUser)
+
+  /**
+   * @route   PATCH /users/:id
+   * @desc    Update user by ID
+   * @access  Private/Admin
+   * @param   {string} id - User MongoDB ObjectId
+   * @body    {Object} User data to update
+   */
+  .patch(validate(userIdSchema, 'params'), userController.updateUser)
+
+  /**
+   * @route   DELETE /users/:id
+   * @desc    Permanently delete user by ID
+   * @access  Private/Admin
+   * @param   {string} id - User MongoDB ObjectId
+   */
+  .delete(validate(userIdSchema, 'params'), userController.deleteUser);
 
 module.exports = router;

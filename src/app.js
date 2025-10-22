@@ -7,11 +7,13 @@ const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const hpp = require('hpp');
 const cors = require('cors');
-const swaggerSpec = require('./config/swagger.config');
 
+const swaggerSpec = require('./config/swagger.config');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./controllers/error.controller');
 const userRouter = require('./routes/user.route');
+const trackRouter = require('./routes/track.route');
+const sessionRouter = require('./routes/session.route');
 
 // Initialize Express app
 const app = express();
@@ -33,6 +35,7 @@ app.use(
       'http://localhost:3000',
       'http://localhost:5000',
       'http://127.0.0.1:5000',
+      'https://*.ngrok-free.dev',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
@@ -43,8 +46,8 @@ app.options('*', cors()); // Handle preflight requests
 
 // Limit request from same IP
 const limiter = rateLimit({
-  max: process.env.RATE_LIMIT_MAX || 100,
-  windowMs: process.env.RATE_LIMIT_WINDOWS_MS || 60 * 60 * 10000, // 1 hour
+  max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60 * 60 * 10000, // 1 hour
   message: 'Too many request from this IP, please try again in an hour',
 });
 
@@ -70,13 +73,26 @@ app.use(xss());
 
 // prevent parameter pollution (its always use the last one)
 // [note:] make sure to focus on what can be arrayed in the params and whitelist it
-app.use(hpp());
+app.use(
+  hpp({
+    whitelist: [
+      'duration',
+      'level',
+      'price',
+      'ratingsAverage',
+      'ratingsQuantity',
+      // Add any parameters that should allow multiple values
+    ],
+  }),
+);
 
 // Serving static files
 // app.use(express.static(`${__dirname}/public`));
 
 //TODO: Mount your routes here
-app.use('/api/v1/users', userRouter);
+app.use('/v1/users', userRouter);
+app.use('/v1/tracks', trackRouter);
+app.use('/v1/sessions', sessionRouter);
 
 // Test route
 app.get('/', (req, res) => {
@@ -84,6 +100,13 @@ app.get('/', (req, res) => {
     status: 'success',
     message: 'Welcome to the Trosc API 🚀',
     docs: '/api-docs',
+  });
+});
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
   });
 });
 

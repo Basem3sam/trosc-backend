@@ -1,54 +1,165 @@
 class APIFeatures {
-  constructor(query, queryString) {
+  constructor(query, queryString, model) {
+    if (!query) {
+      throw new Error('Query cannot be undefined');
+    }
+
     this.query = query;
     this.queryString = queryString;
+    this.model = model;
+    this.totalDocs = 0;
+    this.pagination = {}; // ✅ Initialize pagination object
   }
 
-  filter() {
-    // 1) Filtering
+  // 1️⃣ Enhanced Filtering with Better Error Handling
+  filter(defaultFilter = {}) {
     const queryObj = { ...this.queryString };
-    const excludedFields = ['page', 'sort', 'limit', 'fields'];
+    const excludedFields = [
+      'page',
+      'sort',
+      'limit',
+      'fields',
+      'search',
+      'populate',
+      'keyword', // ✅ Common alternative to 'search'
+    ];
     excludedFields.forEach((el) => delete queryObj[el]);
 
-    // 1B) Advance filtering
-    let queryStr = JSON.stringify(queryObj);
-    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+    try {
+      // Advanced filtering with better regex handling
+      let queryStr = JSON.stringify({ ...queryObj, ...defaultFilter });
+      queryStr = queryStr.replace(
+        /\b(gte|gt|lte|lt|in|ne|regex|options)\b/g,
+        (match) => `$${match}`,
+      );
 
-    this.query = this.query.find(JSON.parse(queryStr));
-
-    return this;
+      this.query = this.query.find(JSON.parse(queryStr));
+      return this;
+    } catch (error) {
+      throw new Error(`Invalid filter parameters: ${error.message}`);
+    }
   }
 
-  sort() {
-    // 2) Sorting
-    if (this.queryString.sort) {
-      const sortBy = this.queryString.sort.split(',').join(' ');
-      this.query = this.query.sort(sortBy);
-    } else {
-      this.query = this.query.sort('-createdAt _id');
+  // 2️⃣ Enhanced Search with Multiple Options
+  search(searchFields = []) {
+    const searchTerm = this.queryString.search || this.queryString.keyword;
+
+    if (searchTerm && searchFields.length > 0) {
+      try {
+        const searchRegex = new RegExp(
+          searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), // ✅ Escape regex chars
+          'i',
+        );
+
+        const searchConditions = searchFields.map((field) => ({
+          [field]: { $regex: searchRegex },
+        }));
+
+        this.query = this.query.find({ $or: searchConditions });
+      } catch (error) {
+        // If regex fails, fall back to simple text search
+        const searchConditions = searchFields.map((field) => ({
+          [field]: { $regex: searchTerm, $options: 'i' },
+        }));
+        this.query = this.query.find({ $or: searchConditions });
+      }
     }
     return this;
   }
 
+  // 3️⃣ Enhanced Sorting with Validation
+  sort() {
+    if (this.queryString.sort) {
+      const sortBy = this.queryString.sort.split(',').join(' ');
+      this.query = this.query.sort(sortBy);
+    } else {
+      this.query = this.query.sort('-createdAt');
+    }
+    return this;
+  }
+
+  // 4️⃣ Enhanced Field Limiting with Security
   limitFields() {
-    // 3) Field limiting
     if (this.queryString.fields) {
       const fields = this.queryString.fields.split(',').join(' ');
-      this.query = this.query.select(fields);
+      // ✅ Basic security: Remove potential dangerous fields
+      const safeFields = fields
+        .split(' ')
+        .filter(
+          (field) => !field.includes('password') && !field.includes('__v'),
+        )
+        .join(' ');
+      this.query = this.query.select(safeFields);
     } else {
       this.query = this.query.select('-__v');
     }
     return this;
   }
 
-  paginate() {
-    // 4) Pagination
-    const page = this.queryString.page * 1 || 1;
-    const limit = this.queryString.limit * 1 || 100;
+  // 5️⃣ Enhanced Pagination with Limits
+  async paginate() {
+    const page = Math.max(1, parseInt(this.queryString.page, 10) || 1);
+    const limit = Math.min(
+      Math.max(1, parseInt(this.queryString.limit, 10) || 20),
+      100, // ✅ Maximum limit to prevent abuse
+    );
     const skip = (page - 1) * limit;
+
+    // Count total documents for pagination metadata
+    if (this.model) {
+      this.totalDocs = await this.model.countDocuments(this.query._conditions);
+    }
 
     this.query = this.query.skip(skip).limit(limit);
 
+    this.pagination = {
+      page,
+      limit,
+      totalPages: this.totalDocs
+        ? Math.ceil(this.totalDocs / limit)
+        : undefined,
+      totalResults: this.totalDocs || undefined,
+      hasNext: this.totalDocs
+        ? page < Math.ceil(this.totalDocs / limit)
+        : undefined,
+      hasPrev: page > 1,
+    };
+
+    return this;
+  }
+
+  // 6️⃣ Enhanced Population with Depth Control
+  populate() {
+    if (this.queryString.populate) {
+      const fields = this.queryString.populate.split(',');
+      fields.forEach((field) => {
+        const trimmedField = field.trim();
+        // ✅ Simple population without deep nesting to avoid performance issues
+        this.query = this.query.populate(trimmedField);
+      });
+    }
+    return this;
+  }
+
+  // 7️⃣ NEW: Get the final query results
+  async getResults() {
+    const results = await this.query;
+    return {
+      status: 'success',
+      results: results.length,
+      pagination: this.pagination,
+      data: results,
+    };
+  }
+
+  // 8️⃣ NEW: Count only (without getting documents)
+  async count() {
+    return await this.query.countDocuments();
+  }
+
+  // 9️⃣ NEW: Add custom query conditions
+  where(conditions) {
+    this.query = this.query.where(conditions);
     return this;
   }
 }

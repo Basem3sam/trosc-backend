@@ -10,7 +10,7 @@ const filterObj = (obj, ...allowedFields) => {
 };
 
 exports.getAllUsers = async () => {
-  const users = await User.find();
+  const users = await User.find({ active: { $ne: false } }); // Exclude deactivated users
   return users;
 };
 
@@ -77,7 +77,7 @@ exports.updateMe = async (userId, data) => {
     );
   }
   // Only allow name, email, etc.
-  const filteredData = filterObj(data, 'name', 'email', 'photo');
+  const filteredData = filterObj(data, 'name', 'email', 'photo', 'bio');
 
   const updatedUser = await User.findByIdAndUpdate(userId, filteredData, {
     new: true,

@@ -1,98 +1,332 @@
 /**
  * @swagger
- * components:
- *   schemas:
- *     User:
- *       type: object
- *       description: Represents a user account in the Trosc platform.
- *       required:
- *         - name
- *         - email
- *         - password
- *         - passwordConfirm
- *       properties:
- *         _id:
+ * /users/signup:
+ *   post:
+ *     summary: Register a new user account
+ *     description: Creates a new user account with student role by default
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserCreate'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TokenResponse'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       409:
+ *         description: Email already registered
+ */
+
+/**
+ * @swagger
+ * /users/login:
+ *   post:
+ *     summary: Authenticate user and return JWT token
+ *     description: Verifies user credentials and returns JWT token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthLogin'
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TokenResponse'
+ *       401:
+ *         description: Invalid credentials
+ */
+
+/**
+ * @swagger
+ * /users/logout:
+ *   get:
+ *     summary: Log out current user
+ *     description: Clears authentication token
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /users/forgotPassword:
+ *   post:
+ *     summary: Send password reset token to user's email
+ *     description: Generates and sends password reset token via email
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: basem@example.com
+ *     responses:
+ *       200:
+ *         description: Password reset email sent
+ *       404:
+ *         description: No user found with provided email
+ */
+
+/**
+ * @swagger
+ * /users/resetPassword/{token}:
+ *   patch:
+ *     summary: Reset password using token from email
+ *     description: Resets user password using valid reset token
+ *     tags: [Auth]
+ *     parameters:
+ *       - name: token
+ *         in: path
+ *         required: true
+ *         schema:
  *           type: string
- *           description: Auto-generated MongoDB ObjectId
- *           example: 66f5d42e2d4a3a7b8c5e9f20
- *         name:
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/PasswordReset'
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid or expired token
+ */
+
+/**
+ * @swagger
+ * /users/updateMyPassword:
+ *   patch:
+ *     summary: Update current user's password
+ *     description: Change password for authenticated user
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/PasswordUpdate'
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /users/me:
+ *   get:
+ *     summary: Get current user's profile
+ *     description: Returns profile of authenticated user
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/UserBase'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /users/updateMe:
+ *   patch:
+ *     summary: Update current user's profile information
+ *     description: Update user profile (name, email, photo, bio)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Basem Updated
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: basem.updated@example.com
+ *               photo:
+ *                 type: string
+ *                 example: new-avatar.jpg
+ *               bio:
+ *                 type: string
+ *                 example: Senior Backend Engineer
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /users/deleteMe:
+ *   delete:
+ *     summary: Deactivate current user account (soft delete)
+ *     description: Soft deletes user account by setting active=false
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       204:
+ *         description: Account deactivated
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
+ * /users:
+ *   get:
+ *     summary: Get all users (admin only)
+ *     description: Retrieves list of all active users
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of users retrieved
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *   post:
+ *     summary: Create a new user (admin only)
+ *     description: Admin endpoint to create users with specific roles
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserAdminCreate'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   get:
+ *     summary: Get user by ID (admin only)
+ *     description: Retrieve specific user details by ID
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
  *           type: string
- *           description: The user's full name
- *           example: Basem Esam
- *         email:
+ *     responses:
+ *       200:
+ *         description: User found
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *   patch:
+ *     summary: Update user by ID (admin only)
+ *     description: Update user information including role
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
  *           type: string
- *           format: email
- *           description: Unique email address used for login and verification
- *           example: basem@example.com
- *         photo:
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserAdminCreate'
+ *     responses:
+ *       200:
+ *         description: User updated successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *   delete:
+ *     summary: Delete user by ID (admin only)
+ *     description: Permanently delete user from database
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
  *           type: string
- *           description: Filename or URL of the user's profile picture
- *           example: default.jpg
- *         role:
- *           type: string
- *           description: User's role and permission level in the system
- *           enum: [student, instructor, admin]
- *           default: student
- *           example: student
- *         bio:
- *           type: string
- *           description: Short personal bio or title for display in profile
- *           example: Backend Engineer | ICPC Competitor | GDG Instructor
- *         emailVerified:
- *           type: boolean
- *           description: Indicates whether the user's email is verified
- *           default: false
- *         password:
- *           type: string
- *           format: password
- *           description: Secure password (minimum 8 characters)
- *           example: StrongPassword123!
- *         passwordConfirm:
- *           type: string
- *           format: password
- *           description: Must match the password field during registration
- *           example: StrongPassword123!
- *         enrolledTracks:
- *           type: array
- *           description: List of Track IDs that the user is enrolled in
- *           items:
- *             type: string
- *             example: 66f5d42e2d4a3a7b8c5e9f21
- *         active:
- *           type: boolean
- *           default: true
- *           description: Indicates whether the user's account is active
- *         passwordChangedAt:
- *           type: string
- *           format: date-time
- *           description: Timestamp when the user last changed their password
- *           example: 2025-10-18T12:10:00.000Z
- *         createdAt:
- *           type: string
- *           format: date-time
- *           description: When the user was first registered
- *           example: 2025-10-18T14:30:00.000Z
- *         updatedAt:
- *           type: string
- *           format: date-time
- *           description: When the user record was last updated
- *           example: 2025-10-18T14:31:00.000Z
- *         lastLogin:
- *           type: string
- *           format: date-time
- *           description: Timestamp of the user's last successful login
- *           example: 2025-10-18T15:00:00.000Z
- *       example:
- *         name: Basem Esam
- *         email: basem@example.com
- *         role: student
- *         photo: default.jpg
- *         bio: Backend Engineer | ICPC Competitor
- *         emailVerified: true
- *         enrolledTracks: []
- *         active: true
- *         createdAt: 2025-10-18T14:30:00.000Z
- *         updatedAt: 2025-10-18T14:31:00.000Z
+ *     responses:
+ *       204:
+ *         description: User deleted successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
  */
 
 const mongoose = require('mongoose');
@@ -117,7 +351,19 @@ const userSchema = new mongoose.Schema(
     },
     photo: {
       type: String,
-      default: 'default.jpg',
+      default: 'default-user.jpg',
+      validate: {
+        validator: function (v) {
+          // Allow default image, relative paths, or valid URLs
+          if (!v || v === 'default-user.jpg') return true;
+
+          // Check for valid URL OR relative path OR filename
+          const urlRegex =
+            /^(https?:\/\/.*\.(jpg|jpeg|png|webp|gif))|([a-zA-Z0-9_\-]+\.(jpg|jpeg|png|webp|gif))$/i;
+          return urlRegex.test(v);
+        },
+        message: 'Photo must be a valid URL or image filename',
+      },
     },
     bio: {
       type: String,

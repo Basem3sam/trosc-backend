@@ -60,7 +60,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteMe = async (req, res, next) => {
-  await userService.deleteMe(req.params.id);
+  await userService.deleteMe(req.user.id);
   res.status(204).json({
     status: 'success',
     data: null,

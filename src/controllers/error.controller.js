@@ -6,8 +6,9 @@ const handleCastErrorDB = (err) => {
 };
 
 const handleDuplicateFieldsDB = (err) => {
+  const field = Object.keys(err.keyValue)[0];
   const value = Object.values(err.keyValue)[0];
-  const message = `Duplicate field value: ${value}. Please use another value!`;
+  const message = `Duplicate field value: "${value}" for field "${field}". Please use another value!`;
   return new AppError(message, 400);
 };
 
@@ -17,11 +18,19 @@ const handleValidationErrorDB = (err) => {
   return new AppError(message, 400);
 };
 
+// JWT Errors
 const handleJWTError = () =>
-  new AppError('Invalid Token. Please log in again.', 401);
+  new AppError('Invalid authentication token. Please log in again.', 401);
 
 const handleJWTExpiredError = () =>
-  new AppError('Your token has expired! Please log in again.', 401);
+  new AppError(
+    'Your authentication token has expired! Please log in again.',
+    401,
+  );
+
+// Rate Limit Error
+const handleRateLimitError = () =>
+  new AppError('Too many requests from this IP. Please try again later.', 429);
 
 const sendErrorDev = (err, res) => {
   res.status(err.statusCode).json({
@@ -42,12 +51,12 @@ const sendErrorProd = (err, res) => {
     // Programming or other unknown error: don't leak error details
   } else {
     // 1) Log error
-    console.error('ERROR', err);
+    console.error('💥 UNEXPECTED ERROR:', err);
 
     // 2) Send generic message
     res.status(500).json({
       status: 'error',
-      message: 'Something went very wrong!',
+      message: 'Something went wrong! Please try again later.',
     });
   }
 };
@@ -68,6 +77,7 @@ module.exports = (err, req, res, next) => {
       error = handleValidationErrorDB(error);
     if (error.name === 'JsonWebTokenError') error = handleJWTError();
     if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
+    if (error.name === 'RateLimitError') error = handleRateLimitError();
     sendErrorProd(error, res);
   }
 };
