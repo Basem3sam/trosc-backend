@@ -1,4 +1,5 @@
 const AppError = require('../utils/AppError');
+const logger = require('../utils/logger');
 
 const handleCastErrorDB = (err) => {
   const message = `Invalid ${err.path}: ${err.value}.`;
@@ -51,7 +52,7 @@ const sendErrorProd = (err, res) => {
     // Programming or other unknown error: don't leak error details
   } else {
     // 1) Log error
-    console.error('💥 UNEXPECTED ERROR:', err);
+    logger.error('Unexpected error', { error: err.message, stack: err.stack });
 
     // 2) Send generic message
     res.status(500).json({

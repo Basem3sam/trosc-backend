@@ -1,13 +1,14 @@
 const mongoose = require('mongoose');
+logger = require('../utils/logger');
 
 // ✅ Register ONCE at module load. mongoose.connection is a singleton,
 // so these fire for every connection (including reconnects).
 mongoose.connection.on('error', (err) => {
-  console.error('MongoDB connection error:', err);
+  logger.error('MongoDB connection error:', { error: err.message, stack: err.stack });
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected');
+  logger.info('MongoDB disconnected');
 });
 
 const connectDB = async () => {
@@ -35,9 +36,9 @@ const connectDB = async () => {
       socketTimeoutMS: 45000,
     });
 
-    console.log(`🗄️ MongoDB Connected: ${conn.connection.host}`);
+    logger.info(`MongoDB Connected: ${conn.connection.host}`);
   } catch (err) {
-    console.error(`❌ DB Connection Error: ${err.message}`);
+    logger.error(`DB Connection Error: ${err.message}`, { stack: err.stack });
     process.exit(1);
   }
 };

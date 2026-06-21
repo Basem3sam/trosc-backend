@@ -21,6 +21,35 @@ const eventRouter = require('./routes/event.route');
 const announcementRouter = require('./routes/announcement.route');
 const feedRouter = require('./routes/feed.route');
 
+// Development logging
+if (!isProduction) {
+  app.use(morgan('dev'));
+}
+
+const logger = require('./utils/logger');
+logger.info(`Starting Trosc API in ${process.env.NODE_ENV} mode...`);
+
+if (isProduction) {
+  // Structured request logging
+  app.use((req, res, next) => {
+    const start = Date.now();
+
+    res.on('finish', () => {
+      logger.info({
+        method: req.method,
+        url: req.originalUrl,
+        status: res.statusCode,
+        duration: `${Date.now() - start}ms`,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        userId: req.user?.id || 'anonymous',
+      });
+    });
+
+    next();
+  });
+}
+
 // Initialize Express app
 const app = express();
 
@@ -38,11 +67,6 @@ app.use(cookieParser());
 
 // Set security HTTP headers
 app.use(helmet());
-
-// Development logging
-if (!isProduction) {
-  app.use(morgan('dev'));
-}
 
 const allowedOrigins = [
   'http://localhost:3000',
