@@ -1,10 +1,13 @@
 const mongoose = require('mongoose');
-logger = require('../utils/logger');
+const logger = require('../utils/logger');
 
 // ✅ Register ONCE at module load. mongoose.connection is a singleton,
 // so these fire for every connection (including reconnects).
 mongoose.connection.on('error', (err) => {
-  logger.error('MongoDB connection error:', { error: err.message, stack: err.stack });
+  logger.error('MongoDB connection error:', {
+    error: err.message,
+    stack: err.stack,
+  });
 });
 
 mongoose.connection.on('disconnected', () => {

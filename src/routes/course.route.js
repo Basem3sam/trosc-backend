@@ -162,7 +162,7 @@
  *   delete:
  *     operationId: deleteCourseById
  *     summary: Delete a course
- *     description: Permanently delete a course (admin only)
+ *     description: Permanently delete a course (admin and instructors only). Instructors can only delete courses they created.
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []

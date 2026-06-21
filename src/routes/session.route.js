@@ -137,7 +137,7 @@
  *   delete:
  *     operationId: deleteSessionById
  *     summary: Delete a session
- *     description: Permanently delete a session (admin only)
+ *     description: Permanently delete a session (admin and instructors only). Instructors can only delete sessions they created.
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []
