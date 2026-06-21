@@ -20,17 +20,19 @@ const courseRouter = require('./routes/course.route');
 const eventRouter = require('./routes/event.route');
 const announcementRouter = require('./routes/announcement.route');
 const feedRouter = require('./routes/feed.route');
+const logger = require('./utils/logger');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Development logging
+// Initialize Express app
+const app = express();
+
+// Development logging with Morgan
 if (!isProduction) {
   app.use(morgan('dev'));
 }
 
-const logger = require('./utils/logger');
-logger.info(`Starting Trosc API in ${process.env.NODE_ENV} mode...`);
-
+// Production logging with Winston
 if (isProduction) {
   // Structured request logging
   app.use((req, res, next) => {
@@ -51,9 +53,6 @@ if (isProduction) {
     next();
   });
 }
-
-// Initialize Express app
-const app = express()
 
 /* GLOBAL MIDDLEWARES */
 
@@ -127,8 +126,8 @@ const authLimiter = rateLimit({
 
 app.use('/v1/users/login', authLimiter);
 app.use('/v1/users/signup', authLimiter);
-app.use('/v1/users/forgot-password', authLimiter);
-app.use('/v1/users/reset-password', authLimiter);
+app.use('/v1/users/forgotPassword', authLimiter);
+app.use('/v1/users/resetPassword', authLimiter);
 
 /* BODY PARSER */
 

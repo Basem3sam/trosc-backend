@@ -28,7 +28,7 @@ const attachmentValidation = Joi.array()
             url.hostname.endsWith(host),
           );
 
-          if (!isAllowedHost && !url.protocol.startsWith('https')) {
+          if (!isAllowedHost || url.protocol !== 'https:') {
             return helpers.error('any.invalid');
           }
 
