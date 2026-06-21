@@ -52,7 +52,7 @@ const assignmentSchema = new mongoose.Schema(
                 'i.imgur.com',
               ];
               return (
-                allowedHosts.some((h) => parsed.hostname.endsWith(h)) ||
+                allowedHosts.some((h) => parsed.hostname.endsWith(h)) &&
                 parsed.protocol === 'https:'
               );
             } catch {

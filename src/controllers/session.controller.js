@@ -56,6 +56,7 @@ exports.updateSession = catchAsync(async (req, res, next) => {
   delete req.body.instructor;
   delete req.body.students;
   delete req.body.course;
+  delete req.body.tracks;
 
   const session = await sessionService.updateSession(req.params.id, req.body);
 
