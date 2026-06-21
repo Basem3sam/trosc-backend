@@ -272,11 +272,6 @@ router
   .route('/')
   .post(
     restrictTo('admin', 'instructor'),
-    checkOwnership({
-      model: 'Session',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
     validateMiddleware(createSessionValidation),
     sessionController.createSession,
   )

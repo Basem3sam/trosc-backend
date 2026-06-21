@@ -27,7 +27,9 @@ exports.protect = catchAsync(async (req, res, next) => {
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
   // 3) Check if user still exists
-  const currentUser = await User.findById(decoded.id).select('+active +passwordChangedAt');
+  const currentUser = await User.findById(decoded.id).select(
+    '+active +passwordChangedAt',
+  );
 
   if (!currentUser || !currentUser.active) {
     return next(new AppError('User no longer exists', 401));
@@ -54,7 +56,7 @@ exports.restrictTo =
         new AppError('You do not have permission to perform this action', 403),
       );
     }
-    next(s);
+    next();
   };
 
 exports.checkOwnership = require('./ownership.middleware').checkOwnership;

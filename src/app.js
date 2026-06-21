@@ -21,6 +21,8 @@ const eventRouter = require('./routes/event.route');
 const announcementRouter = require('./routes/announcement.route');
 const feedRouter = require('./routes/feed.route');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Development logging
 if (!isProduction) {
   app.use(morgan('dev'));
@@ -51,9 +53,7 @@ if (isProduction) {
 }
 
 // Initialize Express app
-const app = express();
-
-const isProduction = process.env.NODE_ENV === 'production';
+const app = express()
 
 /* GLOBAL MIDDLEWARES */
 
