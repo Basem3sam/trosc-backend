@@ -18,16 +18,10 @@ const createSessionValidation = Joi.object({
     'any.required': 'Session title is required.',
   }),
   description: Joi.string().trim().optional().allow(''),
-  instructor: Joi.string().hex().length(24).required().messages({
-    'string.hex': 'Instructor must be a valid MongoDB ID.',
-    'string.length': 'Instructor must be a valid MongoDB ID.',
-    'any.required': 'Instructor is required.',
+  url: Joi.string().uri().optional().allow('').messages({
+    'string.uri': 'Session URL must be a valid URL.',
   }),
   students: Joi.array().items(Joi.string().hex().length(24)).optional(),
-  track: Joi.string().hex().length(24).optional().allow('').messages({
-    'string.hex': 'Track must be a valid MongoDB ID.',
-    'string.length': 'Track must be a valid MongoDB ID.',
-  }),
   isStandalone: Joi.boolean().default(false),
   duration: Joi.number().integer().min(1).optional().messages({
     'number.min': 'Duration must be at least 1 minute.',
@@ -49,15 +43,18 @@ const createSessionValidation = Joi.object({
 const updateSessionValidation = Joi.object({
   title: Joi.string().trim().optional(),
   description: Joi.string().trim().optional().allow(''),
-  instructor: Joi.string().hex().length(24).optional().messages({
-    'string.hex': 'Instructor must be a valid MongoDB ID.',
-    'string.length': 'Instructor must be a valid MongoDB ID.',
+  url: Joi.string().uri().optional().allow('').messages({
+    'string.uri': 'Session URL must be a valid URL.',
   }),
   students: Joi.array().items(Joi.string().hex().length(24)).optional(),
-  track: Joi.string().hex().length(24).optional().allow('').messages({
-    'string.hex': 'Track must be a valid MongoDB ID.',
-    'string.length': 'Track must be a valid MongoDB ID.',
-  }),
+  tracks: Joi.array()
+    .items(Joi.string().hex().length(24))
+    .optional()
+    .allow('')
+    .messages({
+      'string.hex': 'Track must be a valid MongoDB ID.',
+      'string.length': 'Track must be a valid MongoDB ID.',
+    }),
   isStandalone: Joi.boolean().optional(),
   duration: Joi.number().integer().min(1).optional().messages({
     'number.min': 'Duration must be at least 1 minute.',
@@ -90,9 +87,18 @@ const addStudentValidation = Joi.object({
   }),
 });
 
+const studentIdParamValidation = Joi.object({
+  studentId: Joi.string().hex().length(24).required().messages({
+    'string.hex': 'Student ID must be a valid MongoDB ID.',
+    'string.length': 'Student ID must be a valid MongoDB ID.',
+    'any.required': 'Student ID is required.',
+  }),
+});
+
 module.exports = {
   createSessionValidation,
   updateSessionValidation,
   sessionIdValidation,
   addStudentValidation,
+  studentIdParamValidation,
 };

@@ -13,3 +13,9 @@ logs
 .DS_Store
 .vscode/
 .idea/
+
+# Build output
+combined_output.txt
+
+# Scripts
+script.js

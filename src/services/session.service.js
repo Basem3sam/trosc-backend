@@ -1,138 +1,179 @@
 const Session = require('../models/session.model');
+const Course = require('../models/course.model');
+const Track = require('../models/track.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
-const catchAsync = require('../utils/catchAsync');
 
-exports.createSession = catchAsync(async (sessionData) => {
+exports.createSession = async (sessionData) => {
   const session = await Session.create(sessionData);
   return await Session.findById(session._id).populate(
     'instructor',
     'name email role',
   );
-});
+};
 
-exports.getAllSessions = catchAsync(async (query) => {
-  const features = new APIFeatures(Session.find(), query)
+exports.getAllSessions = async (query) => {
+  const features = new APIFeatures(Session.find(), query, Session)
     .filter()
     .sort()
-    .limitFields()
-    .paginate();
+    .limitFields();
+
+  await features.paginate();
 
   const sessions = await features.query.populate(
     'instructor',
     'name email role',
   );
-  return sessions;
-});
 
-exports.getSessionById = catchAsync(async (sessionId) => {
+  return {
+    sessions: sessions || [],
+    total: features.totalDocs || 0,
+    pagination: features.pagination,
+  };
+};
+
+exports.getSessionById = async (sessionId) => {
   const session = await Session.findById(sessionId)
     .populate('instructor', 'name email role')
     .populate('students', 'name email role')
-    .populate('track', 'name description');
+    .populate('tracks', 'title description');
 
   if (!session) {
     throw new AppError('Session not found', 404);
   }
 
-  return session;
-});
+  // Add embed URL for frontend convenience
+  const sessionObj = session.toObject();
+  if (sessionObj.url) {
+    const youtubeMatch = sessionObj.url.match(
+      /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    );
+    if (youtubeMatch) {
+      sessionObj.embedUrl = `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+    }
 
-exports.updateSession = catchAsync(async (sessionId, updateData) => {
+    const driveMatch = sessionObj.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (driveMatch) {
+      sessionObj.embedUrl = `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    }
+  }
+
+  return sessionObj;
+};
+
+exports.updateSession = async (sessionId, updateData) => {
   const session = await Session.findByIdAndUpdate(sessionId, updateData, {
     new: true,
     runValidators: true,
-  })
-    .populate('instructor', 'name email role')
-    .populate('students', 'name email role')
-    .populate('track', 'name description');
+  });
 
   if (!session) {
     throw new AppError('Session not found', 404);
   }
 
-  return session;
-});
+  await session.populate([
+    { path: 'instructor', select: 'name email role' },
+    { path: 'students', select: 'name email role' },
+    { path: 'track', select: 'title description' },
+  ]);
 
-exports.deleteSession = catchAsync(async (sessionId) => {
+  return session;
+};
+
+exports.deleteSession = async (sessionId) => {
   const session = await Session.findByIdAndDelete(sessionId);
 
   if (!session) {
     throw new AppError('Session not found', 404);
   }
 
-  return session;
-});
+  // Remove from every Course and Track that still lists it
+  await Course.updateMany(
+    { sessions: sessionId },
+    { $pull: { sessions: sessionId } },
+  );
+  await Track.updateMany(
+    { sessions: sessionId },
+    { $pull: { sessions: sessionId } },
+  );
 
-exports.addStudentToSession = catchAsync(async (sessionId, studentId) => {
+  return session;
+};
+
+exports.addStudentToSession = async (sessionId, studentId) => {
   const session = await Session.findById(sessionId);
 
   if (!session) {
     throw new AppError('Session not found', 404);
   }
 
-  // Check if student already exists in the session
-  if (session.students.includes(studentId)) {
+  if (session.students.some((id) => id.toString() === studentId)) {
     throw new AppError('Student is already enrolled in this session', 400);
   }
 
-  session.students.push(studentId);
-  await session.save();
-
-  return await Session.findById(sessionId)
+  const updatedSession = await Session.findByIdAndUpdate(
+    sessionId,
+    { $addToSet: { students: studentId } },
+    { new: true },
+  )
     .populate('instructor', 'name email role')
     .populate('students', 'name email role');
-});
 
-exports.removeStudentFromSession = catchAsync(async (sessionId, studentId) => {
+  return updatedSession;
+};
+
+exports.removeStudentFromSession = async (sessionId, studentId) => {
   const session = await Session.findById(sessionId);
 
   if (!session) {
     throw new AppError('Session not found', 404);
   }
 
-  // Check if student exists in the session
-  if (!session.students.includes(studentId)) {
+  if (!session.students.some((id) => id.toString() === studentId)) {
     throw new AppError('Student is not enrolled in this session', 400);
   }
 
-  session.students = session.students.filter(
-    (student) => student.toString() !== studentId,
-  );
-  await session.save();
-
-  return await Session.findById(sessionId)
+  const updatedSession = await Session.findByIdAndUpdate(
+    sessionId,
+    { $pull: { students: studentId } },
+    { new: true },
+  )
     .populate('instructor', 'name email role')
     .populate('students', 'name email role');
-});
 
-exports.getSessionsByInstructor = catchAsync(async (instructorId, query) => {
-  const features = new APIFeatures(
-    Session.find({ instructor: instructorId }),
-    query,
-  )
-    .filter()
+  return updatedSession;
+};
+
+exports.getSessionsByInstructor = async (instructorId, query) => {
+  const features = new APIFeatures(Session.find(), query, Session)
+    .filter({ instructor: instructorId })
     .sort()
-    .limitFields()
-    .paginate();
+    .limitFields();
+
+  await features.paginate();
 
   const sessions = await features.query.populate(
     'instructor',
     'name email role',
   );
-  return sessions;
-});
+  return {
+    sessions: sessions || [],
+    total: features.totalDocs || 0,
+    pagination: features.pagination,
+  };
+};
 
-exports.getSessionsByTrack = catchAsync(async (trackId, query) => {
-  const features = new APIFeatures(Session.find({ track: trackId }), query)
-    .filter()
+exports.getSessionsByTrack = async (trackId, query) => {
+  const features = new APIFeatures(Session.find(), query, Session)
+    .filter({ tracks: trackId })
     .sort()
-    .limitFields()
-    .paginate();
+    .limitFields();
+
+  await features.paginate();
 
   const sessions = await features.query.populate(
     'instructor',
     'name email role',
   );
-  return sessions;
-});
+  return { sessions: sessions || [], total: features.totalDocs || 0, pagination: features.pagination};
+};

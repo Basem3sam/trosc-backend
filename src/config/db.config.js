@@ -1,5 +1,15 @@
 const mongoose = require('mongoose');
 
+// ✅ Register ONCE at module load. mongoose.connection is a singleton,
+// so these fire for every connection (including reconnects).
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected');
+});
+
 const connectDB = async () => {
   try {
     // Use consistent environment variable names
@@ -26,15 +36,6 @@ const connectDB = async () => {
     });
 
     console.log(`🗄️ MongoDB Connected: ${conn.connection.host}`);
-
-    // Handle connection events
-    mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.log('MongoDB disconnected');
-    });
   } catch (err) {
     console.error(`❌ DB Connection Error: ${err.message}`);
     process.exit(1);

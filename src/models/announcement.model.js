@@ -1,3 +1,61 @@
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Announcement:
+ *       type: object
+ *       required:
+ *         - title
+ *         - message
+ *         - createdBy
+ *       properties:
+ *         _id:
+ *           type: string
+ *           example: 6713b5ac12ef4567890a7777
+ *         title:
+ *           type: string
+ *           description: Announcement title
+ *           example: "New Track Available: Full Stack Web Development"
+ *         message:
+ *           type: string
+ *           description: Announcement body content
+ *           example: "We are excited to launch our new track covering React, Node.js, and MongoDB."
+ *         audience:
+ *           type: string
+ *           enum: [all, track, course]
+ *           default: all
+ *           example: all
+ *         targetTrack:
+ *           type: string
+ *           description: Optional track ID if audience is 'track'
+ *           example: 67123abc12ef4567890a1234
+ *         targetCourse:
+ *           type: string
+ *           description: Optional course ID if audience is 'course'
+ *           example: 67123abc12ef4567890a5678
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["announcement-poster.jpg", "schedule.pdf"]
+ *         createdBy:
+ *           type: string
+ *           description: ObjectId reference to admin who created it
+ *           example: 67123abc12ef4567890a9999
+ *         isPinned:
+ *           type: boolean
+ *           default: false
+ *           example: true
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           example: 2025-10-18T14:30:00.000Z
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           example: 2025-10-18T15:00:00.000Z
+ */
+
 const mongoose = require('mongoose');
 
 const announcementSchema = new mongoose.Schema(
@@ -23,7 +81,38 @@ const announcementSchema = new mongoose.Schema(
       type: mongoose.Schema.ObjectId,
       ref: 'Course',
     },
-    attachments: [String],
+    attachments: {
+      type: [String],
+      validate: {
+        validator: function (arr) {
+          if (!arr || !arr.length) return true;
+          return arr.every((url) => {
+            try {
+              const parsed = new URL(url);
+              const allowedHosts = [
+                'drive.google.com',
+                'docs.google.com',
+                'dropbox.com',
+                'dl.dropboxusercontent.com',
+                'github.com',
+                'raw.githubusercontent.com',
+                'res.cloudinary.com',
+                'i.imgur.com',
+                'imgur.com',
+                'cdn.discordapp.com',
+              ];
+              return (
+                allowedHosts.some((h) => parsed.hostname.endsWith(h)) ||
+                parsed.protocol === 'https:'
+              );
+            } catch {
+              return false;
+            }
+          });
+        },
+        message: 'Attachments must be valid URLs from trusted hosts',
+      },
+    },
     createdBy: {
       type: mongoose.Schema.ObjectId,
       ref: 'User',

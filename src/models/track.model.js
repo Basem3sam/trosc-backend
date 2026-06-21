@@ -83,7 +83,6 @@
  *       required:
  *         - title
  *         - description
- *         - instructor
  *       properties:
  *         title:
  *           type: string
@@ -91,9 +90,6 @@
  *         description:
  *           type: string
  *           example: "Learn modern web development with JavaScript, React, Node.js and MongoDB"
- *         instructor:
- *           type: string
- *           example: "507f1f77bcf86cd799439011"
  *         level:
  *           type: string
  *           enum: [beginner, intermediate, advanced, all]
@@ -152,6 +148,9 @@
  *         results:
  *           type: integer
  *           example: 5
+ *         total:
+ *           type: integer
+ *           example: 20
  *         data:
  *           type: object
  *           properties:
@@ -159,9 +158,29 @@
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/Track'
+ *     TrackAnalytics:
+ *       type: object
+ *       properties:
+ *         totalStudents:
+ *           type: integer
+ *           example: 42
+ *         totalSessions:
+ *           type: integer
+ *           example: 12
+ *         enrollmentRate:
+ *           type: integer
+ *           example: 42
+ *         completionRate:
+ *           type: integer
+ *           example: 0
+ *         averageEngagement:
+ *           type: integer
+ *           example: 0
  */
 
 const mongoose = require('mongoose');
+const validator = require('validator');
+const AppError = require('../utils/AppError');
 
 const trackSchema = new mongoose.Schema(
   {
@@ -181,6 +200,12 @@ const trackSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'A track must have an instructor.'],
     },
+    courses: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'Course',
+      },
+    ],
     sessions: [
       {
         type: mongoose.Schema.ObjectId,
@@ -200,13 +225,15 @@ const trackSchema = new mongoose.Schema(
     },
     coverImage: {
       type: String,
-      default: 'default-track.jpg',
+      default: 'https://placehold.co/800x400?text=Trosc+Track',
       validate: {
         validator: function (v) {
-          // Basic URL validation or file extension check
-          return v === 'default-track.jpg' || /\.(jpg|jpeg|png|webp)$/i.test(v);
+          if (!v || v === 'https://placehold.co/800x400?text=Trosc+Track')
+            return true;
+          if (validator.isURL(v, { require_protocol: true })) return true;
+          return /^(?!.*[\/\\])[a-zA-Z0-9_\-]+\.(jpg|jpeg|png|webp)$/i.test(v);
         },
-        message: 'Cover image must be a valid image file',
+        message: 'Cover image must be a valid URL or image filename',
       },
     },
     published: {
@@ -230,6 +257,22 @@ trackSchema.virtual('studentCount').get(function () {
 // Virtual for session count
 trackSchema.virtual('sessionCount').get(function () {
   return this.sessions ? this.sessions.length : 0;
+});
+
+// Virtual for course count
+trackSchema.virtual('courseCount').get(function () {
+  return this.courses ? this.courses.length : 0;
+});
+
+// Virtual: total content count (courses + direct sessions)
+trackSchema.virtual('contentCount').get(function () {
+  const courseCount = this.courses ? this.courses.length : 0;
+  const sessionCount = this.sessions ? this.sessions.length : 0;
+  return {
+    courses: courseCount,
+    sessions: sessionCount,
+    total: courseCount + sessionCount,
+  };
 });
 
 trackSchema.index({ instructor: 1 });

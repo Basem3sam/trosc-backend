@@ -1,332 +1,278 @@
 /**
  * @swagger
- * /users/signup:
- *   post:
- *     summary: Register a new user account
- *     description: Creates a new user account with student role by default
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/UserCreate'
- *     responses:
- *       201:
- *         description: User created successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TokenResponse'
- *       400:
- *         $ref: '#/components/responses/ValidationError'
- *       409:
- *         description: Email already registered
- */
-
-/**
- * @swagger
- * /users/login:
- *   post:
- *     summary: Authenticate user and return JWT token
- *     description: Verifies user credentials and returns JWT token
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AuthLogin'
- *     responses:
- *       200:
- *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/TokenResponse'
- *       401:
- *         description: Invalid credentials
- */
-
-/**
- * @swagger
- * /users/logout:
- *   get:
- *     summary: Log out current user
- *     description: Clears authentication token
- *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Logged out successfully
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- */
-
-/**
- * @swagger
- * /users/forgotPassword:
- *   post:
- *     summary: Send password reset token to user's email
- *     description: Generates and sends password reset token via email
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: basem@example.com
- *     responses:
- *       200:
- *         description: Password reset email sent
- *       404:
- *         description: No user found with provided email
- */
-
-/**
- * @swagger
- * /users/resetPassword/{token}:
- *   patch:
- *     summary: Reset password using token from email
- *     description: Resets user password using valid reset token
- *     tags: [Auth]
- *     parameters:
- *       - name: token
- *         in: path
- *         required: true
- *         schema:
+ * components:
+ *   schemas:
+ *     UserBase:
+ *       type: object
+ *       properties:
+ *         _id:
  *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/PasswordReset'
- *     responses:
- *       200:
- *         description: Password reset successfully
- *       400:
- *         description: Invalid or expired token
- */
-
-/**
- * @swagger
- * /users/updateMyPassword:
- *   patch:
- *     summary: Update current user's password
- *     description: Change password for authenticated user
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/PasswordUpdate'
- *     responses:
- *       200:
- *         description: Password updated successfully
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- */
-
-/**
- * @swagger
- * /users/me:
- *   get:
- *     summary: Get current user's profile
- *     description: Returns profile of authenticated user
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: User profile retrieved
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     user:
- *                       $ref: '#/components/schemas/UserBase'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- */
-
-/**
- * @swagger
- * /users/updateMe:
- *   patch:
- *     summary: Update current user's profile information
- *     description: Update user profile (name, email, photo, bio)
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 example: Basem Updated
- *               email:
- *                 type: string
- *                 format: email
- *                 example: basem.updated@example.com
- *               photo:
- *                 type: string
- *                 example: new-avatar.jpg
- *               bio:
- *                 type: string
- *                 example: Senior Backend Engineer
- *     responses:
- *       200:
- *         description: Profile updated successfully
- *       400:
- *         $ref: '#/components/responses/ValidationError'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- */
-
-/**
- * @swagger
- * /users/deleteMe:
- *   delete:
- *     summary: Deactivate current user account (soft delete)
- *     description: Soft deletes user account by setting active=false
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       204:
- *         description: Account deactivated
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- */
-
-/**
- * @swagger
- * /users:
- *   get:
- *     summary: Get all users (admin only)
- *     description: Retrieves list of all active users
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of users retrieved
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- *   post:
- *     summary: Create a new user (admin only)
- *     description: Admin endpoint to create users with specific roles
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/UserAdminCreate'
- *     responses:
- *       201:
- *         description: User created successfully
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- */
-
-/**
- * @swagger
- * /users/{id}:
- *   get:
- *     summary: Get user by ID (admin only)
- *     description: Retrieve specific user details by ID
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema:
+ *           example: 507f1f77bcf86cd799439011
+ *         name:
  *           type: string
- *     responses:
- *       200:
- *         description: User found
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *   patch:
- *     summary: Update user by ID (admin only)
- *     description: Update user information including role
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema:
+ *           example: Basem Esam
+ *         email:
  *           type: string
- *     requestBody:
- *       required: true
+ *           format: email
+ *           example: basem@example.com
+ *         photo:
+ *           type: string
+ *           example: default.jpg
+ *         bio:
+ *           type: string
+ *           example: Backend Engineer | ICPC Competitor
+ *         role:
+ *           type: string
+ *           enum: [student, admin, instructor]
+ *           example: student
+ *         enrolledTracks:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: [507f1f77bcf86cd799439012]
+ *         active:
+ *           type: boolean
+ *           example: true
+ *         lastLogin:
+ *           type: string
+ *           format: date-time
+ *           example: 2025-10-18T15:00:00.000Z
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           example: 2025-10-18T14:30:00.000Z
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           example: 2025-10-18T14:31:00.000Z
+ *
+ *     UserCreate:
+ *       type: object
+ *       required: [name, email, password, passwordConfirm]
+ *       properties:
+ *         name:
+ *           type: string
+ *           minLength: 3
+ *           maxLength: 50
+ *           example: Basem Esam
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: basem@example.com
+ *         password:
+ *           type: string
+ *           format: password
+ *           minLength: 8
+ *           example: StrongP@ssw0rd123
+ *         passwordConfirm:
+ *           type: string
+ *           format: password
+ *           example: StrongP@ssw0rd123
+ *         photo:
+ *           type: string
+ *           example: profile.jpg
+ *         bio:
+ *           type: string
+ *           maxLength: 500
+ *           example: Backend Engineer | ICPC Competitor
+ *
+ *     AuthLogin:
+ *       type: object
+ *       required: [email, password]
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: basem@example.com
+ *         password:
+ *           type: string
+ *           format: password
+ *           example: StrongP@ssw0rd123
+ *
+ *     TokenResponse:
+ *       type: object
+ *       properties:
+ *         status:
+ *           type: string
+ *           example: success
+ *         token:
+ *           type: string
+ *           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *         data:
+ *           type: object
+ *           properties:
+ *             user:
+ *               $ref: '#/components/schemas/UserBase'
+ *
+ *     StandardError:
+ *       type: object
+ *       properties:
+ *         status:
+ *           type: string
+ *           example: fail
+ *         message:
+ *           type: string
+ *           example: Error description here
+ *
+ *     UsersResponse:
+ *       type: object
+ *       properties:
+ *         status:
+ *           type: string
+ *           example: success
+ *         results:
+ *           type: integer
+ *           example: 5
+ *         total:
+ *           type: integer
+ *           example: 20
+ *         data:
+ *           type: object
+ *           properties:
+ *             users:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/UserBase'
+ *
+ *     PasswordReset:
+ *       type: object
+ *       required: [password, passwordConfirm]
+ *       properties:
+ *         password:
+ *           type: string
+ *           format: password
+ *           minLength: 8
+ *           example: StrongP@ssw0rd123
+ *         passwordConfirm:
+ *           type: string
+ *           format: password
+ *           example: StrongP@ssw0rd123
+ *
+ *     PasswordUpdate:
+ *       type: object
+ *       required: [passwordCurrent, password, passwordConfirm]
+ *       properties:
+ *         passwordCurrent:
+ *           type: string
+ *           format: password
+ *           example: OldP@ssw0rd123
+ *         password:
+ *           type: string
+ *           format: password
+ *           minLength: 8
+ *           example: StrongP@ssw0rd123
+ *         passwordConfirm:
+ *           type: string
+ *           format: password
+ *           example: StrongP@ssw0rd123
+ *
+ *     UserAdminCreate:
+ *       type: object
+ *       required: [name, email, password, passwordConfirm]
+ *       properties:
+ *         name:
+ *           type: string
+ *           example: Basem Esam
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: basem@example.com
+ *         password:
+ *           type: string
+ *           format: password
+ *           minLength: 8
+ *           example: StrongP@ssw0rd123
+ *         passwordConfirm:
+ *           type: string
+ *           format: password
+ *           example: StrongP@ssw0rd123
+ *         role:
+ *           type: string
+ *           enum: [student, instructor, admin]
+ *           example: student
+ *         photo:
+ *           type: string
+ *           example: profile.jpg
+ *         bio:
+ *           type: string
+ *           example: Backend Engineer
+ *         website:
+ *           type: string
+ *           example: https://example.com
+ *         socialMedia:
+ *           type: object
+ *           properties:
+ *             twitter: { type: string }
+ *             linkedin: { type: string }
+ *             github: { type: string }
+ *         active:
+ *           type: boolean
+ *           example: true
+ *         emailVerified:
+ *           type: boolean
+ *           example: false
+ *
+ *     UserAdminUpdate:
+ *       type: object
+ *       properties:
+ *         name:
+ *           type: string
+ *           example: Basem Updated
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: basem.updated@example.com
+ *         role:
+ *           type: string
+ *           enum: [student, instructor, admin]
+ *           example: instructor
+ *         photo:
+ *           type: string
+ *           example: new-avatar.jpg
+ *         bio:
+ *           type: string
+ *           example: Senior Backend Engineer
+ *         website:
+ *           type: string
+ *           example: https://new-website.com
+ *         socialMedia:
+ *           type: object
+ *           properties:
+ *             twitter: { type: string }
+ *             linkedin: { type: string }
+ *             github: { type: string }
+ *         active:
+ *           type: boolean
+ *           example: true
+ *         emailVerified:
+ *           type: boolean
+ *           example: true
+ *
+ *   responses:
+ *     Unauthorized:
+ *       description: Access token is missing or invalid
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/UserAdminCreate'
- *     responses:
- *       200:
- *         description: User updated successfully
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
- *   delete:
- *     summary: Delete user by ID (admin only)
- *     description: Permanently delete user from database
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       204:
- *         description: User deleted successfully
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
+ *             $ref: '#/components/schemas/StandardError'
+ *     ValidationError:
+ *       description: Validation failed
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/StandardError'
+ *     NotFound:
+ *       description: Resource not found
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/StandardError'
+ *     Forbidden:
+ *       description: Insufficient permissions
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/StandardError'
  */
 
 const mongoose = require('mongoose');
@@ -351,16 +297,13 @@ const userSchema = new mongoose.Schema(
     },
     photo: {
       type: String,
-      default: 'default-user.jpg',
+      default: 'https://placehold.co/800x400?text=Trosc+User',
       validate: {
         validator: function (v) {
-          // Allow default image, relative paths, or valid URLs
-          if (!v || v === 'default-user.jpg') return true;
-
-          // Check for valid URL OR relative path OR filename
-          const urlRegex =
-            /^(https?:\/\/.*\.(jpg|jpeg|png|webp|gif))|([a-zA-Z0-9_\-]+\.(jpg|jpeg|png|webp|gif))$/i;
-          return urlRegex.test(v);
+          if (!v || v === 'https://placehold.co/800x400?text=Trosc+User')
+            return true;
+          if (validator.isURL(v, { require_protocol: true })) return true;
+          return /^(?!.*[\/\\])[a-zA-Z0-9_\-]+\.(jpg|jpeg|png|webp)$/i.test(v);
         },
         message: 'Photo must be a valid URL or image filename',
       },
@@ -368,7 +311,53 @@ const userSchema = new mongoose.Schema(
     bio: {
       type: String,
       trim: true,
-      maxlength: [200, 'Bio cannot exceed 200 characters'],
+      maxlength: [500, 'Bio cannot exceed 500 characters'],
+    },
+    website: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function (v) {
+          if (!v) return true;
+          return validator.isURL(v, { require_protocol: true });
+        },
+        message: 'Website must be a valid URL (e.g., https://example.com)',
+      },
+    },
+    socialMedia: {
+      twitter: {
+        type: String,
+        trim: true,
+        validate: {
+          validator: function (v) {
+            if (!v) return true;
+            return validator.isURL(v, { require_protocol: true });
+          },
+          message: 'Twitter URL must be valid',
+        },
+      },
+      linkedin: {
+        type: String,
+        trim: true,
+        validate: {
+          validator: function (v) {
+            if (!v) return true;
+            return validator.isURL(v, { require_protocol: true });
+          },
+          message: 'LinkedIn URL must be valid',
+        },
+      },
+      github: {
+        type: String,
+        trim: true,
+        validate: {
+          validator: function (v) {
+            if (!v) return true;
+            return validator.isURL(v, { require_protocol: true });
+          },
+          message: 'GitHub URL must be valid',
+        },
+      },
     },
     role: {
       type: String,
@@ -396,9 +385,9 @@ const userSchema = new mongoose.Schema(
         message: 'Passwords are not the same!',
       },
     },
-    passwordChangedAt: Date,
-    passwordResetToken: String,
-    passwordResetExpires: Date,
+    passwordChangedAt: { type: Date, select: false },
+    passwordResetToken: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
     enrolledTracks: [
       {
         type: mongoose.Schema.ObjectId,

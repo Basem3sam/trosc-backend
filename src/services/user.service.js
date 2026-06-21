@@ -1,3 +1,4 @@
+const APIFeatures = require('../utils/APIFeatures');
 const User = require('../models/user.model');
 const AppError = require('../utils/AppError');
 
@@ -9,9 +10,20 @@ const filterObj = (obj, ...allowedFields) => {
   return newObj;
 };
 
-exports.getAllUsers = async () => {
-  const users = await User.find({ active: { $ne: false } }); // Exclude deactivated users
-  return users;
+exports.getAllUsers = async (query) => {
+  const features = new APIFeatures(User.find(), query, User)
+    .filter({ active: { $ne: false } })
+    .sort()
+    .limitFields();
+
+  await features.paginate();
+
+  const users = await features.query;
+  return {
+    users: users || [],
+    total: features.totalDocs || 0,
+    pagination: features.pagination,
+  };
 };
 
 exports.getUserById = async (id) => {
@@ -21,29 +33,29 @@ exports.getUserById = async (id) => {
 };
 
 exports.createUser = async (userData) => {
-  // 1) Check if user with this email already exists
   const existingUser = await User.findOne({ email: userData.email });
   if (existingUser) {
     throw new AppError('Email already in use. Please try another one.', 400);
   }
 
-  // 2) Create the new user
   const newUser = await User.create({
     name: userData.name,
     email: userData.email,
     role: userData.role || 'student',
     password: userData.password,
     passwordConfirm: userData.passwordConfirm,
+    photo: userData.photo,
+    bio: userData.bio,
+    website: userData.website,
+    socialMedia: userData.socialMedia,
   });
 
-  // 3) Remove password from output
   newUser.password = undefined;
 
   return newUser;
 };
 
 exports.updateUser = async (id, data) => {
-  // Prevent password updates here for safety
   if (data.password || data.passwordConfirm) {
     throw new AppError('This route is not for password updates.', 400);
   }
@@ -70,19 +82,36 @@ exports.getMe = async (userId) => {
 };
 
 exports.updateMe = async (userId, data) => {
+  if (data.email) {
+    const existing = await User.findOne({
+      email: data.email,
+      _id: { $ne: userId },
+    });
+    if (existing) throw new AppError('Email already in use', 409);
+  }
+
   if (data.password || data.passwordConfirm) {
     throw new AppError(
       'This route is not for password update. Please use /updateMyPassword.',
       400,
     );
   }
-  // Only allow name, email, etc.
-  const filteredData = filterObj(data, 'name', 'email', 'photo', 'bio');
+  const filteredData = filterObj(
+    data,
+    'name',
+    'email',
+    'photo',
+    'bio',
+    'website',
+    'socialMedia',
+  );
 
   const updatedUser = await User.findByIdAndUpdate(userId, filteredData, {
     new: true,
     runValidators: true,
   });
+
+  if (!updatedUser) throw new AppError('User not found', 404);
 
   return updatedUser;
 };
@@ -90,4 +119,26 @@ exports.updateMe = async (userId, data) => {
 exports.deleteMe = async (userId) => {
   await User.findByIdAndUpdate(userId, { active: false });
   return null;
+};
+
+exports.bulkUserAction = async (userIds, action, requestingUserId) => {
+  if (userIds.map(String).includes(String(requestingUserId))) {
+    throw new AppError(
+      'You cannot perform bulk actions on your own account',
+      403,
+    );
+  }
+
+  const admins = await User.find({ _id: { $in: userIds }, role: 'admin' });
+  if (admins.length > 0) {
+    throw new AppError('Bulk actions cannot target admin accounts', 403);
+  }
+
+  if (action === 'activate') {
+    await User.updateMany({ _id: { $in: userIds } }, { active: true });
+  } else if (action === 'deactivate') {
+    await User.updateMany({ _id: { $in: userIds } }, { active: false });
+  } else if (action === 'delete') {
+    await User.deleteMany({ _id: { $in: userIds } });
+  }
 };

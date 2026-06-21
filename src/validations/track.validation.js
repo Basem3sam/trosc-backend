@@ -11,7 +11,7 @@ exports.createTrackSchema = Joi.object({
   level: Joi.string().valid('beginner', 'intermediate', 'advanced', 'all'),
   coverImage: photoValidation,
   published: Joi.boolean(),
-  instructor: objectId.optional(),
+  // instructor: REMOVED - auto-assigned by controller, never from client
 });
 
 exports.getTrackSchema = Joi.object({
@@ -24,14 +24,33 @@ exports.updateTrackSchema = Joi.object({
   level: Joi.string().valid('beginner', 'intermediate', 'advanced', 'all'),
   coverImage: photoValidation,
   published: Joi.boolean(),
-  instructor: objectId,
+  courses: Joi.array().items(objectId),
+  sessions: Joi.array().items(objectId),
 }).min(1);
 
 exports.deleteTrackSchema = Joi.object({
   id: objectId.required(),
 });
 
+exports.manageCourseSchema = Joi.object({
+  trackId: objectId.required(),
+  courseId: objectId.required(),
+});
+
 exports.manageSessionSchema = Joi.object({
   trackId: objectId.required(),
   sessionId: objectId.required(),
+});
+
+exports.addStudentSchema = Joi.object({
+  studentId: objectId.required().messages({
+    'string.pattern.base': 'Student ID must be a valid MongoDB ID',
+    'any.required': 'Student ID is required',
+  }),
+});
+
+exports.studentIdSchema = Joi.object({
+  studentId: objectId.required().messages({
+    'string.pattern.base': 'Student ID must be a valid MongoDB ID',
+  }),
 });

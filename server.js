@@ -9,6 +9,8 @@ process.on('uncaughtException', (err) => {
 
 dotenv.config();
 
+require('./src/config/env.config')(); // ✅ Validate env before booting the app
+
 const app = require('./src/app');
 
 require('./src/config/db.config')();

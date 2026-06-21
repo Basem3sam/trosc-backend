@@ -6,9 +6,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "nodemon server.js",
-    "start:prod": "set NODE_ENV=production && nodemon server.js",
+    "start:prod": "cross-env NODE_ENV=production node server.js",
     "debug": "ndb server.js",
-    "debug:prod": "set NODE_ENV=production && ndb server.js",
+    "debug:prod": "cross-env NODE_ENV=production ndb server.js",
+    "swagger:export": "node -e \"const fs=require('fs');const spec=require('./src/config/swagger.config');fs.writeFileSync('./swagger.json', JSON.stringify(spec, null, 2));console.log('✅ swagger.json exported');\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "echo \"No tests specified yet\" && exit 0"
@@ -27,6 +28,7 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.7.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
@@ -47,6 +49,7 @@
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "eslint": "^8.57.0",
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-prettier": "^10.1.8",

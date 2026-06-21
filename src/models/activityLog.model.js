@@ -64,7 +64,14 @@ const activityLogSchema = new mongoose.Schema(
     },
     targetModel: String,
     targetId: mongoose.Schema.ObjectId,
-    metadata: Object,
+    metadata: {
+      ip: String,
+      browser: String,
+      device: String,
+      os: String,
+      duration: String,
+      referrer: String,
+    },
   },
   { timestamps: true },
 );

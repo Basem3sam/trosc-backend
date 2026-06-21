@@ -13,7 +13,7 @@ exports.protect = catchAsync(async (req, res, next) => {
     req.headers.authorization.startsWith('Bearer')
   ) {
     token = req.headers.authorization.split(' ')[1];
-  } else if (req.cookies.jwt) {
+  } else if (req.cookies?.jwt) {
     token = req.cookies.jwt;
   }
 
@@ -27,14 +27,10 @@ exports.protect = catchAsync(async (req, res, next) => {
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
   // 3) Check if user still exists
-  const currentUser = await User.findById(decoded.id);
-  if (!currentUser) {
-    return next(
-      new AppError(
-        'The user belonging to this token dose no longer exists.',
-        401,
-      ),
-    );
+  const currentUser = await User.findById(decoded.id).select('+active +passwordChangedAt');
+
+  if (!currentUser || !currentUser.active) {
+    return next(new AppError('User no longer exists', 401));
   }
 
   // 4) Check if user changed password after the token was issued

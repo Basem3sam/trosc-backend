@@ -41,6 +41,11 @@
  *           type: string
  *           description: Detailed description of session content
  *           example: "Learn about function declarations, expressions, arrow functions, and closures"
+ *         url:
+ *           type: string
+ *           description: Primary content link (YouTube, Drive, Zoom, etc.)
+ *           format: uri
+ *           example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
  *         instructor:
  *           type: string
  *           description: User ID of the session instructor
@@ -51,10 +56,12 @@
  *           items:
  *             type: string
  *             example: "507f1f77bcf86cd799439012"
- *         track:
- *           type: string
- *           description: Parent track ID (optional for standalone sessions)
- *           example: "507f1f77bcf86cd799439021"
+ *         tracks:
+ *           type: array
+ *           description: Parent track IDs this session belongs to
+ *           items:
+ *             type: string
+ *           example: ["507f1f77bcf86cd799439021"]
  *         isStandalone:
  *           type: boolean
  *           description: Whether session exists independently of a track
@@ -115,7 +122,11 @@
  *           email: "basem@example.com"
  *           role: "instructor"
  *         students: ["507f1f77bcf86cd799439012", "507f1f77bcf86cd799439013"]
- *         track: "507f1f77bcf86cd799439021"
+ *         tracks:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["507f1f77bcf86cd799439021"]
  *         isStandalone: false
  *         duration: 90
  *         level: "intermediate"
@@ -136,7 +147,6 @@
  *       description: Data required to create a new session
  *       required:
  *         - title
- *         - instructor
  *       properties:
  *         title:
  *           type: string
@@ -144,12 +154,10 @@
  *         description:
  *           type: string
  *           example: "Learn about function declarations, expressions, arrow functions, and closures"
- *         instructor:
+ *         url:
  *           type: string
- *           example: "507f1f77bcf86cd799439011"
- *         track:
- *           type: string
- *           example: "507f1f77bcf86cd799439021"
+ *           format: uri
+ *           example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
  *         isStandalone:
  *           type: boolean
  *           example: false
@@ -189,12 +197,18 @@
  *         description:
  *           type: string
  *           example: "Updated session description"
+ *         url:
+ *           type: string
+ *           format: uri
+ *           example: "https://drive.google.com/file/d/abc123"
  *         instructor:
  *           type: string
  *           example: "507f1f77bcf86cd799439012"
- *         track:
- *           type: string
- *           example: "507f1f77bcf86cd799439022"
+ *         tracks:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["507f1f77bcf86cd799439021"]
  *         isStandalone:
  *           type: boolean
  *           example: true
@@ -226,7 +240,7 @@
  *
  *     SessionResponse:
  *       type: object
- *       description: Standard response format for session operations
+ *       description: Response format for a single session
  *       properties:
  *         status:
  *           type: string
@@ -247,6 +261,9 @@
  *         results:
  *           type: integer
  *           example: 8
+ *         total:
+ *           type: integer
+ *           example: 50
  *         data:
  *           type: object
  *           properties:
@@ -257,6 +274,7 @@
  */
 
 const mongoose = require('mongoose');
+const validator = require('validator');
 
 const resourceSchema = new mongoose.Schema({
   title: {
@@ -266,6 +284,33 @@ const resourceSchema = new mongoose.Schema({
   url: {
     type: String,
     required: [true, 'Resource URL is required.'],
+    validate: {
+      validator: function (v) {
+        if (!v) return true;
+        try {
+          const parsed = new URL(v);
+          const allowedHosts = [
+            'drive.google.com',
+            'docs.google.com',
+            'youtube.com',
+            'youtu.be',
+            'github.com',
+            'raw.githubusercontent.com',
+            'res.cloudinary.com',
+            'i.imgur.com',
+            'cdn.discordapp.com',
+          ];
+          return (
+            allowedHosts.some((h) => parsed.hostname.endsWith(h)) ||
+            parsed.protocol === 'https:'
+          );
+        } catch {
+          return false;
+        }
+      },
+      message:
+        'Resource URL must be from a trusted host (YouTube, Drive, GitHub, Cloudinary, etc.)',
+    },
   },
 });
 
@@ -280,6 +325,26 @@ const sessionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    url: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function (v) {
+          if (!v) return true;
+          const youtubeRegex =
+            /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/i;
+          const driveRegex =
+            /^(https?:\/\/)?(drive\.google\.com|docs\.google\.com)\/.+/i;
+          return (
+            youtubeRegex.test(v) ||
+            driveRegex.test(v) ||
+            validator.isURL(v, { require_protocol: true })
+          );
+        },
+        message:
+          'Session URL must be a valid YouTube, Google Drive, or other valid URL',
+      },
+    },
     instructor: {
       type: mongoose.Schema.ObjectId,
       ref: 'User',
@@ -291,10 +356,15 @@ const sessionSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
-    track: {
+    tracks: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'Track',
+      },
+    ],
+    course: {
       type: mongoose.Schema.ObjectId,
-      ref: 'Track',
-      // This is optional, as 'isStandalone' handles the logic
+      ref: 'Course',
     },
     isStandalone: {
       type: Boolean,
@@ -310,6 +380,16 @@ const sessionSchema = new mongoose.Schema(
     },
     coverImage: {
       type: String,
+      default: 'https://placehold.co/800x400?text=Trosc+Session',
+      validate: {
+        validator: function (v) {
+          if (!v || v === 'https://placehold.co/800x400?text=Trosc+Session')
+            return true;
+          if (validator.isURL(v, { require_protocol: true })) return true;
+          return /^(?!.*[\/\\])[a-zA-Z0-9_\-]+\.(jpg|jpeg|png|webp)$/i.test(v);
+        },
+        message: 'Cover image must be a valid URL or image filename',
+      },
     },
     resources: [resourceSchema],
     published: {
@@ -330,6 +410,12 @@ const sessionSchema = new mongoose.Schema(
   },
 );
 
+sessionSchema.pre('save', function (next) {
+  // Auto-set isStandalone based on relationships
+  this.isStandalone = !this.tracks?.length && !this.course;
+  next();
+});
+
 // Middleware to automatically populate the instructor
 sessionSchema.pre(/^find/, function (next) {
   this.populate({
@@ -338,6 +424,9 @@ sessionSchema.pre(/^find/, function (next) {
   });
   next();
 });
+
+// ✅ FIX - Add after sessionSchema definition
+sessionSchema.index({ title: 'text', description: 'text' });
 
 const Session = mongoose.model('Session', sessionSchema);
 

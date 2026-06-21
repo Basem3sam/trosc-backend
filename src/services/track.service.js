@@ -1,4 +1,6 @@
+const User = require('../models/user.model');
 const Track = require('../models/track.model');
+const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
@@ -39,6 +41,7 @@ exports.getAllTracks = async (query) => {
   return {
     tracks: tracks || [], // Ensure it's always an array
     total: features.totalDocs || 0,
+    pagination: features.pagination, // Include pagination info
   };
 };
 
@@ -76,6 +79,11 @@ exports.getTrackById = async (trackId, populateSessions = false) => {
 exports.getTrackDetails = async (trackId) => {
   const track = await Track.findById(trackId)
     .populate({
+      path: 'courses',
+      select: 'title description level',
+      match: { published: true },
+    })
+    .populate({
       path: 'sessions',
       select: 'title description duration level published startDate students',
       match: { published: true },
@@ -99,14 +107,32 @@ exports.getTrackDetails = async (trackId) => {
  * @throws {AppError} 404 if track not found, 400 if validation fails
  */
 exports.updateTrack = async (trackId, updateBody) => {
-  const track = await Track.findByIdAndUpdate(trackId, updateBody, {
-    new: true,
-    runValidators: true,
-  });
+  // If the update touches courses or sessions, validate BEFORE saving
+  if (updateBody.courses !== undefined || updateBody.sessions !== undefined) {
+    const existing = await Track.findById(trackId);
+    if (!existing) throw new AppError('No track found with that ID', 404);
 
-  if (!track) {
-    throw new AppError('No track found with that ID', 404);
+    const mergedCourses = updateBody.courses ?? existing.courses;
+    const mergedSessions = updateBody.sessions ?? existing.sessions;
+
+    if (mergedCourses.length === 0 && mergedSessions.length === 0) {
+      throw new AppError(
+        'A track must have at least one course or one session',
+        400,
+      );
+    }
   }
+
+  const track = await Track.findById(trackId);
+
+  if (!track) throw new AppError('No track found', 404);
+
+  Object.assign(track, updateBody);
+
+  await track.save(); // triggers pre('save') validation
+
+  await track.populate({ path: 'instructor', select: 'name email role photo' });
+
   return track;
 };
 
@@ -117,28 +143,61 @@ exports.updateTrack = async (trackId, updateBody) => {
  * @throws {AppError} 404 if track not found
  */
 exports.deleteTrack = async (trackId) => {
-  const track = await Track.findByIdAndDelete(trackId);
-  if (!track) {
-    throw new AppError('No track found with that ID', 404);
-  }
+  const track = await Track.findById(trackId);
+  if (!track) throw new AppError('No track found with that ID', 404);
 
-  // Convert all track sessions to standalone sessions
-  await Session.updateMany(
-    { _id: { $in: track.sessions } },
-    {
-      $set: {
-        isStandalone: true,
-        track: null,
-      },
-    },
+  // Option A: Delete everything inside (aggressive)
+  // await Course.deleteMany({ _id: { $in: track.courses } });
+  // await Session.deleteMany({ _id: { $in: track.sessions } });
+
+  // Option B: Orphan everything (recommended for Trosc)
+  // Courses become standalone (no track)
+  await Course.updateMany(
+    { _id: { $in: track.courses } },
+    { $set: { track: null } },
   );
 
+  // Sessions become standalone if not in a course
+  const sessionsInTrack = await Session.find({ _id: { $in: track.sessions } });
+  for (const session of sessionsInTrack) {
+    session.tracks.pull(trackId);
+    session.isStandalone = !session.tracks?.length && !session.course;
+    await session.save();
+  }
+
+  await User.updateMany(
+    { enrolledTracks: trackId },
+    { $pull: { enrolledTracks: trackId } },
+  );
+
+  await Track.findByIdAndDelete(trackId);
   return null;
 };
 
 // ===================================================================
-// 🔗 SESSION-TRACK RELATIONSHIP MANAGEMENT
+// 🔗 COURSE-TRACK RELATIONSHIP MANAGEMENT
 // ===================================================================
+
+exports.addCourseToTrack = async (trackId, courseId) => {
+  const [track, course] = await Promise.all([
+    Track.findById(trackId),
+    Course.findById(courseId),
+  ]);
+
+  if (!track) throw new AppError('No track found', 404);
+  if (!course) throw new AppError('No course found', 404);
+
+  if (track.courses.some((id) => id.toString() === courseId)) {
+    throw new AppError('Course already in this track', 400);
+  }
+
+  // Update both sides
+  track.courses.push(courseId);
+  course.track = trackId;
+
+  await Promise.all([track.save(), course.save()]);
+  return track;
+};
 
 /**
  * Add a session to a track with validation
@@ -148,36 +207,47 @@ exports.deleteTrack = async (trackId) => {
  * @throws {AppError} 404 if track/session not found, 400 if invalid operation
  */
 exports.addSessionToTrack = async (trackId, sessionId) => {
-  const trackExists = await Track.findById(trackId);
-  if (!trackExists) {
-    throw new AppError('No track found with that ID', 404);
+  const [track, session] = await Promise.all([
+    Track.findById(trackId),
+    Session.findById(sessionId),
+  ]);
+
+  if (!track) throw new AppError('No track found', 404);
+  if (!session) throw new AppError('No session found', 404);
+
+  if (track.sessions.some((id) => id.toString() === sessionId)) {
+    throw new AppError('Session already in this track', 400);
   }
 
-  const session = await Session.findById(sessionId);
-  if (!session) {
-    throw new AppError('No session found with that ID', 404);
+  track.sessions.push(sessionId);
+  session.tracks.push(trackId);
+  session.isStandalone = !session.tracks.length && !session.course;
+
+  await Promise.all([track.save(), session.save()]);
+  return track;
+};
+
+exports.removeCourseFromTrack = async (trackId, courseId) => {
+  const track = await Track.findById(trackId);
+  if (!track) throw new AppError('No track found', 404);
+
+  track.courses.pull(courseId);
+
+  // Check: track still has content?
+  if (track.courses.length === 0 && track.sessions.length === 0) {
+    throw new AppError(
+      'Cannot remove last course: track must have at least one course or session',
+      400,
+    );
   }
 
-  // Validate session can be added to track
-  if (session.track && session.track.toString() === trackId) {
-    throw new AppError('Session already belongs to this track', 400);
+  const course = await Course.findById(courseId);
+  if (course) {
+    course.track = null; // Orphan the course
+    await course.save();
   }
 
-  if (session.track && session.track.toString() !== trackId) {
-    throw new AppError('Session already belongs to another track', 400);
-  }
-
-  // Update both session and track in parallel
-  session.track = trackId;
-  session.isStandalone = false;
-
-  const track = await Track.findByIdAndUpdate(
-    trackId,
-    { $addToSet: { sessions: sessionId } },
-    { new: true, runValidators: true },
-  );
-
-  await Promise.all([session.save()]);
+  await track.save();
   return track;
 };
 
@@ -189,31 +259,27 @@ exports.addSessionToTrack = async (trackId, sessionId) => {
  * @throws {AppError} 404 if track/session not found, 400 if session not in track
  */
 exports.removeSessionFromTrack = async (trackId, sessionId) => {
-  const trackExists = await Track.findById(trackId);
-  if (!trackExists) {
-    throw new AppError('No track found with that ID', 404);
+  const track = await Track.findById(trackId);
+  if (!track) throw new AppError('No track found', 404);
+
+  track.sessions.pull(sessionId);
+
+  // Check: track still has content?
+  if (track.courses.length === 0 && track.sessions.length === 0) {
+    throw new AppError(
+      'Cannot remove last session: track must have at least one course or session',
+      400,
+    );
   }
 
   const session = await Session.findById(sessionId);
-  if (!session) {
-    throw new AppError('No session found with that ID', 404);
+  if (session) {
+    session.tracks.pull(trackId);
+    session.isStandalone = !session.tracks.length && !session.course; // true if also not in a course
+    await session.save();
   }
 
-  if (!session.track || session.track.toString() !== trackId) {
-    throw new AppError('Session does not belong to this track', 400);
-  }
-
-  // Convert session to standalone and remove from track
-  session.track = null;
-  session.isStandalone = true;
-
-  const track = await Track.findByIdAndUpdate(
-    trackId,
-    { $pull: { sessions: sessionId } },
-    { new: true, runValidators: true },
-  );
-
-  await Promise.all([session.save()]);
+  await track.save();
   return track;
 };
 
@@ -235,13 +301,20 @@ exports.enrollStudentInTrack = async (trackId, studentId) => {
   }
 
   // Prevent duplicate enrollment
-  if (track.students.includes(studentId)) {
+  if (track.students.some((id) => id.toString() === studentId)) {
     throw new AppError('Student is already enrolled in this track', 400);
   }
 
   const updatedTrack = await Track.findByIdAndUpdate(
     trackId,
     { $addToSet: { students: studentId } },
+    { new: true, runValidators: true },
+  );
+
+  // Keep User.enrolledTracks in sync
+  await User.findByIdAndUpdate(
+    studentId,
+    { $addToSet: { enrolledTracks: trackId } },
     { new: true, runValidators: true },
   );
 
@@ -262,7 +335,7 @@ exports.removeStudentFromTrack = async (trackId, studentId) => {
   }
 
   // Ensure student is actually enrolled
-  if (!track.students.includes(studentId)) {
+  if (!track.students.some((id) => id.toString() === studentId)) {
     throw new AppError('Student is not enrolled in this track', 400);
   }
 
@@ -270,6 +343,38 @@ exports.removeStudentFromTrack = async (trackId, studentId) => {
     trackId,
     { $pull: { students: studentId } },
     { new: true, runValidators: true },
+  );
+
+  // Keep User.enrolledTracks in sync
+  await User.findByIdAndUpdate(
+    studentId,
+    { $pull: { enrolledTracks: trackId } },
+    { new: true },
+  );
+
+  return updatedTrack;
+};
+
+exports.enrollMeInTrack = async (trackId, userId) => {
+  const track = await Track.findById(trackId);
+  if (!track) throw new AppError('No track found with that ID', 404);
+  if (!track.published)
+    throw new AppError('This track is not open for enrollment', 400);
+
+  if (track.students.some((id) => id.toString() === userId)) {
+    throw new AppError('You are already enrolled in this track', 400);
+  }
+
+  const updatedTrack = await Track.findByIdAndUpdate(
+    trackId,
+    { $addToSet: { students: userId } },
+    { new: true, runValidators: true },
+  );
+
+  await User.findByIdAndUpdate(
+    userId,
+    { $addToSet: { enrolledTracks: trackId } },
+    { new: true },
   );
 
   return updatedTrack;
@@ -286,19 +391,20 @@ exports.removeStudentFromTrack = async (trackId, studentId) => {
  * @returns {Promise<{tracks: Array, total: Number}>} Instructor's tracks
  */
 exports.getTracksByInstructor = async (instructorId, query) => {
-  const features = new APIFeatures(
-    Track.find({ instructor: instructorId }),
-    query,
-  )
-    .filter()
+  const features = new APIFeatures(Track.find(), query, Track)
+    .filter({ instructor: instructorId })
     .sort()
-    .limitFields()
-    .paginate();
+    .limitFields();
+
+  await features.paginate();
 
   const tracks = await features.query;
-  const total = await Track.countDocuments({ instructor: instructorId });
 
-  return { tracks, total };
+  return {
+    tracks,
+    total: features.totalDocs || 0,
+    pagination: features.pagination,
+  };
 };
 
 /**
@@ -308,16 +414,20 @@ exports.getTracksByInstructor = async (instructorId, query) => {
  * @returns {Promise<{tracks: Array, total: Number}>} Student's enrolled tracks
  */
 exports.getTracksByStudent = async (studentId, query) => {
-  const features = new APIFeatures(Track.find({ students: studentId }), query)
-    .filter()
+  const features = new APIFeatures(Track.find(), query, Track)
+    .filter({ students: studentId })
     .sort()
-    .limitFields()
-    .paginate();
+    .limitFields();
+
+  await features.paginate();
 
   const tracks = await features.query;
-  const total = await Track.countDocuments({ students: studentId });
 
-  return { tracks, total };
+  return {
+    tracks,
+    total: features.totalDocs || 0,
+    pagination: features.pagination,
+  };
 };
 
 /**
@@ -354,6 +464,14 @@ exports.getPopularTracks = async (limit = 10) => {
     },
     {
       $unwind: '$instructor',
+    },
+    {
+      $project: {
+        'instructor.password': 0,
+        'instructor.passwordChangedAt': 0,
+        'instructor.passwordResetToken': 0,
+        'instructor.passwordResetExpires': 0,
+      },
     },
   ]);
 

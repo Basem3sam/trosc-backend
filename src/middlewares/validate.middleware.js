@@ -1,3 +1,5 @@
+const AppError = require('../utils/AppError');
+
 const validateMiddleware =
   (schema, source = 'body') =>
   (req, res, next) => {
@@ -13,18 +15,12 @@ const validateMiddleware =
     }
 
     if (!validationSchema || typeof validationSchema.validate !== 'function') {
-      return res.status(500).json({
-        status: 'error',
-        message: 'Invalid validation schema provided',
-      });
+      return next(new AppError('Invalid validation schema provided', 500));
     }
 
     const { error } = validationSchema.validate(req[source]);
     if (error) {
-      return res.status(400).json({
-        status: 'fail',
-        message: error.details[0].message,
-      });
+      return next(new AppError(error.details[0].message, 400));
     }
     next();
   };

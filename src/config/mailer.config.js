@@ -4,7 +4,7 @@ const createTransporter = () => {
   if (process.env.NODE_ENV === 'production') {
     // Use a reliable service like SendGrid or Gmail in production
     return nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE,
+      service: process.env.EMAIL_SERVICE || 'SendGrid',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,

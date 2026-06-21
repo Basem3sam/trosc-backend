@@ -14,6 +14,7 @@ class APIFeatures {
   // 1️⃣ Enhanced Filtering with Better Error Handling
   filter(defaultFilter = {}) {
     const queryObj = { ...this.queryString };
+
     const excludedFields = [
       'page',
       'sort',
@@ -21,19 +22,39 @@ class APIFeatures {
       'fields',
       'search',
       'populate',
-      'keyword', // ✅ Common alternative to 'search'
+      'keyword', // alternative to 'search'
     ];
+
     excludedFields.forEach((el) => delete queryObj[el]);
 
-    try {
-      // Advanced filtering with better regex handling
-      let queryStr = JSON.stringify({ ...queryObj, ...defaultFilter });
-      queryStr = queryStr.replace(
-        /\b(gte|gt|lte|lt|in|ne|regex|options)\b/g,
-        (match) => `$${match}`,
-      );
+    const addDollarSign = (obj) => {
+      const newObj = {};
+      Object.keys(obj).forEach((key) => {
+        const newKey = [
+          'gte',
+          'gt',
+          'lte',
+          'lt',
+          'in',
+          'ne',
+          'regex',
+          'options',
+        ].includes(key)
+          ? `$${key}`
+          : key;
+        newObj[newKey] =
+          typeof obj[key] === 'object' &&
+          obj[key] !== null &&
+          !Array.isArray(obj[key])
+            ? addDollarSign(obj[key])
+            : obj[key];
+      });
+      return newObj;
+    };
 
-      this.query = this.query.find(JSON.parse(queryStr));
+    try {
+      this.conditions = addDollarSign({ ...queryObj, ...defaultFilter });
+      this.query = this.query.find(this.conditions);
       return this;
     } catch (error) {
       throw new Error(`Invalid filter parameters: ${error.message}`);
@@ -107,7 +128,7 @@ class APIFeatures {
 
     // Count total documents for pagination metadata
     if (this.model) {
-      this.totalDocs = await this.model.countDocuments(this.query._conditions);
+      this.totalDocs = await this.model.countDocuments(this.conditions);
     }
 
     this.query = this.query.skip(skip).limit(limit);

@@ -73,6 +73,7 @@
  */
 
 const mongoose = require('mongoose');
+const validator = require('validator');
 
 const eventSchema = new mongoose.Schema(
   {
@@ -106,7 +107,45 @@ const eventSchema = new mongoose.Schema(
     locationAddress: String,
     coverImage: {
       type: String,
-      default: 'default-event.jpg',
+      default: 'https://placehold.co/800x400?text=Trosc+Event',
+      validate: {
+        validator: function (v) {
+          if (!v || v === 'https://placehold.co/800x400?text=Trosc+Event')
+            return true;
+          if (validator.isURL(v, { require_protocol: true })) return true;
+          return /^(?!.*[\/\\])[a-zA-Z0-9_\-]+\.(jpg|jpeg|png|webp)$/i.test(v);
+        },
+        message: 'Cover image must be a valid URL or image filename',
+      },
+    },
+    attachments: {
+      type: [String],
+      validate: {
+        validator: function (arr) {
+          if (!arr || !arr.length) return true;
+          return arr.every((url) => {
+            try {
+              const parsed = new URL(url);
+              const allowedHosts = [
+                'drive.google.com',
+                'docs.google.com',
+                'dropbox.com',
+                'github.com',
+                'raw.githubusercontent.com',
+                'res.cloudinary.com',
+                'i.imgur.com',
+              ];
+              return (
+                allowedHosts.some((h) => parsed.hostname.endsWith(h)) ||
+                parsed.protocol === 'https:'
+              );
+            } catch {
+              return false;
+            }
+          });
+        },
+        message: 'Event attachments must be valid URLs from trusted hosts',
+      },
     },
     attendees: [
       {
@@ -120,8 +159,35 @@ const eventSchema = new mongoose.Schema(
       required: [true, 'Event must have a creator'],
     },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  },
 );
 
+// Virtual to help the frontend render the correct button instantly
+eventSchema.virtual('locationAction').get(function () {
+  if (this.locationType === 'online' && this.locationLink) {
+    return {
+      type: 'online',
+      url: this.locationLink,
+      label: 'Join Zoom/Meet',
+    };
+  }
+
+  if (this.locationType === 'offline' && this.locationAddress) {
+    const encoded = encodeURIComponent(this.locationAddress);
+    return {
+      type: 'offline',
+      url: `https://www.google.com/maps/search/?api=1&query=${encoded}`,
+      label: 'View on Map',
+    };
+  }
+
+  return null;
+});
+
 const Event = mongoose.model('Event', eventSchema);
+
 module.exports = Event;

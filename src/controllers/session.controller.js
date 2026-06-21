@@ -1,127 +1,143 @@
-const SessionService = require('../services/session.service');
+const sessionService = require('../services/session.service');
 const catchAsync = require('../utils/catchAsync');
 
-const sessionController = {
-  // Create a new session
-  createSession: catchAsync(async (req, res, next) => {
-    const session = await SessionService.createSession(req.body);
+// Create a new session
+exports.createSession = catchAsync(async (req, res, next) => {
+  // Prevent client spoofing and auto-assign from auth token
+  delete req.body.instructor;
+  delete req.body.students;
+  delete req.body.course;
+  delete req.body.tracks;
 
-    res.status(201).json({
-      status: 'success',
-      data: {
-        session,
-      },
-    });
-  }),
+  req.body.instructor = req.user.id;
 
-  // Get all sessions
-  getAllSessions: catchAsync(async (req, res, next) => {
-    const sessions = await SessionService.getAllSessions(req.query);
+  const session = await sessionService.createSession(req.body);
 
-    res.status(200).json({
-      status: 'success',
-      results: sessions.length,
-      data: {
-        sessions,
-      },
-    });
-  }),
+  res.status(201).json({
+    status: 'success',
+    data: {
+      session,
+    },
+  });
+});
 
-  // Get single session
-  getSession: catchAsync(async (req, res, next) => {
-    const session = await SessionService.getSessionById(req.params.id);
+// Get all sessions
+exports.getAllSessions = catchAsync(async (req, res, next) => {
+  const { sessions, total, pagination } = await sessionService.getAllSessions(
+    req.query,
+  );
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        session,
-      },
-    });
-  }),
+  res.status(200).json({
+    status: 'success',
+    results: sessions.length,
+    total,
+    pagination,
+    data: {
+      sessions,
+    },
+  });
+});
 
-  // Update session
-  updateSession: catchAsync(async (req, res, next) => {
-    const session = await SessionService.updateSession(req.params.id, req.body);
+// Get single session
+exports.getSession = catchAsync(async (req, res, next) => {
+  const session = await sessionService.getSessionById(req.params.id);
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        session,
-      },
-    });
-  }),
+  res.status(200).json({
+    status: 'success',
+    data: {
+      session,
+    },
+  });
+});
 
-  // Delete session
-  deleteSession: catchAsync(async (req, res, next) => {
-    await SessionService.deleteSession(req.params.id);
+// Update session
+exports.updateSession = catchAsync(async (req, res, next) => {
+  // Prevent changing instructor via update (security)
+  delete req.body.instructor;
+  delete req.body.students;
+  delete req.body.course;
 
-    res.status(204).json({
-      status: 'success',
-      data: null,
-    });
-  }),
+  const session = await sessionService.updateSession(req.params.id, req.body);
 
-  // Add student to session
-  addStudent: catchAsync(async (req, res, next) => {
-    const session = await SessionService.addStudentToSession(
-      req.params.id,
-      req.body.studentId,
-    );
+  res.status(200).json({
+    status: 'success',
+    data: {
+      session,
+    },
+  });
+});
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        session,
-      },
-    });
-  }),
+// Delete session
+exports.deleteSession = catchAsync(async (req, res, next) => {
+  await sessionService.deleteSession(req.params.id);
 
-  // Remove student from session
-  removeStudent: catchAsync(async (req, res, next) => {
-    const session = await SessionService.removeStudentFromSession(
-      req.params.id,
-      req.params.studentId,
-    );
+  res.status(204).json({
+    status: 'success',
+    data: null,
+  });
+});
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        session,
-      },
-    });
-  }),
+// Add student to session
+exports.addStudent = catchAsync(async (req, res, next) => {
+  const session = await sessionService.addStudentToSession(
+    req.params.id,
+    req.body.studentId,
+  );
 
-  // Get sessions by instructor
-  getSessionsByInstructor: catchAsync(async (req, res, next) => {
-    const sessions = await SessionService.getSessionsByInstructor(
+  res.status(200).json({
+    status: 'success',
+    data: {
+      session,
+    },
+  });
+});
+
+// Remove student from session
+exports.removeStudent = catchAsync(async (req, res, next) => {
+  const session = await sessionService.removeStudentFromSession(
+    req.params.id,
+    req.params.studentId,
+  );
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      session,
+    },
+  });
+});
+
+// Get sessions by instructor
+exports.getSessionsByInstructor = catchAsync(async (req, res, next) => {
+  const { sessions, total, pagination } =
+    await sessionService.getSessionsByInstructor(
       req.params.instructorId,
       req.query,
     );
 
-    res.status(200).json({
-      status: 'success',
-      results: sessions.length,
-      data: {
-        sessions,
-      },
-    });
-  }),
+  res.status(200).json({
+    status: 'success',
+    results: sessions.length,
+    total,
+    pagination,
+    data: {
+      sessions,
+    },
+  });
+});
 
-  // Get sessions by track
-  getSessionsByTrack: catchAsync(async (req, res, next) => {
-    const sessions = await SessionService.getSessionsByTrack(
-      req.params.trackId,
-      req.query,
-    );
+// Get sessions by track
+exports.getSessionsByTrack = catchAsync(async (req, res, next) => {
+  const { sessions, total, pagination } =
+    await sessionService.getSessionsByTrack(req.params.trackId, req.query);
 
-    res.status(200).json({
-      status: 'success',
-      results: sessions.length,
-      data: {
-        sessions,
-      },
-    });
-  }),
-};
-
-module.exports = sessionController;
+  res.status(200).json({
+    status: 'success',
+    results: sessions.length,
+    total,
+    pagination,
+    data: {
+      sessions,
+    },
+  });
+});

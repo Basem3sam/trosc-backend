@@ -68,7 +68,7 @@ module.exports = (err, req, res, next) => {
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
   } else if (process.env.NODE_ENV === 'production') {
-    // Search it up cus err isn't error for some reason and it lacks the name attribute
+    // Mongoose errors lose their name property when spread; manually preserve it
     let error = { ...err, name: err.name };
     error.message = err.message;
     if (error.name === 'CastError') error = handleCastErrorDB(error);

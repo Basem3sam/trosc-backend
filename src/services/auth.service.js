@@ -26,18 +26,21 @@ exports.signUp = async (data, url) => {
     passwordConfirm: data.passwordConfirm,
   };
 
-  if (data.photo) {
-    allowedData.photo = data.photo;
-  }
-  if (data.bio) {
-    allowedData.bio = data.bio;
-  }
+  if (data.photo) allowedData.photo = data.photo;
+  if (data.bio) allowedData.bio = data.bio;
+  if (data.website) allowedData.website = data.website;
+  if (data.socialMedia) allowedData.socialMedia = data.socialMedia;
 
   // Create user with ONLY allowed fields
   const newUser = await User.create(allowedData);
 
-  // send email (business logic)
-  await new Email(newUser, url).sendWelcome();
+  // send email (fire-and-forget; don't fail the HTTP request if SMTP breaks)
+  try {
+    await new Email(newUser, url).sendWelcome();
+  } catch (err) {
+    console.error('Welcome email failed:', err.message);
+    // TODO: send to a logging service (e.g., Sentry) instead of console
+  }
 
   const token = createSendToken(newUser);
   return { token, user: newUser };
@@ -56,6 +59,12 @@ exports.login = async (email, password) => {
   if (!user || !(await user.correctPassword(password, user.password))) {
     throw new AppError('Incorrect email or password', 401);
   }
+  if (!user.active) {
+    throw new AppError(
+      'Your account has been deactivated. Contact support.',
+      401,
+    );
+  }
 
   // Update last login time
   user.lastLogin = new Date();
@@ -69,8 +78,10 @@ exports.login = async (email, password) => {
 exports.forgotPassword = async (email) => {
   // 1) Get user based on POSTed email
   const user = await User.findOne({ email });
-  if (!user)
-    throw new AppError('There is no user with that email address', 404);
+  if (!user || !user.active) {
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // Artificial delay to prevent email enumeration
+    return; // Do not reveal if user exists or not for security reasons
+  }
 
   // 2) Generate the random token
   const resetToken = user.createPasswordResetToken();
@@ -103,6 +114,8 @@ exports.resetPassword = async (token, password, passwordConfirm) => {
 
   if (!user) throw new AppError('Token is invalid or has expired', 400);
 
+  if (!user.active) throw new AppError('Account deactivated', 401);
+
   user.password = password;
   user.passwordConfirm = passwordConfirm;
   user.passwordResetToken = undefined;
@@ -116,25 +129,27 @@ exports.resetPassword = async (token, password, passwordConfirm) => {
 
 exports.updatePassword = async (
   userId,
-  currentPassword,
-  newPassword,
+  passwordCurrent,
+  password,
   passwordConfirm,
 ) => {
   // simple validation
-  if (!currentPassword || !newPassword || !passwordConfirm) {
+  if (!passwordCurrent || !password || !passwordConfirm) {
     throw new AppError('All password fields are required', 400);
   }
 
   // 1) Get user from collection
   const user = await User.findById(userId).select('+password');
 
+  if (!user) throw new AppError('User not found', 404);
+
   // 2) Check if POSTed current password is correct
-  if (!(await user.correctPassword(currentPassword, user.password))) {
+  if (!(await user.correctPassword(passwordCurrent, user.password))) {
     throw new AppError('Your current password is wrong', 401);
   }
 
   // 3) If so, update password
-  user.password = newPassword;
+  user.password = password;
   user.passwordConfirm = passwordConfirm;
   await user.save();
 

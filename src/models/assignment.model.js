@@ -34,7 +34,35 @@ const assignmentSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'An assignment must have an instructor'],
     },
-    attachments: [String],
+    attachments: {
+      type: [String],
+      validate: {
+        validator: function (arr) {
+          if (!arr || !arr.length) return true;
+          return arr.every((url) => {
+            try {
+              const parsed = new URL(url);
+              const allowedHosts = [
+                'drive.google.com',
+                'docs.google.com',
+                'dropbox.com',
+                'github.com',
+                'raw.githubusercontent.com',
+                'res.cloudinary.com',
+                'i.imgur.com',
+              ];
+              return (
+                allowedHosts.some((h) => parsed.hostname.endsWith(h)) ||
+                parsed.protocol === 'https:'
+              );
+            } catch {
+              return false;
+            }
+          });
+        },
+        message: 'Attachments must be valid URLs from trusted hosts',
+      },
+    },
     deadline: {
       type: Date,
       required: [true, 'An assignment must have a deadline'],

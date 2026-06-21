@@ -1,7 +1,17 @@
 /**
  * @swagger
+ * tags:
+ *   - name: Auth
+ *     description: Authentication and user registration
+ *   - name: Users
+ *     description: User management and profile operations
+ */
+
+/**
+ * @swagger
  * /users/signup:
  *   post:
+ *     operationId: signup
  *     summary: Register a new user account
  *     description: Creates a new user account with student role by default
  *     tags: [Auth]
@@ -28,6 +38,7 @@
  * @swagger
  * /users/login:
  *   post:
+ *     operationId: login
  *     summary: Authenticate user and return JWT token
  *     description: Verifies user credentials and returns JWT token
  *     tags: [Auth]
@@ -51,7 +62,8 @@
 /**
  * @swagger
  * /users/logout:
- *   get:
+ *   post:
+ *     operationId: logout
  *     summary: Log out current user
  *     description: Clears authentication token
  *     tags: [Auth]
@@ -68,6 +80,7 @@
  * @swagger
  * /users/forgotPassword:
  *   post:
+ *     operationId: forgotPassword
  *     summary: Send password reset token to user's email
  *     description: Generates and sends password reset token via email
  *     tags: [Auth]
@@ -95,6 +108,7 @@
  * @swagger
  * /users/resetPassword/{token}:
  *   patch:
+ *     operationId: resetPassword
  *     summary: Reset password using token from email
  *     description: Resets user password using valid reset token
  *     tags: [Auth]
@@ -121,6 +135,7 @@
  * @swagger
  * /users/updateMyPassword:
  *   patch:
+ *     operationId: updateMyPassword
  *     summary: Update current user's password
  *     description: Change password for authenticated user
  *     tags: [Users]
@@ -141,8 +156,45 @@
 
 /**
  * @swagger
+ * /users/me/enrollments:
+ *   get:
+ *     operationId: getMyEnrollments
+ *     summary: Get my track and course enrollments
+ *     description: Returns all tracks and courses the current user is enrolled in
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Enrollments retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     tracks:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Track'
+ *                     courses:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Course'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+
+/**
+ * @swagger
  * /users/me:
  *   get:
+ *     operationId: getMyProfile
  *     summary: Get current user's profile
  *     description: Returns profile of authenticated user
  *     tags: [Users]
@@ -172,6 +224,7 @@
  * @swagger
  * /users/updateMe:
  *   patch:
+ *     operationId: updateMyProfile
  *     summary: Update current user's profile information
  *     description: Update user profile (name, email, photo, bio)
  *     tags: [Users]
@@ -200,6 +253,19 @@
  *     responses:
  *       200:
  *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/UserBase'
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
@@ -210,6 +276,7 @@
  * @swagger
  * /users/deleteMe:
  *   delete:
+ *     operationId: deleteMyAccount
  *     summary: Deactivate current user account (soft delete)
  *     description: Soft deletes user account by setting active=false
  *     tags: [Users]
@@ -226,6 +293,7 @@
  * @swagger
  * /users:
  *   get:
+ *     operationId: getAllUsers
  *     summary: Get all users (admin only)
  *     description: Retrieves list of all active users
  *     tags: [Users]
@@ -234,11 +302,16 @@
  *     responses:
  *       200:
  *         description: List of users retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UsersResponse'
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  *   post:
+ *     operationId: createUser
  *     summary: Create a new user (admin only)
  *     description: Admin endpoint to create users with specific roles
  *     tags: [Users]
@@ -263,6 +336,7 @@
  * @swagger
  * /users/{id}:
  *   get:
+ *     operationId: getUserById
  *     summary: Get user by ID (admin only)
  *     description: Retrieve specific user details by ID
  *     tags: [Users]
@@ -277,6 +351,19 @@
  *     responses:
  *       200:
  *         description: User found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/UserBase'
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
@@ -284,6 +371,7 @@
  *       404:
  *         $ref: '#/components/responses/NotFound'
  *   patch:
+ *     operationId: updateUserById
  *     summary: Update user by ID (admin only)
  *     description: Update user information including role
  *     tags: [Users]
@@ -300,7 +388,7 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/UserAdminCreate'
+ *             $ref: '#/components/schemas/UserAdminUpdate'
  *     responses:
  *       200:
  *         description: User updated successfully
@@ -309,6 +397,7 @@
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  *   delete:
+ *     operationId: deleteUserById
  *     summary: Delete user by ID (admin only)
  *     description: Permanently delete user from database
  *     tags: [Users]
@@ -323,6 +412,58 @@
  *     responses:
  *       204:
  *         description: User deleted successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+
+/**
+ * @swagger
+ * /users/bulk:
+ *   post:
+ *     operationId: bulkUserAction
+ *     summary: Bulk user actions (admin only)
+ *     description: Activate, deactivate, or delete multiple users at once
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userIds
+ *               - action
+ *             properties:
+ *               userIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   example: "507f1f77bcf86cd799439011"
+ *                 example: ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012"]
+ *               action:
+ *                 type: string
+ *                 enum: [activate, deactivate, delete]
+ *                 example: "activate"
+ *     responses:
+ *       200:
+ *         description: Bulk action completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: "Bulk activate completed successfully"
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
@@ -344,6 +485,8 @@ const {
   updateMeSchema,
   userIdSchema,
   adminCreateUserSchema,
+  adminUpdateUserSchema,
+  bulkUserActionSchema,
 } = require('../validations/user.validation');
 
 const router = express.Router();
@@ -396,11 +539,11 @@ router.patch(
 router.use(authMiddleware.protect);
 
 /**
- * @route   GET /users/logout
+ * @route   POST /users/logout
  * @desc    Log out current user (clear JWT cookie)
  * @access  Private
  */
-router.get('/logout', authController.logout);
+router.post('/logout', authController.logout);
 
 /**
  * @route   PATCH /users/updateMyPassword
@@ -434,12 +577,31 @@ router.patch('/updateMe', validate(updateMeSchema), userController.updateMe);
  */
 router.delete('/deleteMe', userController.deleteMe);
 
+/**
+ * @route   GET /me/enrollments
+ * @desc    Get current user's enrollments
+ * @access  Private
+ */
+router.get('/me/enrollments', userController.getMyEnrollments);
+
 // ===================================================================
 // 👑 ADMIN ONLY ROUTES - Admin role required
 // ===================================================================
 
 // Apply admin restriction to all routes below
 router.use(authMiddleware.restrictTo('admin'));
+
+/**
+ * @route   POST /users/bulk
+ * @desc    Bulk user actions (activate, deactivate, delete)
+ * @access  Private/Admin
+ * @body    { userIds: [string], action: string }
+*/
+router.post(
+  '/bulk',
+  validate(bulkUserActionSchema),
+  userController.bulkUserAction,
+);
 
 /**
  * @route   GET /users
@@ -480,7 +642,11 @@ router
    * @param   {string} id - User MongoDB ObjectId
    * @body    {Object} User data to update
    */
-  .patch(validate(userIdSchema, 'params'), userController.updateUser)
+  .patch(
+    validate(userIdSchema, 'params'),
+    validate(adminUpdateUserSchema),
+    userController.updateUser,
+  )
 
   /**
    * @route   DELETE /users/:id

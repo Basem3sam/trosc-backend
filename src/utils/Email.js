@@ -38,7 +38,7 @@ class Email {
   }
 
   async sendWelcome() {
-    const subject = 'Welcome to Trosc 🎉 - Start Your Learning Journey';
+    const subject = 'Welcome to Trosc - Start Your Learning Journey';
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -92,7 +92,7 @@ class Email {
   }
 
   async sendPasswordReset() {
-    const subject = '🔐 Password Reset Request - Trosc Account';
+    const subject = 'Password Reset Request - Trosc Account';
     const htmlContent = `
       <!DOCTYPE html>
       <html>
