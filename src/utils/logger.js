@@ -18,7 +18,7 @@ const logger = winston.createLogger({
   ],
 });
 
-// In production, also log to file (optional, for debugging)
+// In production, also log to file
 if (process.env.NODE_ENV === 'production') {
   logger.add(
     new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),

@@ -19,22 +19,21 @@
 
 ## 🧰 Tech Stack
 
-| Layer | Tech |
-|-------|------|
-| Runtime | Node.js + Express.js |
-| Database | MongoDB (Mongoose ODM) |
-| Auth | JWT (bearer + cookie), bcrypt |
-| Validation | Joi |
-| Security | Helmet, express-rate-limit, mongo-sanitize, xss-clean, hpp |
-| Email | Nodemailer (SMTP / Mailtrap / SendGrid) |
-| Docs | Swagger (auto-generated from JSDoc) |
+| Layer      | Tech                                            |
+| ---------- | ----------------------------------------------- |
+| Runtime    | Node.js + Express.js                            |
+| Database   | MongoDB (Mongoose ODM)                          |
+| Auth       | JWT (bearer + cookie), bcrypt                   |
+| Validation | Joi                                             |
+| Security   | Helmet, express-rate-limit, mongo-sanitize, hpp |
+| Email      | Nodemailer (SMTP / Mailtrap / SendGrid)         |
+| Docs       | Swagger (auto-generated from JSDoc)             |
 
 > **Note:** No file upload server. Images and session videos are URLs (YouTube, Drive, Cloudinary, Imgur, etc.) to keep hosting 100% free.
 
 ---
 
 ## 📁 Architecture
-
 
 ```
 src/
@@ -55,6 +54,7 @@ src/
 ## ⚡ Quick Start
 
 ### Prerequisites
+
 - Node.js ≥ 18
 - MongoDB (local or [Atlas free tier](https://www.mongodb.com/atlas))
 
@@ -104,6 +104,7 @@ EMAIL_FROM=Trosc Club <noreply@trosc.club>
 ```bash
 # Development (nodemon)
 npm start
+
 # production
 NODE_ENV=production npm start
 ```
@@ -114,80 +115,91 @@ NODE_ENV=production npm start
 
 Once running, open:
 
+```plain
 http://localhost:5000/api-docs
+```
 
 Auto-generated Swagger UI with all endpoints, schemas, and auth.
 
 ### Key Endpoints
 
-| Resource | Endpoint | Access |
-|----------|----------|--------|
-| Auth | `POST /v1/users/signup` | Public |
-| Auth | `POST /v1/users/login` | Public |
-| Auth | `POST /v1/users/forgotPassword` | Public |
-| Auth | `PATCH /v1/users/resetPassword/:token` | Public |
-| Auth | `POST /v1/users/logout` | Protected |
-| Auth | `PATCH /v1/users/updateMyPassword` | Protected |
-| Users | `GET /v1/users/me` | Protected |
-| Users | `PATCH /v1/users/updateMe` | Protected |
-| Users | `DELETE /v1/users/deleteMe` | Protected |
-| Users | `GET /v1/users/me/enrollments` | Protected |
-| Users | `GET /v1/users` | Admin |
-| Users | `POST /v1/users` | Admin |
-| Users | `GET /v1/users/:id` | Admin |
-| Users | `PATCH /v1/users/:id` | Admin |
-| Users | `DELETE /v1/users/:id` | Admin |
-| Users | `POST /v1/users/bulk` | Admin |
-| Tracks | `GET /v1/tracks` | Public |
-| Tracks | `GET /v1/tracks/popular` | Public |
-| Tracks | `POST /v1/tracks` | Admin/Instructor |
-| Tracks | `GET /v1/tracks/:id` | Public |
-| Tracks | `PATCH /v1/tracks/:id` | Admin/Instructor |
-| Tracks | `DELETE /v1/tracks/:id` | Admin |
-| Tracks | `GET /v1/tracks/:id/analytics` | Admin/Instructor |
-| Tracks | `POST /v1/tracks/:id/enroll-me` | Protected |
-| Tracks | `POST /v1/tracks/:id/students` | Admin/Instructor |
-| Tracks | `DELETE /v1/tracks/:id/students/:studentId` | Admin/Instructor |
-| Tracks | `PATCH /v1/tracks/:trackId/courses/:courseId` | Admin/Instructor |
-| Tracks | `DELETE /v1/tracks/:trackId/courses/:courseId` | Admin/Instructor |
-| Tracks | `PATCH /v1/tracks/:trackId/sessions/:sessionId` | Admin/Instructor |
-| Tracks | `DELETE /v1/tracks/:trackId/sessions/:sessionId` | Admin/Instructor |
-| Courses | `GET /v1/courses` | Public |
-| Courses | `POST /v1/courses` | Admin/Instructor |
-| Courses | `GET /v1/courses/:id` | Public |
-| Courses | `PATCH /v1/courses/:id` | Admin/Instructor |
-| Courses | `DELETE /v1/courses/:id` | Admin |
-| Courses | `GET /v1/courses/instructor/:instructorId` | Public |
-| Courses | `GET /v1/courses/track/:trackId` | Public |
-| Courses | `GET /v1/courses/student/:studentId` | Public |
-| Courses | `POST /v1/courses/:id/students` | Admin/Instructor |
-| Courses | `DELETE /v1/courses/:id/students/:studentId` | Admin/Instructor |
-| Courses | `PATCH /v1/courses/:courseId/sessions/:sessionId` | Admin/Instructor |
-| Courses | `DELETE /v1/courses/:courseId/sessions/:sessionId` | Admin/Instructor |
-| Sessions | `GET /v1/sessions` | Protected |
-| Sessions | `POST /v1/sessions` | Admin/Instructor |
-| Sessions | `GET /v1/sessions/:id` | Protected |
-| Sessions | `PATCH /v1/sessions/:id` | Admin/Instructor |
-| Sessions | `DELETE /v1/sessions/:id` | Admin |
-| Sessions | `GET /v1/sessions/instructor/:instructorId` | Protected |
-| Sessions | `GET /v1/sessions/track/:trackId` | Protected |
-| Sessions | `POST /v1/sessions/:id/students` | Admin/Instructor |
-| Sessions | `DELETE /v1/sessions/:id/students/:studentId` | Admin/Instructor |
-| Events | `GET /v1/events` | Public |
-| Events | `GET /v1/events/my-events` | Protected |
-| Events | `GET /v1/events/:id` | Public |
-| Events | `POST /v1/events` | Admin/Instructor |
-| Events | `PATCH /v1/events/:id` | Admin/Instructor |
-| Events | `DELETE /v1/events/:id` | Admin |
-| Events | `POST /v1/events/:id/rsvp` | Protected |
-| Events | `DELETE /v1/events/:id/rsvp` | Protected |
-| Announcements | `GET /v1/announcements` | Public |
-| Announcements | `POST /v1/announcements` | Admin/Instructor |
-| Announcements | `GET /v1/announcements/:id` | Public |
-| Announcements | `PATCH /v1/announcements/:id` | Admin/Instructor |
-| Announcements | `DELETE /v1/announcements/:id` | Admin |
-| Feed | `GET /v1/feed` | Public |
-| Health | `GET /health` | Public |
+| Resource                   | Endpoint                                    | Method | Access           |
+| -------------------------- | ------------------------------------------- | ------ | ---------------- |
+| **Auth**                   |                                             |        |                  |
+| Sign up                    | `/v1/users/signup`                          | POST   | Public           |
+| Log in                     | `/v1/users/login`                           | POST   | Public           |
+| Forgot password            | `/v1/users/forgotPassword`                  | POST   | Public           |
+| Reset password             | `/v1/users/resetPassword/:token`            | PATCH  | Public           |
+| Log out                    | `/v1/users/logout`                          | POST   | Protected        |
+| Update my password         | `/v1/users/updateMyPassword`                | PATCH  | Protected        |
+| **Users**                  |                                             |        |                  |
+| Get me                     | `/v1/users/me`                              | GET    | Protected        |
+| Update me                  | `/v1/users/updateMe`                        | PATCH  | Protected        |
+| Delete me                  | `/v1/users/deleteMe`                        | DELETE | Protected        |
+| My enrollments             | `/v1/users/me/enrollments`                  | GET    | Protected        |
+| List users                 | `/v1/users`                                 | GET    | Admin            |
+| Create user                | `/v1/users`                                 | POST   | Admin            |
+| Get user                   | `/v1/users/:id`                             | GET    | Admin            |
+| Update user                | `/v1/users/:id`                             | PATCH  | Admin            |
+| Delete user                | `/v1/users/:id`                             | DELETE | Admin            |
+| Bulk action                | `/v1/users/bulk`                            | POST   | Admin            |
+| **Tracks**                 |                                             |        |                  |
+| List tracks                | `/v1/tracks`                                | GET    | Public           |
+| Popular tracks             | `/v1/tracks/popular`                        | GET    | Public           |
+| Create track               | `/v1/tracks`                                | POST   | Admin/Instructor |
+| Get track                  | `/v1/tracks/:id`                            | GET    | Public           |
+| Update track               | `/v1/tracks/:id`                            | PATCH  | Admin/Instructor |
+| Delete track               | `/v1/tracks/:id`                            | DELETE | Admin            |
+| Track analytics            | `/v1/tracks/:id/analytics`                  | GET    | Admin/Instructor |
+| Self-enroll                | `/v1/tracks/:id/enroll-me`                  | POST   | Protected        |
+| Add student                | `/v1/tracks/:id/students`                   | POST   | Admin/Instructor |
+| Remove student             | `/v1/tracks/:id/students/:studentId`        | DELETE | Admin/Instructor |
+| Add course to track        | `/v1/tracks/:trackId/courses/:courseId`     | PATCH  | Admin/Instructor |
+| Remove course from track   | `/v1/tracks/:trackId/courses/:courseId`     | DELETE | Admin/Instructor |
+| Add session to track       | `/v1/tracks/:trackId/sessions/:sessionId`   | PATCH  | Admin/Instructor |
+| Remove session from track  | `/v1/tracks/:trackId/sessions/:sessionId`   | DELETE | Admin/Instructor |
+| **Courses**                |                                             |        |                  |
+| List courses               | `/v1/courses`                               | GET    | Public           |
+| Create course              | `/v1/courses`                               | POST   | Admin/Instructor |
+| Get course                 | `/v1/courses/:id`                           | GET    | Public           |
+| Update course              | `/v1/courses/:id`                           | PATCH  | Admin/Instructor |
+| Delete course              | `/v1/courses/:id`                           | DELETE | Admin            |
+| By instructor              | `/v1/courses/instructor/:instructorId`      | GET    | Public           |
+| By track                   | `/v1/courses/track/:trackId`                | GET    | Public           |
+| By student                 | `/v1/courses/student/:studentId`            | GET    | Public           |
+| Add student                | `/v1/courses/:id/students`                  | POST   | Admin/Instructor |
+| Remove student             | `/v1/courses/:id/students/:studentId`       | DELETE | Admin/Instructor |
+| Add session to course      | `/v1/courses/:courseId/sessions/:sessionId` | PATCH  | Admin/Instructor |
+| Remove session from course | `/v1/courses/:courseId/sessions/:sessionId` | DELETE | Admin/Instructor |
+| **Sessions**               |                                             |        |                  |
+| List sessions              | `/v1/sessions`                              | GET    | Protected        |
+| Create session             | `/v1/sessions`                              | POST   | Admin/Instructor |
+| Get session                | `/v1/sessions/:id`                          | GET    | Protected        |
+| Update session             | `/v1/sessions/:id`                          | PATCH  | Admin/Instructor |
+| Delete session             | `/v1/sessions/:id`                          | DELETE | Admin            |
+| By instructor              | `/v1/sessions/instructor/:instructorId`     | GET    | Protected        |
+| By track                   | `/v1/sessions/track/:trackId`               | GET    | Protected        |
+| Add student                | `/v1/sessions/:id/students`                 | POST   | Admin/Instructor |
+| Remove student             | `/v1/sessions/:id/students/:studentId`      | DELETE | Admin/Instructor |
+| **Events**                 |                                             |        |                  |
+| List events                | `/v1/events`                                | GET    | Public           |
+| My events                  | `/v1/events/my-events`                      | GET    | Protected        |
+| Get event                  | `/v1/events/:id`                            | GET    | Public           |
+| Create event               | `/v1/events`                                | POST   | Admin/Instructor |
+| Update event               | `/v1/events/:id`                            | PATCH  | Admin/Instructor |
+| Delete event               | `/v1/events/:id`                            | DELETE | Admin            |
+| RSVP                       | `/v1/events/:id/rsvp`                       | POST   | Protected        |
+| Cancel RSVP                | `/v1/events/:id/rsvp`                       | DELETE | Protected        |
+| **Announcements**          |                                             |        |                  |
+| List announcements         | `/v1/announcements`                         | GET    | Public           |
+| Create announcement        | `/v1/announcements`                         | POST   | Admin/Instructor |
+| Get announcement           | `/v1/announcements/:id`                     | GET    | Public           |
+| Update announcement        | `/v1/announcements/:id`                     | PATCH  | Admin/Instructor |
+| Delete announcement        | `/v1/announcements/:id`                     | DELETE | Admin            |
+| **Feed**                   |                                             |        |                  |
+| Dashboard feed             | `/v1/feed`                                  | GET    | Public           |
+| **Health**                 |                                             |        |                  |
+| Health check               | `/health`                                   | GET    | Public           |
 
 ---
 
@@ -196,32 +208,45 @@ Auto-generated Swagger UI with all endpoints, schemas, and auth.
 - **Helmet** — Secure HTTP headers
 - **Rate Limiting** — 300 req / 15 min per IP
 - **NoSQL Injection** — `express-mongo-sanitize`
-- **XSS** — `xss-clean` + input validation
+- **Input Sanitization** — Joi validation on all inputs
 - **HPP** — Parameter pollution protection
 - **CORS** — Whitelist-based with credentials
 - **Passwords** — bcrypt (cost 12)
 - **JWT** — Stored in httpOnly cookie + `sameSite: strict`
+- **Ownership** — Instructors can only modify their own content; admins bypass
 
 ---
 
 ## 💰 Cost Strategy
 
-| Feature | Solution | Cost |
-|---------|----------|------|
-| Video hosting | YouTube / Google Drive | Free |
-| Images | External URLs (Cloudinary, Imgur, etc.) | Free |
-| Database | MongoDB Atlas M0 | Free |
-| Backend hosting | Render / Railway / Vercel | Free tier |
-| Email | Mailtrap (dev) / SendGrid (prod) | Free tier |
+| Feature         | Solution                                | Cost      |
+| --------------- | --------------------------------------- | --------- |
+| Video hosting   | YouTube / Google Drive                  | Free      |
+| Images          | External URLs (Cloudinary, Imgur, etc.) | Free      |
+| Database        | MongoDB Atlas M0                        | Free      |
+| Backend hosting | Render / Railway / Vercel               | Free tier |
+| Email           | Mailtrap (dev) / SendGrid (prod)        | Free tier |
 
 ---
 
 ## 🛠️ Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm start` | Start with nodemon (dev) |
-| `npm start:prod` | Production mode |
+| Command          | Description              |
+| ---------------- | ------------------------ |
+| `npm start`      | Start with nodemon (dev) |
+| `npm start:prod` | Production mode          |
+
+---
+
+## 🧪 Testing
+
+```bash
+# Health check
+curl http://localhost:5000/health
+
+# Swagger docs
+open http://localhost:5000/api-docs
+```
 
 ---
 
