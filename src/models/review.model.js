@@ -84,5 +84,10 @@ reviewSchema.index(
   { unique: true, partialFilterExpression: { assignment: { $exists: true } } },
 );
 
-const Review = mongoose.model('Review', reviewSchema);
-module.exports = Review;
+// TODO - Future feature: Course and assignment reviews - This model will allow students to leave reviews and ratings for courses and assignments. It will include fields for the reviewer (user), the course or assignment being reviewed, a rating (e.g., 1-5 stars), and a text review. This can help other students make informed decisions and provide feedback to instructors for improvement.
+// const Review = mongoose.model('Review', reviewSchema);
+// module.exports = Review;
+
+module.exports = () => {
+  throw new Error('Review model is not implemented');
+};

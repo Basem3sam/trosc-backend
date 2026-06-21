@@ -72,5 +72,10 @@ const assignmentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-const Assignment = mongoose.model('Assignment', assignmentSchema);
-module.exports = Assignment;
+// TODO - Future feature: Assignment management - This model will store information about assignments, including their title, description, course, instructor, deadline, and submissions. It will allow students to view assignments and submit their work.
+// const Assignment = mongoose.model('Assignment', assignmentSchema);
+// module.exports = Assignment;
+
+module.exports = () => {
+  throw new Error('Assignment model is not implemented');
+};

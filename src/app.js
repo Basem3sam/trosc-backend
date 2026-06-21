@@ -24,15 +24,23 @@ const feedRouter = require('./routes/feed.route');
 // Initialize Express app
 const app = express();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 /* GLOBAL MIDDLEWARES */
 
+// Set 'trust proxy' if behind a reverse proxy (e.g., Heroku, Nginx)
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
+
+// Parse cookies
 app.use(cookieParser());
 
 // Set security HTTP headers
 app.use(helmet());
 
 // Development logging
-if (process.env.NODE_ENV === 'development') {
+if (!isProduction) {
   app.use(morgan('dev'));
 }
 
@@ -40,8 +48,12 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5000',
   'http://127.0.0.1:5000',
-  /https:\/\/.*\.ngrok-free\.dev/,
 ];
+
+// Only add ngrok in development
+if (!isProduction) {
+  allowedOrigins.push(/https:\/\/.*\.ngrok-free\.dev/);
+}
 
 if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
@@ -50,7 +62,20 @@ if (process.env.FRONTEND_URL) {
 // Enable CORS
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      if (
+        allowedOrigins.some((allowed) =>
+          allowed instanceof RegExp ? allowed.test(origin) : allowed === origin,
+        )
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -153,7 +178,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-if (process.env.NODE_ENV !== 'production') {
+if (!isProduction) {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 }
 

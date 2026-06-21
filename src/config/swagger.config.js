@@ -7,7 +7,7 @@ const getBaseUrl = () => {
   }
   const port = process.env.PORT || 5000;
   return process.env.NODE_ENV === 'production'
-    ? `https://your-production-domain.com`
+    ? process.env.BASE_URL || `https://your-production-domain.com`
     : `http://localhost:${port}`;
 };
 

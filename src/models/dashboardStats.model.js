@@ -25,5 +25,10 @@ const dashboardStatsSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-const DashboardStats = mongoose.model('DashboardStats', dashboardStatsSchema);
-module.exports = DashboardStats;
+// TODO - Future feature: Admin analytics dashboard - This model will store aggregated statistics for the admin dashboard, such as user growth, course completion rates, and popular tracks/courses. It can be updated periodically (e.g., daily) to provide insights into platform usage and performance.
+// const DashboardStats = mongoose.model('DashboardStats', dashboardStatsSchema);
+// module.exports = DashboardStats;
+
+module.exports = () => {
+  throw new Error('DashboardStats model is not implemented');
+};
