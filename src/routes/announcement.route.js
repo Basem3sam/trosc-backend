@@ -114,7 +114,11 @@
 
 const express = require('express');
 const announcementController = require('../controllers/announcement.controller');
-const { protect, restrictTo } = require('../middlewares/auth.middleware');
+const {
+  protect,
+  restrictTo,
+  checkOwnership,
+} = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   createAnnouncementSchema,
@@ -151,6 +155,11 @@ router.post(
 router.patch(
   '/:id',
   restrictTo('admin', 'instructor'),
+  checkOwnership({
+    model: 'Announcement',
+    ownerField: 'createdBy',
+    paramName: 'id',
+  }),
   validate(announcementIdSchema, 'params'),
   validate(updateAnnouncementSchema),
   announcementController.updateAnnouncement,
@@ -158,7 +167,12 @@ router.patch(
 
 router.delete(
   '/:id',
-  restrictTo('admin'),
+  restrictTo('admin', 'instructor'),
+  checkOwnership({
+    model: 'Announcement',
+    ownerField: 'createdBy',
+    paramName: 'id',
+  }),
   validate(announcementIdSchema, 'params'),
   announcementController.deleteAnnouncement,
 );

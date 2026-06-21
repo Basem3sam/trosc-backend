@@ -166,6 +166,9 @@ const eventSchema = new mongoose.Schema(
   },
 );
 
+// For upcoming events feed (sorted by date, filtered by future dates)
+eventSchema.index({ date: 1 });
+
 // Virtual to help the frontend render the correct button instantly
 eventSchema.virtual('locationAction').get(function () {
   if (this.locationType === 'online' && this.locationLink) {

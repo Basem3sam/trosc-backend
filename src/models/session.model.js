@@ -410,6 +410,15 @@ const sessionSchema = new mongoose.Schema(
   },
 );
 
+// For filtering by track
+sessionSchema.index({ tracks: 1 });
+// For filtering by course
+sessionSchema.index({ course: 1 });
+// For filtering by instructor
+sessionSchema.index({ instructor: 1 });
+// For published + level filtering
+sessionSchema.index({ published: 1, level: 1 });
+
 sessionSchema.pre('save', function (next) {
   // Auto-set isStandalone based on relationships
   this.isStandalone = !this.tracks?.length && !this.course;
@@ -424,9 +433,6 @@ sessionSchema.pre(/^find/, function (next) {
   });
   next();
 });
-
-// ✅ FIX - Add after sessionSchema definition
-sessionSchema.index({ title: 'text', description: 'text' });
 
 const Session = mongoose.model('Session', sessionSchema);
 

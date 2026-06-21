@@ -407,6 +407,9 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// For enrollment lookups
+userSchema.index({ enrolledTracks: 1 });
+
 /* 🧩 MIDDLEWARES */
 
 // Hash password before saving

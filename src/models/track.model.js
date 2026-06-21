@@ -249,6 +249,12 @@ const trackSchema = new mongoose.Schema(
   },
 );
 
+// Indexes for performance
+trackSchema.index({ instructor: 1 });
+trackSchema.index({ students: 1 });
+trackSchema.index({ published: 1, level: 1 });
+trackSchema.index({ title: 'text', description: 'text' }); // For search
+
 // Virtual for enrolled students count
 trackSchema.virtual('studentCount').get(function () {
   return this.students ? this.students.length : 0;
@@ -274,10 +280,6 @@ trackSchema.virtual('contentCount').get(function () {
     total: courseCount + sessionCount,
   };
 });
-
-trackSchema.index({ instructor: 1 });
-trackSchema.index({ published: 1, level: 1 });
-trackSchema.index({ title: 'text', description: 'text' }); // For search
 
 // Populate instructor info on every query
 trackSchema.pre(/^find/, function (next) {

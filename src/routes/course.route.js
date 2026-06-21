@@ -420,7 +420,11 @@
 
 const express = require('express');
 const courseController = require('../controllers/course.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
+const {
+  protect,
+  restrictTo,
+  checkOwnership,
+} = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   createCourseSchema,
@@ -441,8 +445,8 @@ const router = express.Router();
 router
   .route('/')
   .post(
-    authMiddleware.protect,
-    authMiddleware.restrictTo('admin', 'instructor'),
+    protect,
+    restrictTo('admin', 'instructor'),
     validate(createCourseSchema),
     courseController.createCourse,
   )
@@ -465,15 +469,25 @@ router
   .route('/:id')
   .get(validate(getCourseSchema, 'params'), courseController.getCourse)
   .patch(
-    authMiddleware.protect,
-    authMiddleware.restrictTo('admin', 'instructor'),
+    protect,
+    restrictTo('admin', 'instructor'),
+    checkOwnership({
+      model: 'Course',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validate(getCourseSchema, 'params'),
     validate(updateCourseSchema),
     courseController.updateCourse,
   )
   .delete(
-    authMiddleware.protect,
-    authMiddleware.restrictTo('admin'),
+    protect,
+    restrictTo('admin', 'instructor'),
+    checkOwnership({
+      model: 'Course',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validate(deleteCourseSchema, 'params'),
     courseController.deleteCourse,
   );
@@ -485,14 +499,24 @@ router
 router
   .route('/:courseId/sessions/:sessionId')
   .patch(
-    authMiddleware.protect,
-    authMiddleware.restrictTo('admin', 'instructor'),
+    protect,
+    restrictTo('admin', 'instructor'),
+    checkOwnership({
+      model: 'Course',
+      ownerField: 'instructor',
+      paramName: 'courseId',
+    }),
     validate(manageSessionSchema, 'params'),
     courseController.addSessionToCourse,
   )
   .delete(
-    authMiddleware.protect,
-    authMiddleware.restrictTo('admin', 'instructor'),
+    protect,
+    restrictTo('admin', 'instructor'),
+    checkOwnership({
+      model: 'Course',
+      ownerField: 'instructor',
+      paramName: 'courseId',
+    }),
     validate(manageSessionSchema, 'params'),
     courseController.removeSessionFromCourse,
   );
@@ -504,21 +528,24 @@ router
 router
   .route('/:id/students')
   .post(
-    authMiddleware.protect,
-    authMiddleware.restrictTo('admin', 'instructor'),
+    protect,
+    restrictTo('admin', 'instructor'),
     validate(getCourseSchema, 'params'),
     validate(addStudentSchema),
     courseController.addStudent,
   );
 
-router
-  .route('/:id/students/:studentId')
-  .delete(
-    authMiddleware.protect,
-    authMiddleware.restrictTo('admin', 'instructor'),
-    validate(getCourseSchema, 'params'),
-    validate(studentIdSchema, 'params'),
-    courseController.removeStudent,
-  );
+router.route('/:id/students/:studentId').delete(
+  protect,
+  restrictTo('admin', 'instructor'),
+  checkOwnership({
+    model: 'Course',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  validate(getCourseSchema, 'params'),
+  validate(studentIdSchema, 'params'),
+  courseController.removeStudent,
+);
 
 module.exports = router;

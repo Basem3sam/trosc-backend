@@ -374,6 +374,7 @@ courseSchema.virtual('sessionCount').get(function () {
 
 // Indexes for performance
 courseSchema.index({ instructor: 1 });
+courseSchema.index({ students: 1 });
 courseSchema.index({ track: 1 });
 courseSchema.index({ published: 1, level: 1 });
 courseSchema.index({ title: 'text', description: 'text' });

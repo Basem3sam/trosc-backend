@@ -67,6 +67,20 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
+// Stricter rate limit for auth endpoints (login, signup, forgotPassword)
+const authLimiter = rateLimit({
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || 5,
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  message:
+    'Too many auth attempts from this IP, please try again in 15 minutes',
+  skipSuccessfulRequests: true, // Don't count successful logins
+});
+
+app.use('/v1/users/login', authLimiter);
+app.use('/v1/users/signup', authLimiter);
+app.use('/v1/users/forgot-password', authLimiter);
+app.use('/v1/users/reset-password', authLimiter);
+
 /* BODY PARSER */
 
 // Body parser, reading data from body into req.body

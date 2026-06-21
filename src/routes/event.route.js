@@ -244,7 +244,7 @@
 
 const express = require('express');
 const eventController = require('../controllers/event.controller');
-const { protect, restrictTo } = require('../middlewares/auth.middleware');
+const { protect, restrictTo, checkOwnership } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   createEventSchema,
@@ -281,6 +281,11 @@ router.post(
 router.patch(
   '/:id',
   restrictTo('admin', 'instructor'),
+  checkOwnership({
+    model: 'Event',
+    ownerField: 'createdBy',
+    paramName: 'id',
+  }),
   validate(eventIdSchema, 'params'),
   validate(updateEventSchema),
   eventController.updateEvent,
@@ -288,7 +293,12 @@ router.patch(
 
 router.delete(
   '/:id',
-  restrictTo('admin'),
+  restrictTo('admin', 'instructor'),
+  checkOwnership({
+    model: 'Event',
+    ownerField: 'createdBy',
+    paramName: 'id',
+  }),
   validate(eventIdSchema, 'params'),
   eventController.deleteEvent,
 );

@@ -245,7 +245,11 @@
 
 const express = require('express');
 const sessionController = require('../controllers/session.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
+const {
+  protect,
+  restrictTo,
+  checkOwnership,
+} = require('../middlewares/auth.middleware');
 const validateMiddleware = require('../middlewares/validate.middleware');
 const {
   createSessionValidation,
@@ -258,7 +262,7 @@ const {
 const router = express.Router();
 
 // Protect all routes
-router.use(authMiddleware.protect);
+router.use(protect);
 
 // ===================================================================
 // 📚 MAIN SESSION ROUTES
@@ -267,7 +271,12 @@ router.use(authMiddleware.protect);
 router
   .route('/')
   .post(
-    authMiddleware.restrictTo('admin', 'instructor'),
+    restrictTo('admin', 'instructor'),
+    checkOwnership({
+      model: 'Session',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validateMiddleware(createSessionValidation),
     sessionController.createSession,
   )
@@ -291,13 +300,23 @@ router
     sessionController.getSession,
   )
   .patch(
-    authMiddleware.restrictTo('admin', 'instructor'),
+    restrictTo('admin', 'instructor'),
+    checkOwnership({
+      model: 'Session',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validateMiddleware(sessionIdValidation, 'params'),
     validateMiddleware(updateSessionValidation),
     sessionController.updateSession,
   )
   .delete(
-    authMiddleware.restrictTo('admin'),
+    restrictTo('admin', 'instructor'),
+    checkOwnership({
+      model: 'Session',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validateMiddleware(sessionIdValidation, 'params'),
     sessionController.deleteSession,
   );
@@ -309,19 +328,22 @@ router
 router
   .route('/:id/students')
   .post(
-    authMiddleware.restrictTo('admin', 'instructor'),
+    restrictTo('admin', 'instructor'),
     validateMiddleware(sessionIdValidation, 'params'),
     validateMiddleware(addStudentValidation),
     sessionController.addStudent,
   );
 
-router
-  .route('/:id/students/:studentId')
-  .delete(
-    authMiddleware.restrictTo('admin', 'instructor'),
-    validateMiddleware(sessionIdValidation, 'params'),
-    validateMiddleware(studentIdParamValidation, 'params'),
-    sessionController.removeStudent,
-  );
+router.route('/:id/students/:studentId').delete(
+  restrictTo('admin', 'instructor'),
+  checkOwnership({
+    model: 'Session',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  validateMiddleware(sessionIdValidation, 'params'),
+  validateMiddleware(studentIdParamValidation, 'params'),
+  sessionController.removeStudent,
+);
 
 module.exports = router;

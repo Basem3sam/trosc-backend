@@ -126,5 +126,9 @@ const announcementSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// For pinned announcements feed (pinned first, then newest)
+announcementSchema.index({ isPinned: -1, createdAt: -1 });
+
 const Announcement = mongoose.model('Announcement', announcementSchema);
+
 module.exports = Announcement;
