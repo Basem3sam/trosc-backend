@@ -1,0 +1,100 @@
+erDiagram
+    direction LR
+
+    USER ||--o{ TRACK : instructs
+    USER ||--o{ COURSE : instructs
+    USER ||--o{ SESSION : instructs
+    USER }o--o{ TRACK : enrolls
+    USER }o--o{ COURSE : enrolls
+    USER }o--o{ SESSION : enrolls
+    USER ||--o{ EVENT : creates
+    USER }o--o{ EVENT : attends
+    USER ||--o{ ANNOUNCEMENT : creates
+
+    TRACK ||--o{ COURSE : contains
+    TRACK ||--o{ SESSION : contains
+    COURSE ||--o{ SESSION : contains
+    COURSE }o--o{ COURSE : prerequisites
+
+    TRACK ||--o{ EVENT : "optional ref"
+    COURSE ||--o{ EVENT : "optional ref"
+    TRACK ||--o{ ANNOUNCEMENT : "optional target"
+    COURSE ||--o{ ANNOUNCEMENT : "optional target"
+
+    USER["User"] {
+        ObjectId _id PK
+        string name
+        string email
+        string role
+        boolean active
+        boolean emailVerified
+        date lastLogin
+    }
+
+    TRACK["Track"] {
+        ObjectId _id PK
+        string title
+        string description
+        ObjectId instructor FK
+        string level
+        boolean published
+    }
+
+    COURSE["Course"] {
+        ObjectId _id PK
+        string title
+        string description
+        ObjectId track FK
+        ObjectId instructor FK
+        string level
+        boolean published
+        number duration
+    }
+
+    SESSION["Session"] {
+        ObjectId _id PK
+        string title
+        string url
+        ObjectId instructor FK
+        ObjectId course FK
+        boolean isStandalone
+        number duration
+        boolean published
+    }
+
+    EVENT["Event"] {
+        ObjectId _id PK
+        string title
+        date date
+        string locationType
+        string locationLink
+        ObjectId createdBy FK
+    }
+
+    ANNOUNCEMENT["Announcement"] {
+        ObjectId _id PK
+        string title
+        string message
+        string audience
+        boolean isPinned
+        ObjectId createdBy FK
+    }
+
+    classDef user fill:#e8d5f5,stroke:#7b4fa6,stroke-width:2px,color:#1a1a1a
+    classDef content fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px,color:#1a1a1a
+    classDef event fill:#d5e8d4,stroke:#82b366,stroke-width:2px,color:#1a1a1a
+    classDef announcement fill:#fff2cc,stroke:#d6b656,stroke-width:2px,color:#1a1a1a
+
+    class USER user
+    class TRACK content
+    class COURSE content
+    class SESSION content
+    class EVENT event
+    class ANNOUNCEMENT announcement
+
+    style USER fill:#e8d5f5,stroke:#7b4fa6,stroke-width:2px
+    style TRACK fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px
+    style COURSE fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px
+    style SESSION fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px
+    style EVENT fill:#d5e8d4,stroke:#82b366,stroke-width:2px
+    style ANNOUNCEMENT fill:#fff2cc,stroke:#d6b656,stroke-width:2px

@@ -48,6 +48,9 @@ exports.updateCourse = catchAsync(async (req, res, next) => {
   // Prevent changing instructor via update (security)
   delete req.body.instructor;
   delete req.body.students;
+  delete req.body.courses;
+  delete req.body.sessions;
+  
   const course = await courseService.updateCourse(req.params.id, req.body);
 
   res.status(200).json({
