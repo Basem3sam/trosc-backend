@@ -465,7 +465,11 @@
 
 const express = require('express');
 const trackController = require('../controllers/track.controller');
-const { protect, restrictTo, checkOwnership } = require('../middlewares/auth.middleware');
+const {
+  protect,
+  restrictTo,
+  checkOwnership,
+} = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   createTrackSchema,
@@ -496,6 +500,19 @@ router
   )
   .get(trackController.getAllTracks);
 
+
+router.get(
+  '/student/:studentId',
+  protect,
+  (req, res, next) => {
+    if (req.user.role !== 'admin' && req.params.studentId !== req.user.id) {
+      return next(new AppError('You can only view your own enrollments', 403));
+    }
+    next();
+  },
+  trackController.getTracksByStudent
+);
+
 // --- TRACK ANALYTICS (must be before /:id) ---
 
 router.get(
@@ -512,7 +529,11 @@ router
   .patch(
     protect,
     restrictTo('admin', 'instructor'),
-    checkOwnership({ model: 'Track', ownerField: 'instructor', paramName: 'id' }),
+    checkOwnership({
+      model: 'Track',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validate(getTrackSchema, 'params'),
     validate(updateTrackSchema),
     trackController.updateTrack,
@@ -520,7 +541,11 @@ router
   .delete(
     protect,
     restrictTo('admin'),
-    checkOwnership({ model: 'Track', ownerField: 'instructor', paramName: 'id' }),
+    checkOwnership({
+      model: 'Track',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validate(deleteTrackSchema, 'params'),
     trackController.deleteTrack,
   );
@@ -532,14 +557,22 @@ router
   .patch(
     protect,
     restrictTo('admin', 'instructor'),
-    checkOwnership({ model: 'Track', ownerField: 'instructor', paramName: 'trackId' }),
+    checkOwnership({
+      model: 'Track',
+      ownerField: 'instructor',
+      paramName: 'trackId',
+    }),
     validate(manageCourseSchema, 'params'), // Reuse or create manageCourseSchema
     trackController.addCourseToTrack,
   )
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
-    checkOwnership({ model: 'Track', ownerField: 'instructor', paramName: 'trackId' }),
+    checkOwnership({
+      model: 'Track',
+      ownerField: 'instructor',
+      paramName: 'trackId',
+    }),
     validate(manageCourseSchema, 'params'),
     trackController.removeCourseFromTrack,
   );
@@ -549,14 +582,22 @@ router
   .patch(
     protect,
     restrictTo('admin', 'instructor'),
-    checkOwnership({ model: 'Track', ownerField: 'instructor', paramName: 'trackId' }),
+    checkOwnership({
+      model: 'Track',
+      ownerField: 'instructor',
+      paramName: 'trackId',
+    }),
     validate(manageSessionSchema, 'params'),
     trackController.addSessionToTrack,
   )
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
-    checkOwnership({ model: 'Track', ownerField: 'instructor', paramName: 'trackId' }),
+    checkOwnership({
+      model: 'Track',
+      ownerField: 'instructor',
+      paramName: 'trackId',
+    }),
     validate(manageSessionSchema, 'params'),
     trackController.removeSessionFromTrack,
   );
@@ -568,6 +609,11 @@ router
   .post(
     protect,
     restrictTo('admin', 'instructor'),
+    checkOwnership({
+      model: 'Track',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validate(getTrackSchema, 'params'),
     validate(addStudentSchema),
     trackController.addStudent,
@@ -578,7 +624,11 @@ router
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
-    checkOwnership({ model: 'Track', ownerField: 'instructor', paramName: 'id' }),
+    checkOwnership({
+      model: 'Track',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validate(getTrackSchema, 'params'),
     validate(studentIdSchema, 'params'),
     trackController.removeStudent,

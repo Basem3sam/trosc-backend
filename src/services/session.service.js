@@ -74,7 +74,7 @@ exports.updateSession = async (sessionId, updateData) => {
   await session.populate([
     { path: 'instructor', select: 'name email role' },
     { path: 'students', select: 'name email role' },
-    { path: 'track', select: 'title description' },
+    { path: 'tracks', select: 'title description' },
   ]);
 
   return session;

@@ -320,14 +320,17 @@ router
 // 👥 STUDENT MANAGEMENT ROUTES
 // ===================================================================
 
-router
-  .route('/:id/students')
-  .post(
-    restrictTo('admin', 'instructor'),
-    validateMiddleware(sessionIdValidation, 'params'),
-    validateMiddleware(addStudentValidation),
-    sessionController.addStudent,
-  );
+router.route('/:id/students').post(
+  restrictTo('admin', 'instructor'),
+  checkOwnership({
+    model: 'Session',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  validateMiddleware(sessionIdValidation, 'params'),
+  validateMiddleware(addStudentValidation),
+  sessionController.addStudent,
+);
 
 router.route('/:id/students/:studentId').delete(
   restrictTo('admin', 'instructor'),

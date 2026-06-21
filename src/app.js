@@ -4,7 +4,6 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
 const hpp = require('hpp');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -144,9 +143,6 @@ app.use(
 // Data sanitization against NoSQL query injection
 app.use(mongoSanitize());
 
-// Data sanitization against XSS
-app.use(xss());
-
 // prevent parameter pollution (its always use the last one)
 // [note:] make sure to focus on what can be arrayed in the params and whitelist it
 app.use(
@@ -164,10 +160,7 @@ app.use(
   }),
 );
 
-// Serving static files
-// app.use(express.static(`${__dirname}/public`));
-
-//TODO: Mount your routes here
+/* ROUTES */
 app.use('/v1/users', userRouter);
 app.use('/v1/tracks', trackRouter);
 app.use('/v1/sessions', sessionRouter);

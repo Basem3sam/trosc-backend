@@ -1,9 +1,3 @@
----
-config:
-  layout: elk
-  flowchart:
-    curve: stepBefore
----
 flowchart TD
     subgraph users [User Access]
         direction LR
@@ -43,7 +37,7 @@ flowchart TD
 
     Student -->|signup/login credentials| P1
     P1 -->|JWT token| Student
-    P1 <-->|read/write user record| DS1
+    P1 <-->|read/write user record + lastLogin| DS1
 
     Admin -->|create/update content| P2
     P2 <-->|read/write| DS2
@@ -54,11 +48,13 @@ flowchart TD
     Admin -->|create/update announcement| P4
     P4 <-->|read/write| DS4
 
-    Student -->|enroll request, RSVP| P5
+    Student -->|enroll/RSVP request| P5
+    Admin -->|enroll students manually| P5
     P5 -->|update enrolledTracks| DS1
-    P5 -->|update students/attendees| DS2
+    P5 -->|update students| DS2
     P5 -->|update attendees| DS3
 
-    P6 -->|pinned items + upcoming events| Student
+    P6 -->|pinned items + upcoming events + creator info| Student
+    DS1 -->|user/creator data| P6
     DS3 -->|upcoming events| P6
     DS4 -->|pinned announcements| P6

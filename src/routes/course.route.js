@@ -463,7 +463,17 @@ router.get(
 
 router.get('/track/:trackId', courseController.getCoursesByTrack);
 
-router.get('/student/:studentId', courseController.getCoursesByStudent);
+router.get(
+  '/student/:studentId',
+  protect,
+  (req, res, next) => {
+    if (req.user.role !== 'admin' && req.params.studentId !== req.user.id) {
+      return next(new AppError('You can only view your own enrollments', 403));
+    }
+    next();
+  },
+  courseController.getCoursesByStudent,
+);
 
 router
   .route('/:id')
@@ -525,15 +535,18 @@ router
 // 👥 STUDENT ENROLLMENT ROUTES
 // ===================================================================
 
-router
-  .route('/:id/students')
-  .post(
-    protect,
-    restrictTo('admin', 'instructor'),
-    validate(getCourseSchema, 'params'),
-    validate(addStudentSchema),
-    courseController.addStudent,
-  );
+router.route('/:id/students').post(
+  protect,
+  restrictTo('admin', 'instructor'),
+  checkOwnership({
+    model: 'Course',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  validate(getCourseSchema, 'params'),
+  validate(addStudentSchema),
+  courseController.addStudent,
+);
 
 router.route('/:id/students/:studentId').delete(
   protect,

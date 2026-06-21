@@ -1,5 +1,13 @@
 # 🎓 Trosc Backend
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/Express.js-4.x-000000?logo=express&logoColor=white" alt="Express">
+  <img src="https://img.shields.io/badge/MongoDB-Atlas-green?logo=mongodb&logoColor=white" alt="MongoDB">
+  <img src="https://img.shields.io/badge/Swagger-3.0-orange?logo=swagger&logoColor=white" alt="Swagger">
+  <img src="https://img.shields.io/badge/License-ISC-blue.svg" alt="License">
+</p>
+
 > Backend API for **Trosc**, the student club at **Faculty of Computers and Informatics, Suez Canal University**.  
 > Built to be cheap, fast, and maintainable — media lives on YouTube/Google Drive, not your server.
 
@@ -51,6 +59,20 @@ src/
 
 ---
 
+## 🏗️ System Design
+
+### Data Flow Diagram (Level 1)
+
+![DFD](./design/DFD.png)
+
+### Entity Relationship Diagram
+
+![ERD](./design/ERD.png)
+
+> 📂 Source files: [`trosc-DFD-level1.mmd`](/design/trosc-DFD-level1.mmd) · [`trosc-ERD.mmd`](/design/trosc-ERD.mmd)
+
+---
+
 ## ⚡ Quick Start
 
 ### Prerequisites
@@ -69,6 +91,12 @@ npm install
 ### 2. Environment Variables
 
 Create `.env` in the root:
+
+```bash
+cp .env.example .env
+```
+
+Then fill in your values in `.env`.
 
 ```env
 NODE_ENV=development
@@ -260,4 +288,4 @@ Backend Engineer — Node.js | MongoDB | Express.js
 
 ## 📄 License
 
-ISC — Free for educational use.
+[ISC — Free for educational use.](LICENSE)
