@@ -37,7 +37,7 @@ exports.getAllCourses = catchAsync(async (req, res, next) => {
 });
 
 exports.getCourse = catchAsync(async (req, res, next) => {
-  const course = await courseService.getCourseDetails(req.params.id);
+  const course = await courseService.getCourseDetails(req.params.id, req.user);
 
   res.status(200).json({
     status: 'success',

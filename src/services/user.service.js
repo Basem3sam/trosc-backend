@@ -82,14 +82,6 @@ exports.getMe = async (userId) => {
 };
 
 exports.updateMe = async (userId, data) => {
-  if (data.email) {
-    const existing = await User.findOne({
-      email: data.email,
-      _id: { $ne: userId },
-    });
-    if (existing) throw new AppError('Email already in use', 409);
-  }
-
   if (data.password || data.passwordConfirm) {
     throw new AppError(
       'This route is not for password update. Please use /updateMyPassword.',
@@ -105,6 +97,20 @@ exports.updateMe = async (userId, data) => {
     'website',
     'socialMedia',
   );
+
+  if (data.email) {
+    const existing = await User.findOne({
+      email: data.email,
+      _id: { $ne: userId },
+    });
+    if (existing) throw new AppError('Email already in use', 409);
+  }
+
+  const current = await User.findById(userId).select('email');
+    if (current.email !== data.email) {
+      filteredData.emailVerified = false;
+    }
+  }
 
   const updatedUser = await User.findByIdAndUpdate(userId, filteredData, {
     new: true,

@@ -74,7 +74,7 @@ exports.getCourseById = async (courseId, populateSessions = false) => {
  * @returns {Promise<Course>} Fully populated course
  * @throws {AppError} 404 if course not found
  */
-exports.getCourseDetails = async (courseId) => {
+exports.getCourseDetails = async (courseId, requestingUser = null) => {
   const course = await Course.findById(courseId)
     .populate({
       path: 'sessions',
@@ -93,6 +93,15 @@ exports.getCourseDetails = async (courseId) => {
   if (!course) {
     throw new AppError('No course found with that ID', 404);
   }
+
+  if (!course.published) {
+    const isOwner = requestingUser?.id === course.instructor?._id?.toString();
+    const isAdmin = requestingUser?.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      throw new AppError('No course found with that ID', 404);
+    }
+  }
+
   return course;
 };
 
@@ -181,6 +190,12 @@ exports.addSessionToCourse = async (courseId, sessionId) => {
 
   if (courseExists.sessions.some((id) => id.toString() === sessionId)) {
     throw new AppError('Session already exists in this course', 400);
+  }
+
+  if (session.course && session.course.toString() !== courseId) {
+    await Course.findByIdAndUpdate(session.course, {
+      $pull: { sessions: sessionId },
+    });
   }
 
   const course = await Course.findByIdAndUpdate(

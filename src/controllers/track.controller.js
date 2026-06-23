@@ -40,7 +40,7 @@ exports.getAllTracks = catchAsync(async (req, res, next) => {
 });
 
 exports.getTrack = catchAsync(async (req, res, next) => {
-  const track = await trackService.getTrackDetails(req.params.id);
+  const track = await trackService.getTrackDetails(req.params.id, req.user);
 
   res.status(200).json({
     status: 'success',

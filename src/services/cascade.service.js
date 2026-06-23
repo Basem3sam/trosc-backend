@@ -24,8 +24,8 @@ exports.syncUserEnrollments = async (userId, trackId) => {
       { $push: { students: userId } },
     ),
     User.findByIdAndUpdate(userId, {
+      $set: { enrolledTrack: trackId },
       $addToSet: {
-        enrolledTracks: trackId,
         enrolledCourses: { $each: courseIds },
         enrolledSessions: { $each: sessionIds },
       },
@@ -35,15 +35,6 @@ exports.syncUserEnrollments = async (userId, trackId) => {
 
 // Called when a student leaves a track (approve leave or instructor kick)
 exports.unsyncUserEnrollments = async (userId, trackId) => {
-  // Centralized one-track guard (runs for any update method)
-  const existingTrack = await Track.findOne({
-    students: userId,
-    _id: { $ne: trackId },
-  });
-  if (existingTrack) {
-    throw new AppError('User can only be enrolled in one track at a time', 400);
-  }
-
   const [trackCourses, trackSessions] = await Promise.all([
     Course.find({ track: trackId }),
     Session.find({ tracks: trackId }),
@@ -62,8 +53,8 @@ exports.unsyncUserEnrollments = async (userId, trackId) => {
       { $pull: { students: userId } },
     ),
     User.findByIdAndUpdate(userId, {
+      $unset: { enrolledTrack: 1 },
       $pull: {
-        enrolledTracks: trackId,
         enrolledCourses: { $in: courseIds },
         enrolledSessions: { $in: sessionIds },
       },

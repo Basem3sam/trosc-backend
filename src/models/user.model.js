@@ -421,12 +421,11 @@ const userSchema = new mongoose.Schema(
     passwordChangedAt: { type: Date, select: false },
     passwordResetToken: { type: String, select: false },
     passwordResetExpires: { type: Date, select: false },
-    enrolledTracks: [
-      {
-        type: mongoose.Schema.ObjectId,
-        ref: 'Track',
-      },
-    ],
+    enrolledTrack: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'Track',
+      default: null,
+    },
     enrolledCourses: [{ type: mongoose.Schema.ObjectId, ref: 'Course' }],
     enrolledSessions: [{ type: mongoose.Schema.ObjectId, ref: 'Session' }],
     active: {
