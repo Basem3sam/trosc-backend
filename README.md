@@ -169,8 +169,6 @@ src/
 
 </details>
 
-<br>
-
 <details>
 <summary>📊 Entity Relationship Diagram (click to expand)</summary>
 <br>
@@ -178,8 +176,6 @@ src/
 ![ERD](./design/ERD.svg)
 
 </details>
-
-<br>
 
 > 📂 Source files: [`design/trosc-DFD-level1.mmd`](./design/trosc-DFD-level1.mmd) · [`design/trosc-ERD.mmd`](./design/trosc-ERD.mmd)
 
