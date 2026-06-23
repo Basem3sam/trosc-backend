@@ -163,12 +163,16 @@ src/
 
 <details>
 <summary>📐 Data Flow Diagram (Level 1) (click to expand)</summary>
+<br>
 
 ![DFD Level 1](./design/DFD.svg)
 
 </details>
+
 <br>
+
 <details>
+<br>
 <summary>📊 Entity Relationship Diagram (click to expand)</summary>
 
 ![ERD](./design/ERD.svg)
