@@ -40,6 +40,7 @@
  *     summary: Get all sessions
  *     description: |
  *       Retrieve all sessions with filtering and pagination.
+ *       **Note:** The list view omits `url`, `embedUrl`, and `resources` for non-enrolled users.
  *       Supports MongoDB-style query filters, e.g.
  *       `?level=intermediate&published=true`.
  *     tags: [Sessions]

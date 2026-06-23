@@ -66,7 +66,19 @@
  *             locationType: "online"
  *             locationLink: "https://zoom.us/meeting/xyz"
  *     responses:
- *       201: { description: Created }
+ *       201:
+ *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     event:
+ *                       $ref: '#/components/schemas/Event'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
@@ -156,7 +168,19 @@
  *           schema:
  *             $ref: '#/components/schemas/EventUpdate'
  *     responses:
- *       200: { description: Updated }
+ *       200:
+ *         description: Updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     event:
+ *                       $ref: '#/components/schemas/Event'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }

@@ -676,6 +676,31 @@
             "description": "Address or venue for offline events",
             "example": "ITI Smart Village, Cairo"
           },
+          "locationAction": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "online",
+                  "offline"
+                ]
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "example": {
+              "type": "online",
+              "url": "https://zoom.us/meeting/xyz",
+              "label": "Join Zoom/Meet"
+            }
+          },
           "coverImage": {
             "type": "string",
             "description": "Event cover image",
@@ -922,6 +947,11 @@
             "format": "uri",
             "example": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
           },
+          "embedUrl": {
+            "type": "string",
+            "description": "Auto-generated YouTube embed or Google Drive preview URL",
+            "example": "https://www.youtube.com/embed/dQw4w9WgXcQ"
+          },
           "instructor": {
             "type": "string",
             "description": "User ID of the session instructor",
@@ -1040,15 +1070,9 @@
             "507f1f77bcf86cd799439012",
             "507f1f77bcf86cd799439013"
           ],
-          "tracks": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "507f1f77bcf86cd799439021"
-            ]
-          },
+          "tracks": [
+            "507f1f77bcf86cd799439021"
+          ],
           "isStandalone": false,
           "duration": 90,
           "level": "intermediate",
@@ -1575,14 +1599,11 @@
             ],
             "example": "student"
           },
-          "enrolledTracks": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "507f1f77bcf86cd799439012"
-            ]
+          "enrolledTrack": {
+            "type": "string",
+            "nullable": true,
+            "description": "ObjectId reference to the single track the user is enrolled in",
+            "example": "507f1f77bcf86cd799439012"
           },
           "enrolledCourses": {
             "type": "array",
@@ -2261,7 +2282,28 @@
         },
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "announcement": {
+                          "$ref": "#/components/schemas/Announcement"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/ValidationError"
@@ -2299,7 +2341,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Announcement"
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "announcement": {
+                          "$ref": "#/components/schemas/Announcement"
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -2342,7 +2398,28 @@
         },
         "responses": {
           "200": {
-            "description": "Updated"
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "announcement": {
+                          "$ref": "#/components/schemas/Announcement"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -3056,7 +3133,14 @@
         ],
         "responses": {
           "200": {
-            "description": "List of courses"
+            "description": "List of courses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoursesResponse"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -3277,7 +3361,28 @@
         },
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "$ref": "#/components/schemas/Event"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/ValidationError"
@@ -3446,7 +3551,28 @@
         },
         "responses": {
           "200": {
-            "description": "Updated"
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "$ref": "#/components/schemas/Event"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/ValidationError"
@@ -3696,7 +3822,7 @@
       "get": {
         "operationId": "getAllSessions",
         "summary": "Get all sessions",
-        "description": "Retrieve all sessions with filtering and pagination.\nSupports MongoDB-style query filters, e.g.\n`?level=intermediate&published=true`.\n",
+        "description": "Retrieve all sessions with filtering and pagination.\n**Note:** The list view omits `url`, `embedUrl`, and `resources` for non-enrolled users.\nSupports MongoDB-style query filters, e.g.\n`?level=intermediate&published=true`.\n",
         "tags": [
           "Sessions"
         ],
@@ -4227,7 +4353,7 @@
       "post": {
         "operationId": "createTrack",
         "summary": "Create a new learning track",
-        "description": "Retrieve all tracks (public endpoint).\nSupports filtering, sorting, and pagination.\n**Filter examples:**\n`?level=beginner`, `?published=true`, `?createdAt[gte]=2024-01-01`.\n",
+        "description": "Create a new learning track (admin and instructors only).\nInstructor is auto-assigned from the auth token.\n",
         "tags": [
           "Tracks"
         ],
@@ -4282,7 +4408,7 @@
         "security": [],
         "operationId": "getAllTracks",
         "summary": "Get all tracks",
-        "description": "Retrieve all tracks (public endpoint)",
+        "description": "Retrieve all tracks (public endpoint).\nSupports filtering, sorting, and pagination.\n**Filter examples:**\n`?level=beginner`, `?published=true`, `?createdAt[gte]=2024-01-01`.\n",
         "tags": [
           "Tracks"
         ],
@@ -4834,29 +4960,7 @@
                       "type": "object",
                       "properties": {
                         "analytics": {
-                          "type": "object",
-                          "properties": {
-                            "totalStudents": {
-                              "type": "integer",
-                              "example": 42
-                            },
-                            "totalSessions": {
-                              "type": "integer",
-                              "example": 12
-                            },
-                            "enrollmentRate": {
-                              "type": "integer",
-                              "example": 42
-                            },
-                            "completionRate": {
-                              "type": "integer",
-                              "example": 0
-                            },
-                            "averageEngagement": {
-                              "type": "integer",
-                              "example": 0
-                            }
-                          }
+                          "$ref": "#/components/schemas/TrackAnalytics"
                         }
                       }
                     }
@@ -5080,7 +5184,7 @@
       "post": {
         "operationId": "requestLeaveTrack",
         "summary": "Request to leave a track",
-        "description": "Submits a leave request for instructor approval",
+        "description": "Submits a leave request pending instructor approval",
         "tags": [
           "Tracks"
         ],
@@ -5527,7 +5631,24 @@
         ],
         "responses": {
           "200": {
-            "description": "Logged out successfully"
+            "description": "Logged out successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Logged out successfully!"
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -5565,7 +5686,24 @@
         },
         "responses": {
           "200": {
-            "description": "Password reset email sent"
+            "description": "Password reset email sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "If an account exists, a reset link has been sent. Please check your email."
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
             "description": "No user found with provided email"
@@ -5603,7 +5741,14 @@
         },
         "responses": {
           "200": {
-            "description": "Password reset successfully"
+            "description": "Password reset successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid or expired token"
@@ -5636,7 +5781,14 @@
         },
         "responses": {
           "200": {
-            "description": "Password updated successfully"
+            "description": "Password updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -5873,7 +6025,28 @@
         },
         "responses": {
           "201": {
-            "description": "User created successfully"
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "user": {
+                          "$ref": "#/components/schemas/UserBase"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -5977,7 +6150,28 @@
         },
         "responses": {
           "200": {
-            "description": "User updated successfully"
+            "description": "User updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "user": {
+                          "$ref": "#/components/schemas/UserBase"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"

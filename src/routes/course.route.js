@@ -445,7 +445,12 @@
  *         required: true
  *         schema: { type: string }
  *     responses:
- *       200: { description: List of courses }
+ *       200:
+ *         description: List of courses
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CoursesResponse'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */

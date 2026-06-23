@@ -46,6 +46,10 @@
  *           description: Primary content link (YouTube, Drive, Zoom, etc.)
  *           format: uri
  *           example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+ *         embedUrl:
+ *           type: string
+ *           description: Auto-generated YouTube embed or Google Drive preview URL
+ *           example: "https://www.youtube.com/embed/dQw4w9WgXcQ"
  *         instructor:
  *           type: string
  *           description: User ID of the session instructor
@@ -131,11 +135,7 @@
  *           email: "basem@example.com"
  *           role: "instructor"
  *         students: ["507f1f77bcf86cd799439012", "507f1f77bcf86cd799439013"]
- *         tracks:
- *           type: array
- *           items:
- *             type: string
- *           example: ["507f1f77bcf86cd799439021"]
+ *         tracks: ["507f1f77bcf86cd799439021"]
  *         isStandalone: false
  *         duration: 90
  *         level: "intermediate"

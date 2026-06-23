@@ -50,7 +50,19 @@
  *           schema:
  *             $ref: '#/components/schemas/AnnouncementCreate'
  *     responses:
- *       201: { description: Created }
+ *       201:
+ *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     announcement:
+ *                       $ref: '#/components/schemas/Announcement'
  *       400: { $ref: '#/components/responses/ValidationError' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
@@ -72,7 +84,14 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Announcement'
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     announcement:
+ *                       $ref: '#/components/schemas/Announcement'
  *       404: { $ref: '#/components/responses/NotFound' }
  *
  *   patch:
@@ -92,7 +111,19 @@
  *           schema:
  *             $ref: '#/components/schemas/AnnouncementUpdate'
  *     responses:
- *       200: { description: Updated }
+ *       200:
+ *         description: Updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     announcement:
+ *                       $ref: '#/components/schemas/Announcement'
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }

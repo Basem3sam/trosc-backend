@@ -25,11 +25,11 @@
  *           type: string
  *           enum: [student, admin, instructor]
  *           example: student
- *         enrolledTracks:
- *           type: array
- *           items:
- *             type: string
- *           example: [507f1f77bcf86cd799439012]
+ *         enrolledTrack:
+ *           type: string
+ *           nullable: true
+ *           description: ObjectId reference to the single track the user is enrolled in
+ *           example: "507f1f77bcf86cd799439012"
  *         enrolledCourses:
  *           type: array
  *           items:

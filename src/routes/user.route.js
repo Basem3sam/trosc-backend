@@ -72,6 +72,15 @@
  *     responses:
  *       200:
  *         description: Logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 message:
+ *                   type: string
+ *                   example: Logged out successfully!
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  */
@@ -100,6 +109,15 @@
  *     responses:
  *       200:
  *         description: Password reset email sent
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 message:
+ *                   type: string
+ *                   example: If an account exists, a reset link has been sent. Please check your email.
  *       404:
  *         description: No user found with provided email
  */
@@ -127,6 +145,10 @@
  *     responses:
  *       200:
  *         description: Password reset successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TokenResponse'
  *       400:
  *         description: Invalid or expired token
  */
@@ -150,6 +172,10 @@
  *     responses:
  *       200:
  *         description: Password updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TokenResponse'
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  */
@@ -311,6 +337,17 @@
  *     responses:
  *       201:
  *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/UserBase'
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
@@ -377,6 +414,17 @@
  *     responses:
  *       200:
  *         description: User updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/UserBase'
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:

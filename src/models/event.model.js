@@ -48,6 +48,22 @@
  *           type: string
  *           description: Address or venue for offline events
  *           example: "ITI Smart Village, Cairo"
+ *         locationAction:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             type:
+ *               type: string
+ *               enum: [online, offline]
+ *             url:
+ *               type: string
+ *               format: uri
+ *             label:
+ *               type: string
+ *           example:
+ *             type: online
+ *             url: https://zoom.us/meeting/xyz
+ *             label: Join Zoom/Meet
  *         coverImage:
  *           type: string
  *           description: Event cover image

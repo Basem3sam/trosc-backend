@@ -12,10 +12,8 @@
  *     operationId: createTrack
  *     summary: Create a new learning track
  *     description: |
- *       Retrieve all tracks (public endpoint).
- *       Supports filtering, sorting, and pagination.
- *       **Filter examples:**
- *       `?level=beginner`, `?published=true`, `?createdAt[gte]=2024-01-01`.
+ *       Create a new learning track (admin and instructors only).
+ *       Instructor is auto-assigned from the auth token.
  *     tags: [Tracks]
  *     security:
  *       - bearerAuth: []
@@ -51,7 +49,11 @@
  *     security: []
  *     operationId: getAllTracks
  *     summary: Get all tracks
- *     description: Retrieve all tracks (public endpoint)
+ *     description: |
+ *       Retrieve all tracks (public endpoint).
+ *       Supports filtering, sorting, and pagination.
+ *       **Filter examples:**
+ *       `?level=beginner`, `?published=true`, `?createdAt[gte]=2024-01-01`.
  *     tags: [Tracks]
  *     parameters:
  *       - name: page
@@ -418,23 +420,7 @@
  *                   type: object
  *                   properties:
  *                     analytics:
- *                       type: object
- *                       properties:
- *                         totalStudents:
- *                           type: integer
- *                           example: 42
- *                         totalSessions:
- *                           type: integer
- *                           example: 12
- *                         enrollmentRate:
- *                           type: integer
- *                           example: 42
- *                         completionRate:
- *                           type: integer
- *                           example: 0
- *                         averageEngagement:
- *                           type: integer
- *                           example: 0
+ *                       $ref: '#/components/schemas/TrackAnalytics'
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
@@ -679,29 +665,6 @@
  *       400: { description: Student not pending }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
- *       404: { $ref: '#/components/responses/NotFound' }
- *
- * /tracks/{id}/leave-me:
- *   post:
- *     operationId: requestLeaveTrack
- *     summary: Request to leave a track
- *     description: Submits a leave request for instructor approval
- *     tags: [Tracks]
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema: { type: string }
- *     responses:
- *       200:
- *         description: Leave request submitted
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/MessageResponse'
- *       400: { description: Not enrolled or already pending }
- *       401: { $ref: '#/components/responses/Unauthorized' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *
  * /tracks/{id}/leaves:
