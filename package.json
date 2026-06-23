@@ -10,7 +10,7 @@
     "start:prod": "cross-env NODE_ENV=production node server.js",
     "debug": "ndb server.js",
     "debug:prod": "cross-env NODE_ENV=production ndb server.js",
-    "swagger:export": "node scripts/export-swagger.js",
+    "swagger:export": "node scripts/exportSwagger.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "echo \"No tests specified yet\" && exit 0"
