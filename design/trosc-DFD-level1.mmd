@@ -1,0 +1,60 @@
+flowchart TD
+    subgraph users [User Access]
+        direction LR
+        Student([Student/User])
+        Admin([Admin/Instructor])
+    end
+
+    subgraph auth [Authentication]
+        direction LR
+        P1[1.0 Authenticate user]
+    end
+
+    subgraph content [Content Management]
+        direction TB
+        P2[2.0 Manage tracks/courses/sessions]
+        P3[3.0 Manage events]
+        P4[4.0 Manage announcements]
+    end
+
+    subgraph enroll [Enrollment]
+        direction LR
+        P5[5.0 Enroll/RSVP]
+    end
+
+    subgraph feed [Dashboard Feed]
+        direction LR
+        P6[6.0 Build dashboard feed]
+    end
+
+    subgraph stores [Data Stores]
+        direction TB
+        DS1[(User store)]
+        DS2[(Track/Course/Session store)]
+        DS3[(Event store)]
+        DS4[(Announcement store)]
+    end
+
+    Student -->|signup/login credentials| P1
+    P1 -->|JWT token| Student
+    P1 <-->|read/write user record + lastLogin| DS1
+
+    Admin -->|create/update content| P2
+    P2 <-->|read/write| DS2
+
+    Admin -->|create/update event| P3
+    P3 <-->|read/write| DS3
+
+    Admin -->|create/update announcement| P4
+    P4 <-->|read/write| DS4
+
+    Student -->|enroll/RSVP request| P5
+    Admin -->|enroll students manually| P5
+    P5 -->|update enrolledTracks| DS1
+    P5 -->|update students| DS2
+    P5 -->|update attendees| DS3
+
+    P6 -->|pinned items + upcoming events + creator info| Student
+    DS1 -->|user/creator data| P6
+    DS3 -->|upcoming events| P6
+    DS4 -->|pinned announcements| P6
