@@ -161,17 +161,18 @@ src/
 
 ## 🏗️ System Design
 
-### Data Flow Diagram (Level 1)
+<details>
+<summary>📐 Data Flow Diagram (Level 1) (click to expand)</summary>
 
-<p align="center">
-  <img src="./design/DFD.svg" width="750" alt="Data Flow Diagram">
-</p>
+![DFD Level 1](./design/DFD.svg)
+</details>
+<br>
+<details>
+<summary>📊 Entity Relationship Diagram (click to expand)</summary>
 
-### Entity Relationship Diagram
-
-<p align="center">
-  <img src="./design/ERD.svg" width="500" alt="Entity Relationship Diagram">
-</p>
+![ERD](./design/ERD.svg)
+</details>
+<br>
 
 > 📂 Source files: [`design/trosc-DFD-level1.mmd`](./design/trosc-DFD-level1.mmd) · [`design/trosc-ERD.mmd`](./design/trosc-ERD.mmd)
 
