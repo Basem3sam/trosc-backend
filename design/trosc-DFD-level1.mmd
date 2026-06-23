@@ -1,60 +1,78 @@
 flowchart TD
-    subgraph users [User Access]
+    subgraph ext [External Entities]
         direction LR
-        Student([Student/User])
-        Admin([Admin/Instructor])
+        Student([Student / User])
+        Instructor([Instructor])
+        Admin([Admin])
     end
 
     subgraph auth [Authentication]
-        direction LR
-        P1[1.0 Authenticate user]
+        P1[1.0 Authenticate User]
     end
 
     subgraph content [Content Management]
         direction TB
-        P2[2.0 Manage tracks/courses/sessions]
-        P3[3.0 Manage events]
-        P4[4.0 Manage announcements]
+        P2[2.0 Manage Tracks, Courses, Sessions]
+        P3[3.0 Manage Events]
+        P4[4.0 Manage Announcements]
     end
 
-    subgraph enroll [Enrollment]
-        direction LR
-        P5[5.0 Enroll/RSVP]
+    subgraph enroll [Enrollment & Approval]
+        P5[5.0 Process Enrollment & RSVP]
     end
 
-    subgraph feed [Dashboard Feed]
-        direction LR
-        P6[6.0 Build dashboard feed]
+    subgraph feed [Dashboard & Discovery]
+        P6[6.0 Build Dashboard Feed]
     end
 
     subgraph stores [Data Stores]
         direction TB
-        DS1[(User store)]
-        DS2[(Track/Course/Session store)]
-        DS3[(Event store)]
-        DS4[(Announcement store)]
+        DS1[(User Store)]
+        DS2[(Content Store<br/>Tracks, Courses, Sessions)]
+        DS3[(Event Store)]
+        DS4[(Announcement Store)]
     end
 
-    Student -->|signup/login credentials| P1
-    P1 -->|JWT token| Student
-    P1 <-->|read/write user record + lastLogin| DS1
+    %% Authentication flows
+    Student -->|signup / login credentials| P1
+    Instructor -->|login credentials| P1
+    Admin -->|login credentials| P1
+    P1 -->|JWT token + user profile| Student
+    P1 -->|JWT token + user profile| Instructor
+    P1 -->|JWT token + user profile| Admin
+    P1 <-->|read / write user record, lastLogin| DS1
 
-    Admin -->|create/update content| P2
-    P2 <-->|read/write| DS2
+    %% Content CRUD (Instructor + Admin)
+    Instructor -->|create / update / delete content| P2
+    Admin -->|create / update / delete / bulk| P2
+    P2 <-->|read / write tracks, courses, sessions| DS2
+    P2 <-->|read / write instructor ref| DS1
 
-    Admin -->|create/update event| P3
-    P3 <-->|read/write| DS3
+    Instructor -->|create / update event| P3
+    Admin -->|create / update event| P3
+    Student -->|RSVP / cancel RSVP| P3
+    P3 <-->|read / write events| DS3
+    P3 <-->|read creator ref| DS1
 
-    Admin -->|create/update announcement| P4
-    P4 <-->|read/write| DS4
+    Instructor -->|create / update announcement| P4
+    Admin -->|create / update announcement| P4
+    P4 <-->|read / write announcements| DS4
+    P4 <-->|read creator ref| DS1
 
-    Student -->|enroll/RSVP request| P5
-    Admin -->|enroll students manually| P5
-    P5 -->|update enrolledTracks| DS1
-    P5 -->|update students| DS2
+    %% Enrollment & Approval
+    Student -->|self-enroll / request leave| P5
+    Instructor -->|manual add / approve / reject| P5
+    Admin -->|manual add / bulk manage| P5
+    P5 -->|update enrolledTracks / Courses / Sessions| DS1
+    P5 -->|update students / pending / pendingLeaves| DS2
     P5 -->|update attendees| DS3
 
-    P6 -->|pinned items + upcoming events + creator info| Student
-    DS1 -->|user/creator data| P6
+    %% Public browsing & Feed
+    Student -->|browse / view / search| P2
+    P2 -->|public content + instructor info| Student
+    Student -->|request dashboard| P6
+    P6 -->|pinned + upcoming + creator info| Student
+    DS1 -->|user / creator data| P6
+    DS2 -->|public content metadata| P6
     DS3 -->|upcoming events| P6
     DS4 -->|pinned announcements| P6

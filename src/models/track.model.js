@@ -26,7 +26,7 @@
  *           example: "Learn modern web development with JavaScript, React, Node.js and MongoDB"
  *         instructor:
  *           type: string
- *           description: Reference to the User who instructs this track
+ *           description: ObjectId reference to the instructor. Returned as a populated object in GET responses.
  *           example: "507f1f77bcf86cd799439011"
  *         courses:
  *           type: array
@@ -40,6 +40,14 @@
  *           items:
  *             type: string
  *             example: "507f1f77bcf86cd799439012"
+ *         pendingStudents:
+ *           type: array
+ *           items: { type: string }
+ *           description: Students awaiting enrollment approval
+ *         pendingLeaves:
+ *           type: array
+ *           items: { type: string }
+ *           description: Students awaiting leave approval
  *         sessions:
  *           type: array
  *           description: List of sessions belonging to this track

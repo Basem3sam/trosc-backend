@@ -11,7 +11,7 @@ erDiagram
     USER }o--o{ EVENT : attends
     USER ||--o{ ANNOUNCEMENT : creates
 
-    TRACK ||--o{ COURSE : contains
+    TRACK |o--o{ COURSE : contains
     TRACK }o--o{ SESSION : contains
     COURSE |o--o{ SESSION : contains
     COURSE }o--o{ COURSE : prerequisites
@@ -25,11 +25,23 @@ erDiagram
         ObjectId _id PK
         string name
         string email
+        string password_hash
         string role
-        boolean active
+        string photo
+        string bio
+        string website
+        object socialMedia
         boolean emailVerified
+        boolean active
         date lastLogin
-        ObjectId[] enrolledTracks
+        ObjectId[] enrolledTracks FK
+        ObjectId[] enrolledCourses FK
+        ObjectId[] enrolledSessions FK
+        date passwordChangedAt
+        string passwordResetToken
+        date passwordResetExpires
+        date createdAt
+        date updatedAt
     }
 
     TRACK["Track"] {
@@ -39,6 +51,14 @@ erDiagram
         ObjectId instructor FK
         string level
         boolean published
+        string coverImage
+        ObjectId[] courses FK
+        ObjectId[] sessions FK
+        ObjectId[] students FK
+        ObjectId[] pendingStudents FK
+        ObjectId[] pendingLeaves FK
+        date createdAt
+        date updatedAt
     }
 
     COURSE["Course"] {
@@ -47,32 +67,58 @@ erDiagram
         string description
         ObjectId track FK
         ObjectId instructor FK
+        ObjectId[] students FK
+        ObjectId[] sessions FK
         string level
         boolean published
+        string access
+        string coverImage
+        ObjectId[] prerequisites FK
         number duration
+        object[] syllabus
+        string[] attachments
+        date createdAt
+        date updatedAt
     }
 
     SESSION["Session"] {
         ObjectId _id PK
         string title
+        string description
         string url
         ObjectId instructor FK
+        ObjectId[] students FK
+        ObjectId[] tracks FK
         ObjectId course FK
-        ObjectId[] tracks
         boolean isStandalone
+        string access
         number duration
+        string level
+        string coverImage
+        object[] resources
         boolean published
+        date startDate
+        date endDate
+        date createdAt
+        date updatedAt
     }
 
     EVENT["Event"] {
         ObjectId _id PK
         string title
+        string description
         date date
         string locationType
         string locationLink
+        string locationAddress
+        string coverImage
+        string[] attachments
+        ObjectId[] attendees FK
         ObjectId createdBy FK
         ObjectId track FK
         ObjectId course FK
+        date createdAt
+        date updatedAt
     }
 
     ANNOUNCEMENT["Announcement"] {
@@ -80,16 +126,26 @@ erDiagram
         string title
         string message
         string audience
-        boolean isPinned
-        ObjectId createdBy FK
         ObjectId targetTrack FK
         ObjectId targetCourse FK
+        string[] attachments
+        ObjectId createdBy FK
+        boolean isPinned
+        date createdAt
+        date updatedAt
     }
 
     classDef user fill:#e8d5f5,stroke:#7b4fa6,stroke-width:2px,color:#1a1a1a
     classDef content fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px,color:#1a1a1a
     classDef event fill:#d5e8d4,stroke:#82b366,stroke-width:2px,color:#1a1a1a
     classDef announcement fill:#fff2cc,stroke:#d6b656,stroke-width:2px,color:#1a1a1a
+
+    style USER fill:#e8d5f5,stroke:#7b4fa6,stroke-width:2px
+    style TRACK fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px
+    style COURSE fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px
+    style SESSION fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px
+    style EVENT fill:#d5e8d4,stroke:#82b366,stroke-width:2px
+    style ANNOUNCEMENT fill:#fff2cc,stroke:#d6b656,stroke-width:2px
 
     class USER user
     class TRACK content

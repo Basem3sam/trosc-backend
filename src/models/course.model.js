@@ -60,6 +60,17 @@
  *           description: Whether the course is publicly available
  *           default: false
  *           example: true
+ *         access:
+ *           type: string
+ *           enum: [public, track-only, private]
+ *           default: track-only
+ *           example: track-only
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
+ *             format: uri
+ *           description: Trusted-host URLs (Drive, GitHub, Cloudinary, etc.)
  *         prerequisites:
  *           type: array
  *           description: List of prerequisite course IDs
@@ -141,6 +152,14 @@
  *         published:
  *           type: boolean
  *           example: true
+ *         access:
+ *           type: string
+ *           enum: [public, track-only, private]
+ *           example: track-only
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
  *         prerequisites:
  *           type: array
  *           items:
@@ -185,6 +204,17 @@
  *         published:
  *           type: boolean
  *           example: false
+ *         access:
+ *           type: string
+ *           enum: [public, track-only, private]
+ *           default: track-only
+ *           example: track-only
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
+ *             format: uri
+ *           description: Trusted-host URLs (Drive, GitHub, Cloudinary, etc.)
  *         prerequisites:
  *           type: array
  *           items:

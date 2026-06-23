@@ -30,6 +30,29 @@
  *           items:
  *             type: string
  *           example: [507f1f77bcf86cd799439012]
+ *         enrolledCourses:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["507f1f77bcf86cd799439041"]
+ *         enrolledSessions:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["507f1f77bcf86cd799439031"]
+ *         website:
+ *           type: string
+ *           format: uri
+ *           example: https://basem.dev
+ *         socialMedia:
+ *           type: object
+ *           properties:
+ *             twitter: { type: string, format: uri }
+ *             linkedin: { type: string, format: uri }
+ *             github: { type: string, format: uri }
+ *         emailVerified:
+ *           type: boolean
+ *           example: false
  *         active:
  *           type: boolean
  *           example: true
@@ -273,6 +296,16 @@
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/StandardError'
+ *     MyEnrollmentsResponse:
+ *       type: object
+ *       properties:
+ *         status: { type: string, example: success }
+ *         data:
+ *           type: object
+ *           properties:
+ *             tracks: { type: array, items: { $ref: '#/components/schemas/Track' } }
+ *             courses: { type: array, items: { $ref: '#/components/schemas/Course' } }
+ *             sessions: { type: array, items: { $ref: '#/components/schemas/Session' } }
  */
 
 const mongoose = require('mongoose');
@@ -468,3 +501,59 @@ userSchema.methods.createPasswordResetToken = function () {
 
 const User = mongoose.model('User', userSchema);
 module.exports = User;
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     MessageResponse:
+ *       type: object
+ *       properties:
+ *         status:
+ *           type: string
+ *           example: success
+ *         message:
+ *           type: string
+ *           example: Operation completed successfully
+ *         data:
+ *           type: object
+ *
+ *     PendingListResponse:
+ *       type: object
+ *       properties:
+ *         status:
+ *           type: string
+ *           example: success
+ *         results:
+ *           type: integer
+ *           example: 3
+ *         data:
+ *           type: object
+ *           properties:
+ *             pendingStudents:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/UserBase'
+ *             pendingLeaves:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/UserBase'
+ *
+ *     FeedResponse:
+ *       type: object
+ *       properties:
+ *         status:
+ *           type: string
+ *           example: success
+ *         data:
+ *           type: object
+ *           properties:
+ *             announcements:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Announcement'
+ *             upcomingEvents:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Event'
+ */

@@ -123,7 +123,6 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true, // Don't count successful logins
 });
 
-
 app.use('/v1/users/login', authLimiter);
 app.use('/v1/users/signup', authLimiter);
 app.use('/v1/users/forgotPassword', authLimiter);
@@ -195,9 +194,10 @@ app.get('/', (req, res) => {
  *
  * /health:
  *   get:
+ *     security: []
+ *     tags: [Health]
  *     operationId: healthCheck
  *     summary: Health check
- *     tags: [Health]
  *     responses:
  *       200:
  *         description: Server is healthy

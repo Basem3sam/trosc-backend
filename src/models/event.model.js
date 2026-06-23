@@ -52,6 +52,12 @@
  *           type: string
  *           description: Event cover image
  *           example: "bootcamp-cover.jpg"
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
+ *             format: uri
+ *           description: Trusted-host URLs (Drive, GitHub, Cloudinary, etc.)
  *         attendees:
  *           type: array
  *           items:
@@ -236,6 +242,10 @@ module.exports = Event;
  *         coverImage:
  *           type: string
  *           example: "bootcamp-cover.jpg"
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
  */
 
 /**

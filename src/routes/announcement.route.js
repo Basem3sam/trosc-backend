@@ -6,6 +6,7 @@
  *
  * /announcements:
  *   get:
+ *     security: []
  *     operationId: getAllAnnouncements
  *     summary: Get all announcements
  *     description: Retrieve all announcements with filtering
@@ -56,6 +57,7 @@
  *
  * /announcements/{id}:
  *   get:
+ *     security: []
  *     operationId: getAnnouncement
  *     summary: Get single announcement
  *     tags: [Announcements]

@@ -42,13 +42,35 @@ const options = {
         },
       },
     },
-    security: [{ bearerAuth: [] }],
+    tags: [
+      {
+        name: 'Auth',
+        description: 'Authentication, registration & password management',
+      },
+      { name: 'Users', description: 'User profiles & admin management' },
+      {
+        name: 'Tracks',
+        description:
+          'Learning tracks, content organization & enrollment approvals',
+      },
+      {
+        name: 'Courses',
+        description: 'Courses within tracks & student enrollment',
+      },
+      { name: 'Sessions', description: 'Learning sessions & video content' },
+      { name: 'Events', description: 'Club events, workshops & RSVP' },
+      { name: 'Announcements', description: 'Pinned posts & targeted news' },
+      {
+        name: 'Feed',
+        description: 'Dashboard announcements + upcoming events',
+      },
+      { name: 'Health', description: 'Server & database health checks' },
+    ],
   },
   apis: [
     path.join(__dirname, '../app.js'),
     path.join(__dirname, '../routes/*.js'),
     path.join(__dirname, '../models/*.js'),
-    path.join(__dirname, '../validations/*.js'),
   ], // Path to the API docs
 };
 

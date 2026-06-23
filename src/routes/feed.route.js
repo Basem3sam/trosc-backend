@@ -6,6 +6,7 @@
  *
  * /feed:
  *   get:
+ *     security: []
  *     operationId: getFeed
  *     summary: Get dashboard feed
  *     description: Returns pinned announcements and upcoming events for the dashboard
@@ -16,22 +17,7 @@
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     announcements:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/Announcement'
- *                     upcomingEvents:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/Event'
+ *               $ref: '#/components/schemas/FeedResponse'
  */
 
 const express = require('express');

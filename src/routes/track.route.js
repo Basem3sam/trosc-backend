@@ -11,7 +11,11 @@
  *   post:
  *     operationId: createTrack
  *     summary: Create a new learning track
- *     description: Create a new track (admin and instructors only)
+ *     description: |
+ *       Retrieve all tracks (public endpoint).
+ *       Supports filtering, sorting, and pagination.
+ *       **Filter examples:**
+ *       `?level=beginner`, `?published=true`, `?createdAt[gte]=2024-01-01`.
  *     tags: [Tracks]
  *     security:
  *       - bearerAuth: []
@@ -44,6 +48,7 @@
  *         description: Track title already exists
  *
  *   get:
+ *     security: []
  *     operationId: getAllTracks
  *     summary: Get all tracks
  *     description: Retrieve all tracks (public endpoint)
@@ -73,6 +78,11 @@
  *         schema:
  *           type: string
  *           example: "-createdAt"
+ *       - name: search
+ *         in: query
+ *         schema: { type: string }
+ *         description: Full-text search across title and description
+ *         example: javascript
  *     responses:
  *       200:
  *         description: List of tracks retrieved successfully
@@ -86,6 +96,7 @@
  * @swagger
  * /tracks/{id}:
  *   get:
+ *     security: []
  *     operationId: getTrackById
  *     summary: Get a specific track by ID
  *     description: Retrieve detailed information about a track (public endpoint)
@@ -340,6 +351,7 @@
  * @swagger
  * /tracks/popular:
  *   get:
+ *     security: []
  *     operationId: getPopularTracks
  *     summary: Get most popular tracks
  *     description: Retrieve tracks sorted by student enrollment count (public endpoint)
@@ -454,7 +466,7 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/TrackResponse'
+ *               $ref: '#/components/schemas/MessageResponse'
  *       400:
  *         description: Already enrolled or track not published
  *       401:
@@ -559,6 +571,216 @@
  *         description: Track or course not found
  */
 
+/**
+ * @swagger
+ * /tracks/{id}/leave-me:
+ *   post:
+ *     operationId: requestLeaveTrack
+ *     summary: Request to leave a track
+ *     description: Submits a leave request pending instructor approval
+ *     tags: [Tracks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *         example: "507f1f77bcf86cd799439021"
+ *     responses:
+ *       200:
+ *         description: Leave request submitted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MessageResponse'
+ *       400:
+ *         description: Not enrolled or already pending
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * /tracks/{id}/pending:
+ *   get:
+ *     operationId: getPendingStudents
+ *     summary: Get pending enrollment requests
+ *     description: Retrieve students awaiting approval for a track
+ *     tags: [Tracks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *         example: "507f1f77bcf86cd799439021"
+ *     responses:
+ *       200:
+ *         description: List of pending students
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PendingListResponse'
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /tracks/{id}/students/{studentId}/approve:
+ *   post:
+ *     operationId: approveStudent
+ *     summary: Approve a student's enrollment request
+ *     tags: [Tracks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *       - name: studentId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Student approved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TrackResponse'
+ *       400: { description: Student not pending }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /tracks/{id}/students/{studentId}/reject:
+ *   post:
+ *     operationId: rejectStudent
+ *     summary: Reject a student's enrollment request
+ *     tags: [Tracks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *       - name: studentId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Request rejected
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MessageResponse'
+ *       400: { description: Student not pending }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /tracks/{id}/leave-me:
+ *   post:
+ *     operationId: requestLeaveTrack
+ *     summary: Request to leave a track
+ *     description: Submits a leave request for instructor approval
+ *     tags: [Tracks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Leave request submitted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MessageResponse'
+ *       400: { description: Not enrolled or already pending }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /tracks/{id}/leaves:
+ *   get:
+ *     operationId: getPendingLeaves
+ *     summary: Get pending leave requests
+ *     tags: [Tracks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: List of pending leaves
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PendingListResponse'
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /tracks/{id}/leaves/{studentId}/approve:
+ *   post:
+ *     operationId: approveLeaveTrack
+ *     summary: Approve a leave request
+ *     tags: [Tracks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *       - name: studentId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Leave approved, student removed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MessageResponse'
+ *       400: { description: No pending leave found }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /tracks/{id}/leaves/{studentId}/reject:
+ *   post:
+ *     operationId: rejectLeaveTrack
+ *     summary: Reject a leave request
+ *     tags: [Tracks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *       - name: studentId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Leave request rejected
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MessageResponse'
+ *       400: { description: No pending leave found }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+
 const express = require('express');
 const AppError = require('../utils/AppError');
 const trackController = require('../controllers/track.controller');
@@ -578,7 +800,7 @@ const {
   addStudentSchema,
   studentIdSchema,
 } = require('../validations/track.validation');
-const selfApproval = require('../middlewares/selfApproval')
+const selfApproval = require('../middlewares/selfApproval');
 
 const router = express.Router();
 

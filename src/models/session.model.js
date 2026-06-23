@@ -62,6 +62,15 @@
  *           items:
  *             type: string
  *           example: ["507f1f77bcf86cd799439021"]
+ *         course:
+ *           type: string
+ *           description:  Parent course ObjectId (if any)
+ *           example: "507f1f77bcf86cd799439041"
+ *         access:
+ *           type: string
+ *           enum: [public, track-only, private]
+ *           default: track-only
+ *           example: track-only
  *         isStandalone:
  *           type: boolean
  *           description: Whether session exists independently of a track
@@ -209,6 +218,10 @@
  *           items:
  *             type: string
  *           example: ["507f1f77bcf86cd799439021"]
+ *         access:
+ *           type: string
+ *           enum: [public, track-only, private]
+ *           example: public
  *         isStandalone:
  *           type: boolean
  *           example: true

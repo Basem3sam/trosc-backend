@@ -5,6 +5,7 @@
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
+    "prestart": "npm run swagger:export",
     "start": "nodemon server.js",
     "start:prod": "cross-env NODE_ENV=production node server.js",
     "debug": "ndb server.js",

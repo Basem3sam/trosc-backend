@@ -50,9 +50,13 @@
  *         description: Course title already exists
  *
  *   get:
+ *     security: []
  *     operationId: getAllCourses
  *     summary: Get all courses
- *     description: Retrieve all courses with filtering and pagination
+ *     description: |
+ *       Retrieve all courses with filtering and pagination.
+ *       **Filter examples:**
+ *       `?level=intermediate`, `?track=507f...`, `?duration[gte]=10`.
  *     tags: [Courses]
  *     parameters:
  *       - name: page
@@ -84,6 +88,11 @@
  *         schema:
  *           type: string
  *           example: "-createdAt"
+ *       - name: search
+ *         in: query
+ *         schema: { type: string }
+ *         description: Full-text search across title and description
+ *         example: react
  *     responses:
  *       200:
  *         description: List of courses retrieved
@@ -97,6 +106,7 @@
  * @swagger
  * /courses/{id}:
  *   get:
+ *     security: []
  *     operationId: getCourseById
  *     summary: Get a specific course by ID
  *     description: Retrieve detailed information about a course
@@ -350,6 +360,7 @@
  * @swagger
  * /courses/instructor/{instructorId}:
  *   get:
+ *     security: []
  *     operationId: getCoursesByInstructor
  *     summary: Get courses by instructor
  *     description: Retrieve all courses taught by a specific instructor
@@ -386,6 +397,7 @@
  * @swagger
  * /courses/track/{trackId}:
  *   get:
+ *     security: []
  *     operationId: getCoursesByTrack
  *     summary: Get courses by track
  *     description: Retrieve all courses within a specific track
@@ -436,6 +448,57 @@
  *       200: { description: List of courses }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+
+/**
+ * @swagger
+ * /courses/{id}/enroll-me:
+ *   post:
+ *     operationId: enrollMeInCourse
+ *     summary: Self-enroll in a course
+ *     description: |
+ *       Enroll the current user in a course.
+ *       Prerequisites and access rules (track-only/private) are enforced.
+ *     tags: [Courses]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Enrolled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CourseResponse'
+ *       400: { description: Already enrolled or prerequisites not met }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { description: Track-only course without track membership }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /courses/{id}/leave-me:
+ *   delete:
+ *     operationId: leaveMeFromCourse
+ *     summary: Leave a course
+ *     tags: [Courses]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Left successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CourseResponse'
+ *       400: { description: Not enrolled }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */
 
 const express = require('express');

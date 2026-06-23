@@ -170,22 +170,7 @@
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     tracks:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/Track'
- *                     courses:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/Course'
+ *               $ref: '#/components/schemas/MyEnrollmentsResponse'
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  */
@@ -596,7 +581,7 @@ router.use(authMiddleware.restrictTo('admin'));
  * @desc    Bulk user actions (activate, deactivate, delete)
  * @access  Private/Admin
  * @body    { userIds: [string], action: string }
-*/
+ */
 router.post(
   '/bulk',
   validate(bulkUserActionSchema),

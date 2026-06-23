@@ -6,9 +6,13 @@
  *
  * /events:
  *   get:
+ *     security: []
  *     operationId: getAllEvents
  *     summary: Get all events
- *     description: Retrieve all events with filtering, sorting, and pagination
+ *     description: |
+ *       Retrieve all events with filtering, sorting, and pagination.
+ *       **Filter examples:**
+ *       `?locationType=online`, `?date[gte]=2025-01-01`.
  *     tags: [Events]
  *     parameters:
  *       - name: page
@@ -110,6 +114,7 @@
  * @swagger
  * /events/{id}:
  *   get:
+ *     security: []
  *     operationId: getEvent
  *     summary: Get single event
  *     tags: [Events]

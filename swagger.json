@@ -304,6 +304,24 @@
             "default": false,
             "example": true
           },
+          "access": {
+            "type": "string",
+            "enum": [
+              "public",
+              "track-only",
+              "private"
+            ],
+            "default": "track-only",
+            "example": "track-only"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Trusted-host URLs (Drive, GitHub, Cloudinary, etc.)"
+          },
           "prerequisites": {
             "type": "array",
             "description": "List of prerequisite course IDs",
@@ -422,6 +440,21 @@
             "type": "boolean",
             "example": true
           },
+          "access": {
+            "type": "string",
+            "enum": [
+              "public",
+              "track-only",
+              "private"
+            ],
+            "example": "track-only"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "prerequisites": {
             "type": "array",
             "items": {
@@ -489,6 +522,24 @@
           "published": {
             "type": "boolean",
             "example": false
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "public",
+              "track-only",
+              "private"
+            ],
+            "default": "track-only",
+            "example": "track-only"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Trusted-host URLs (Drive, GitHub, Cloudinary, etc.)"
           },
           "prerequisites": {
             "type": "array",
@@ -630,6 +681,14 @@
             "description": "Event cover image",
             "example": "bootcamp-cover.jpg"
           },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Trusted-host URLs (Drive, GitHub, Cloudinary, etc.)"
+          },
           "attendees": {
             "type": "array",
             "items": {
@@ -706,6 +765,12 @@
           "coverImage": {
             "type": "string",
             "example": "bootcamp-cover.jpg"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -879,6 +944,21 @@
             "example": [
               "507f1f77bcf86cd799439021"
             ]
+          },
+          "course": {
+            "type": "string",
+            "description": "Parent course ObjectId (if any)",
+            "example": "507f1f77bcf86cd799439041"
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "public",
+              "track-only",
+              "private"
+            ],
+            "default": "track-only",
+            "example": "track-only"
           },
           "isStandalone": {
             "type": "boolean",
@@ -1083,6 +1163,15 @@
               "507f1f77bcf86cd799439021"
             ]
           },
+          "access": {
+            "type": "string",
+            "enum": [
+              "public",
+              "track-only",
+              "private"
+            ],
+            "example": "public"
+          },
           "isStandalone": {
             "type": "boolean",
             "example": true
@@ -1201,7 +1290,7 @@
           },
           "instructor": {
             "type": "string",
-            "description": "Reference to the User who instructs this track",
+            "description": "ObjectId reference to the instructor. Returned as a populated object in GET responses.",
             "example": "507f1f77bcf86cd799439011"
           },
           "courses": {
@@ -1219,6 +1308,20 @@
               "type": "string",
               "example": "507f1f77bcf86cd799439012"
             }
+          },
+          "pendingStudents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Students awaiting enrollment approval"
+          },
+          "pendingLeaves": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Students awaiting leave approval"
           },
           "sessions": {
             "type": "array",
@@ -1480,6 +1583,50 @@
             "example": [
               "507f1f77bcf86cd799439012"
             ]
+          },
+          "enrolledCourses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "507f1f77bcf86cd799439041"
+            ]
+          },
+          "enrolledSessions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "507f1f77bcf86cd799439031"
+            ]
+          },
+          "website": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://basem.dev"
+          },
+          "socialMedia": {
+            "type": "object",
+            "properties": {
+              "twitter": {
+                "type": "string",
+                "format": "uri"
+              },
+              "linkedin": {
+                "type": "string",
+                "format": "uri"
+              },
+              "github": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "example": false
           },
           "active": {
             "type": "boolean",
@@ -1801,6 +1948,78 @@
             "example": true
           }
         }
+      },
+      "MessageResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "message": {
+            "type": "string",
+            "example": "Operation completed successfully"
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "PendingListResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "results": {
+            "type": "integer",
+            "example": 3
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "pendingStudents": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/UserBase"
+                }
+              },
+              "pendingLeaves": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/UserBase"
+                }
+              }
+            }
+          }
+        }
+      },
+      "FeedResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "announcements": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Announcement"
+                }
+              },
+              "upcomingEvents": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -1843,22 +2062,88 @@
             }
           }
         }
+      },
+      "MyEnrollmentsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "tracks": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Track"
+                }
+              },
+              "courses": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Course"
+                }
+              },
+              "sessions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
-  "security": [
+  "tags": [
     {
-      "bearerAuth": []
+      "name": "Auth",
+      "description": "Authentication, registration & password management"
+    },
+    {
+      "name": "Users",
+      "description": "User profiles & admin management"
+    },
+    {
+      "name": "Tracks",
+      "description": "Learning tracks, content organization & enrollment approvals"
+    },
+    {
+      "name": "Courses",
+      "description": "Courses within tracks & student enrollment"
+    },
+    {
+      "name": "Sessions",
+      "description": "Learning sessions & video content"
+    },
+    {
+      "name": "Events",
+      "description": "Club events, workshops & RSVP"
+    },
+    {
+      "name": "Announcements",
+      "description": "Pinned posts & targeted news"
+    },
+    {
+      "name": "Feed",
+      "description": "Dashboard announcements + upcoming events"
+    },
+    {
+      "name": "Health",
+      "description": "Server & database health checks"
     }
   ],
   "paths": {
     "/health": {
       "get": {
-        "operationId": "healthCheck",
-        "summary": "Health check",
+        "security": [],
         "tags": [
           "Health"
         ],
+        "operationId": "healthCheck",
+        "summary": "Health check",
         "responses": {
           "200": {
             "description": "Server is healthy",
@@ -1891,6 +2176,7 @@
     },
     "/announcements": {
       "get": {
+        "security": [],
         "operationId": "getAllAnnouncements",
         "summary": "Get all announcements",
         "description": "Retrieve all announcements with filtering",
@@ -1991,6 +2277,7 @@
     },
     "/announcements/{id}": {
       "get": {
+        "security": [],
         "operationId": "getAnnouncement",
         "summary": "Get single announcement",
         "tags": [
@@ -2172,9 +2459,10 @@
         }
       },
       "get": {
+        "security": [],
         "operationId": "getAllCourses",
         "summary": "Get all courses",
-        "description": "Retrieve all courses with filtering and pagination",
+        "description": "Retrieve all courses with filtering and pagination.\n**Filter examples:**\n`?level=intermediate`, `?track=507f...`, `?duration[gte]=10`.\n",
         "tags": [
           "Courses"
         ],
@@ -2229,6 +2517,15 @@
               "type": "string",
               "example": "-createdAt"
             }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Full-text search across title and description",
+            "example": "react"
           }
         ],
         "responses": {
@@ -2247,6 +2544,7 @@
     },
     "/courses/{id}": {
       "get": {
+        "security": [],
         "operationId": "getCourseById",
         "summary": "Get a specific course by ID",
         "description": "Retrieve detailed information about a course",
@@ -2629,6 +2927,7 @@
     },
     "/courses/instructor/{instructorId}": {
       "get": {
+        "security": [],
         "operationId": "getCoursesByInstructor",
         "summary": "Get courses by instructor",
         "description": "Retrieve all courses taught by a specific instructor",
@@ -2681,6 +2980,7 @@
     },
     "/courses/track/{trackId}": {
       "get": {
+        "security": [],
         "operationId": "getCoursesByTrack",
         "summary": "Get courses by track",
         "description": "Retrieve all courses within a specific track",
@@ -2767,11 +3067,106 @@
         }
       }
     },
+    "/courses/{id}/enroll-me": {
+      "post": {
+        "operationId": "enrollMeInCourse",
+        "summary": "Self-enroll in a course",
+        "description": "Enroll the current user in a course.\nPrerequisites and access rules (track-only/private) are enforced.\n",
+        "tags": [
+          "Courses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enrolled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Already enrolled or prerequisites not met"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Track-only course without track membership"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/courses/{id}/leave-me": {
+      "delete": {
+        "operationId": "leaveMeFromCourse",
+        "summary": "Leave a course",
+        "tags": [
+          "Courses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Left successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not enrolled"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/events": {
       "get": {
+        "security": [],
         "operationId": "getAllEvents",
         "summary": "Get all events",
-        "description": "Retrieve all events with filtering, sorting, and pagination",
+        "description": "Retrieve all events with filtering, sorting, and pagination.\n**Filter examples:**\n`?locationType=online`, `?date[gte]=2025-01-01`.\n",
         "tags": [
           "Events"
         ],
@@ -2972,6 +3367,7 @@
     },
     "/events/{id}": {
       "get": {
+        "security": [],
         "operationId": "getEvent",
         "summary": "Get single event",
         "tags": [
@@ -3231,6 +3627,7 @@
     },
     "/feed": {
       "get": {
+        "security": [],
         "operationId": "getFeed",
         "summary": "Get dashboard feed",
         "description": "Returns pinned announcements and upcoming events for the dashboard",
@@ -3243,30 +3640,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "success"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "announcements": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/Announcement"
-                          }
-                        },
-                        "upcomingEvents": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/Event"
-                          }
-                        }
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/FeedResponse"
                 }
               }
             }
@@ -3322,7 +3696,7 @@
       "get": {
         "operationId": "getAllSessions",
         "summary": "Get all sessions",
-        "description": "Retrieve all sessions with filtering and pagination",
+        "description": "Retrieve all sessions with filtering and pagination.\nSupports MongoDB-style query filters, e.g.\n`?level=intermediate&published=true`.\n",
         "tags": [
           "Sessions"
         ],
@@ -3646,11 +4020,214 @@
         }
       }
     },
+    "/sessions/instructor/{instructorId}": {
+      "get": {
+        "operationId": "getSessionsByInstructor",
+        "summary": "Get sessions by instructor",
+        "tags": [
+          "Sessions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instructorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instructor not found"
+          }
+        }
+      }
+    },
+    "/sessions/track/{trackId}": {
+      "get": {
+        "operationId": "getSessionsByTrack",
+        "summary": "Get sessions by track",
+        "tags": [
+          "Sessions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "trackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Track not found"
+          }
+        }
+      }
+    },
+    "/sessions/{id}/enroll-me": {
+      "post": {
+        "operationId": "enrollMeInSession",
+        "summary": "Self-enroll in a session",
+        "tags": [
+          "Sessions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enrolled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Already enrolled"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Track-only session without membership"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/sessions/{id}/leave-me": {
+      "delete": {
+        "operationId": "leaveMeFromSession",
+        "summary": "Leave a session",
+        "tags": [
+          "Sessions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Left successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not enrolled"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/tracks": {
       "post": {
         "operationId": "createTrack",
         "summary": "Create a new learning track",
-        "description": "Create a new track (admin and instructors only)",
+        "description": "Retrieve all tracks (public endpoint).\nSupports filtering, sorting, and pagination.\n**Filter examples:**\n`?level=beginner`, `?published=true`, `?createdAt[gte]=2024-01-01`.\n",
         "tags": [
           "Tracks"
         ],
@@ -3702,6 +4279,7 @@
         }
       },
       "get": {
+        "security": [],
         "operationId": "getAllTracks",
         "summary": "Get all tracks",
         "description": "Retrieve all tracks (public endpoint)",
@@ -3752,6 +4330,15 @@
               "type": "string",
               "example": "-createdAt"
             }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Full-text search across title and description",
+            "example": "javascript"
           }
         ],
         "responses": {
@@ -3770,6 +4357,7 @@
     },
     "/tracks/{id}": {
       "get": {
+        "security": [],
         "operationId": "getTrackById",
         "summary": "Get a specific track by ID",
         "description": "Retrieve detailed information about a track (public endpoint)",
@@ -4153,6 +4741,7 @@
     },
     "/tracks/popular": {
       "get": {
+        "security": [],
         "operationId": "getPopularTracks",
         "summary": "Get most popular tracks",
         "description": "Retrieve tracks sorted by student enrollment count (public endpoint)",
@@ -4318,7 +4907,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TrackResponse"
+                  "$ref": "#/components/schemas/MessageResponse"
                 }
               }
             }
@@ -4483,6 +5072,369 @@
           },
           "404": {
             "description": "Track or course not found"
+          }
+        }
+      }
+    },
+    "/tracks/{id}/leave-me": {
+      "post": {
+        "operationId": "requestLeaveTrack",
+        "summary": "Request to leave a track",
+        "description": "Submits a leave request for instructor approval",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "507f1f77bcf86cd799439021"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leave request submitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not enrolled or already pending"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/tracks/{id}/pending": {
+      "get": {
+        "operationId": "getPendingStudents",
+        "summary": "Get pending enrollment requests",
+        "description": "Retrieve students awaiting approval for a track",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "507f1f77bcf86cd799439021"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of pending students",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/tracks/{id}/students/{studentId}/approve": {
+      "post": {
+        "operationId": "approveStudent",
+        "summary": "Approve a student's enrollment request",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Student approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Student not pending"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/tracks/{id}/students/{studentId}/reject": {
+      "post": {
+        "operationId": "rejectStudent",
+        "summary": "Reject a student's enrollment request",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Student not pending"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/tracks/{id}/leaves": {
+      "get": {
+        "operationId": "getPendingLeaves",
+        "summary": "Get pending leave requests",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of pending leaves",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/tracks/{id}/leaves/{studentId}/approve": {
+      "post": {
+        "operationId": "approveLeaveTrack",
+        "summary": "Approve a leave request",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leave approved, student removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No pending leave found"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/tracks/{id}/leaves/{studentId}/reject": {
+      "post": {
+        "operationId": "rejectLeaveTrack",
+        "summary": "Reject a leave request",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leave request rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No pending leave found"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -4711,30 +5663,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "success"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "tracks": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/Track"
-                          }
-                        },
-                        "courses": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/Course"
-                          }
-                        }
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/MyEnrollmentsResponse"
                 }
               }
             }
@@ -5175,43 +6104,5 @@
         }
       }
     }
-  },
-  "tags": [
-    {
-      "name": "Health",
-      "description": "Server health and status checks"
-    },
-    {
-      "name": "Announcements",
-      "description": "Club announcements and news"
-    },
-    {
-      "name": "Courses",
-      "description": "Course management within tracks and student enrollment"
-    },
-    {
-      "name": "Events",
-      "description": "Club events, workshops, and RSVP management"
-    },
-    {
-      "name": "Feed",
-      "description": "Dashboard feed with announcements and events"
-    },
-    {
-      "name": "Sessions",
-      "description": "Learning session management and student enrollment"
-    },
-    {
-      "name": "Tracks",
-      "description": "Learning track management and session organization"
-    },
-    {
-      "name": "Auth",
-      "description": "Authentication and user registration"
-    },
-    {
-      "name": "Users",
-      "description": "User management and profile operations"
-    }
-  ]
+  }
 }

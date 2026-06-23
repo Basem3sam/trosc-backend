@@ -38,7 +38,10 @@
  *   get:
  *     operationId: getAllSessions
  *     summary: Get all sessions
- *     description: Retrieve all sessions with filtering and pagination
+ *     description: |
+ *       Retrieve all sessions with filtering and pagination.
+ *       Supports MongoDB-style query filters, e.g.
+ *       `?level=intermediate&published=true`.
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []
@@ -241,6 +244,106 @@
  *         $ref: '#/components/responses/Forbidden'
  *       404:
  *         description: Session or student not found
+ */
+
+/**
+ * @swagger
+ * /sessions/instructor/{instructorId}:
+ *   get:
+ *     operationId: getSessionsByInstructor
+ *     summary: Get sessions by instructor
+ *     tags: [Sessions]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: instructorId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *       - name: limit
+ *         in: query
+ *         schema: { type: integer, default: 10 }
+ *     responses:
+ *       200:
+ *         description: List of sessions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SessionsResponse'
+ *       404: { description: Instructor not found }
+ *
+ * /sessions/track/{trackId}:
+ *   get:
+ *     operationId: getSessionsByTrack
+ *     summary: Get sessions by track
+ *     tags: [Sessions]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: trackId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *       - name: limit
+ *         in: query
+ *         schema: { type: integer, default: 10 }
+ *     responses:
+ *       200:
+ *         description: List of sessions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SessionsResponse'
+ *       404: { description: Track not found }
+ *
+ * /sessions/{id}/enroll-me:
+ *   post:
+ *     operationId: enrollMeInSession
+ *     summary: Self-enroll in a session
+ *     tags: [Sessions]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Enrolled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SessionResponse'
+ *       400: { description: Already enrolled }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { description: Track-only session without membership }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /sessions/{id}/leave-me:
+ *   delete:
+ *     operationId: leaveMeFromSession
+ *     summary: Leave a session
+ *     tags: [Sessions]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Left successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SessionResponse'
+ *       400: { description: Not enrolled }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */
 
 const express = require('express');
