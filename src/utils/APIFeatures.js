@@ -68,7 +68,7 @@ class APIFeatures {
     if (searchTerm && searchFields.length > 0) {
       try {
         const searchRegex = new RegExp(
-          searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), // ✅ Escape regex chars
+          searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
           'i',
         );
 
@@ -76,13 +76,22 @@ class APIFeatures {
           [field]: { $regex: searchRegex },
         }));
 
-        this.query = this.query.find({ $or: searchConditions });
+        const searchQuery = { $or: searchConditions };
+        this.query = this.query.find(searchQuery);
+
+        this.conditions = this.conditions
+          ? { $and: [this.conditions, searchQuery] }
+          : searchQuery;
       } catch (error) {
-        // If regex fails, fall back to simple text search
         const searchConditions = searchFields.map((field) => ({
           [field]: { $regex: searchTerm, $options: 'i' },
         }));
-        this.query = this.query.find({ $or: searchConditions });
+        const searchQuery = { $or: searchConditions };
+        this.query = this.query.find(searchQuery);
+
+        this.conditions = this.conditions
+          ? { $and: [this.conditions, searchQuery] }
+          : searchQuery;
       }
     }
     return this;

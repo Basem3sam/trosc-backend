@@ -13,6 +13,7 @@ exports.createEvent = async (data) => {
 exports.getAllEvents = async (query) => {
   const features = new APIFeatures(Event.find(), query, Event)
     .filter()
+    .search(['title', 'message'])
     .sort()
     .limitFields();
 
@@ -78,6 +79,7 @@ exports.cancelRsvp = async (eventId, userId) => {
 exports.getMyEvents = async (userId, query) => {
   const features = new APIFeatures(Event.find(), query, Event)
     .filter({ attendees: userId })
+    .search(['title', 'message'])
     .sort()
     .limitFields();
 

@@ -30,6 +30,7 @@ exports.getAllTracks = async (query) => {
   // Create features instance with the Track model
   const features = new APIFeatures(Track.find(), query, Track)
     .filter()
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 
@@ -339,198 +340,6 @@ exports.removeSessionFromTrack = async (trackId, sessionId) => {
 };
 
 // ===================================================================
-// 👥 STUDENT ENROLLMENT MANAGEMENT
-// ===================================================================
-
-/**
- * Enroll a student in a track with duplicate prevention
- * @param {string} trackId - MongoDB track ID
- * @param {string} studentId - MongoDB user ID (student)
- * @returns {Promise<Track>} Updated track with enrolled student
- * @throws {AppError} 404 if track not found, 400 if already enrolled
- */
-exports.enrollStudentInTrack = async (trackId, studentId) => {
-  const track = await Track.findById(trackId);
-  if (!track) {
-    throw new AppError('No track found with that ID', 404);
-  }
-
-  // Prevent duplicate enrollment
-  if (track.students.some((id) => id.toString() === studentId)) {
-    throw new AppError('Student is already enrolled in this track', 400);
-  }
-
-  const updatedTrack = await Track.findByIdAndUpdate(
-    trackId,
-    { $addToSet: { students: studentId } },
-    { new: true, runValidators: true },
-  );
-
-  // Keep User.enrolledTracks in sync
-  await cascade.syncUserEnrollments(studentId, trackId);
-
-  return updatedTrack;
-};
-
-/**
- * Remove a student from a track enrollment
- * @param {string} trackId - MongoDB track ID
- * @param {string} studentId - MongoDB user ID (student)
- * @returns {Promise<Track>} Updated track without the student
- * @throws {AppError} 404 if track not found, 400 if student not enrolled
- */
-exports.removeStudentFromTrack = async (trackId, studentId) => {
-  const track = await Track.findById(trackId);
-  if (!track) throw new AppError('No track found with that ID', 404);
-  if (!track.students.some((id) => id.toString() === studentId)) {
-    throw new AppError('Student is not enrolled in this track', 400);
-  }
-
-  track.students.pull(studentId);
-  await track.save();
-
-  await cascade.unsyncUserEnrollments(studentId, trackId);
-
-  return track;
-};
-
-exports.requestLeaveTrack = async (trackId, studentId) => {
-  const track = await Track.findById(trackId);
-  if (!track) throw new AppError('No track found with that ID', 404);
-  if (!track.students.some((id) => id.toString() === studentId)) {
-    throw new AppError('You are not enrolled in this track', 400);
-  }
-  if (track.pendingLeaves.some((id) => id.toString() === studentId)) {
-    throw new AppError('Your leave request is already pending', 400);
-  }
-
-  track.pendingLeaves.push(studentId);
-  await track.save();
-  return track;
-};
-
-exports.approveLeaveTrack = async (trackId, studentId) => {
-  const track = await Track.findById(trackId);
-  if (!track) throw new AppError('No track found with that ID', 404);
-  if (!track.pendingLeaves.some((id) => id.toString() === studentId)) {
-    throw new AppError('No pending leave request found', 400);
-  }
-
-  track.pendingLeaves.pull(studentId);
-  track.students.pull(studentId);
-  await track.save();
-
-  await cascade.unsyncUserEnrollments(studentId, trackId);
-
-  return track;
-};
-
-exports.rejectLeaveTrack = async (trackId, studentId) => {
-  const track = await Track.findById(trackId);
-  if (!track) throw new AppError('No track found with that ID', 404);
-  if (!track.pendingLeaves.some((id) => id.toString() === studentId)) {
-    throw new AppError('No pending leave request found', 400);
-  }
-
-  track.pendingLeaves.pull(studentId);
-  await track.save();
-  return track;
-};
-
-exports.getPendingLeaves = async (trackId) => {
-  const track = await Track.findById(trackId)
-    .populate('pendingLeaves', 'name email photo role')
-    .select('pendingLeaves title');
-  if (!track) throw new AppError('No track found with that ID', 404);
-  return track.pendingLeaves;
-};
-
-exports.enrollMeInTrack = async (trackId, userId) => {
-  // One-track-only rule: cannot be in or pending in any other track
-  const userDoc = await User.findById(userId).select('enrolledTrack');
-  if (userDoc.enrolledTrack && userDoc.enrolledTrack.toString() !== trackId) {
-    throw new AppError(
-      'You can only apply to one track at a time. Leave your current track first.',
-      400,
-    );
-  }
-  const existingPending = await Track.findOne({
-    pendingStudents: userId,
-    _id: { $ne: trackId },
-  });
-  if (existingPending) {
-    throw new AppError('You can only apply to one track at a time...', 400);
-  }
-
-  const track = await Track.findById(trackId);
-  if (!track) throw new AppError('No track found with that ID', 404);
-  if (!track.published)
-    throw new AppError('This track is not open for enrollment', 400);
-
-  if (track.students.some((id) => id.toString() === userId)) {
-    throw new AppError('You are already enrolled in this track', 400);
-  }
-
-  if (track.pendingStudents.some((id) => id.toString() === userId)) {
-    throw new AppError('Your application is already pending approval', 400);
-  }
-
-  track.pendingStudents.push(userId);
-  await track.save();
-  return track;
-};
-
-exports.approveStudentInTrack = async (trackId, studentId) => {
-  const track = await Track.findById(trackId);
-  if (!track) throw new AppError('No track found with that ID', 404);
-
-  if (!track.pendingStudents.some((id) => id.toString() === studentId)) {
-    throw new AppError('Student is not pending in this track', 400);
-  }
-
-  const claimed = await User.findOneAndUpdate(
-    { _id: studentId, enrolledTrack: null },
-    { $set: { enrolledTrack: trackId } },
-    { new: true },
-  );
-  if (!claimed) {
-    const user = await User.findById(studentId).select('enrolledTrack');
-    if (user.enrolledTrack?.toString() !== trackId) {
-      throw new AppError('Student is already enrolled in another track', 400);
-    }
-  }
-
-  track.pendingStudents.pull(studentId);
-  track.students.push(studentId);
-  await track.save();
-
-  await cascade.syncUserEnrollments(studentId, trackId);
-
-  return track;
-};
-
-exports.rejectStudentInTrack = async (trackId, studentId) => {
-  const track = await Track.findById(trackId);
-  if (!track) throw new AppError('No track found with that ID', 404);
-
-  if (!track.pendingStudents.some((id) => id.toString() === studentId)) {
-    throw new AppError('Student is not pending in this track', 400);
-  }
-
-  track.pendingStudents.pull(studentId);
-  await track.save();
-  return track;
-};
-
-exports.getPendingStudents = async (trackId) => {
-  const track = await Track.findById(trackId)
-    .populate('pendingStudents', 'name email photo role')
-    .select('pendingStudents title');
-  if (!track) throw new AppError('No track found with that ID', 404);
-  return track.pendingStudents;
-};
-
-// ===================================================================
 // 🔍 ADVANCED QUERIES & ANALYTICS
 // ===================================================================
 
@@ -543,6 +352,7 @@ exports.getPendingStudents = async (trackId) => {
 exports.getTracksByInstructor = async (instructorId, query) => {
   const features = new APIFeatures(Track.find(), query, Track)
     .filter({ instructor: instructorId })
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 
@@ -566,6 +376,7 @@ exports.getTracksByInstructor = async (instructorId, query) => {
 exports.getTracksByStudent = async (studentId, query) => {
   const features = new APIFeatures(Track.find(), query, Track)
     .filter({ students: studentId })
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 

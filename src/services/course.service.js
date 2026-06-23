@@ -29,6 +29,7 @@ exports.createCourse = async (courseBody) => {
 exports.getAllCourses = async (query) => {
   const features = new APIFeatures(Course.find(), query, Course)
     .filter()
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 
@@ -322,6 +323,7 @@ exports.removeStudentFromCourse = async (courseId, studentId) => {
 exports.getCoursesByInstructor = async (instructorId, query) => {
   const features = new APIFeatures(Course.find(), query, Course)
     .filter({ instructor: instructorId })
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 
@@ -345,6 +347,7 @@ exports.getCoursesByInstructor = async (instructorId, query) => {
 exports.getCoursesByTrack = async (trackId, query) => {
   const features = new APIFeatures(Course.find(), query, Course)
     .filter({ track: trackId })
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 

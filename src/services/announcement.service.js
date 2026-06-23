@@ -15,6 +15,7 @@ exports.getAnnouncements = async (query) => {
   const baseQuery = Announcement.find().sort({ isPinned: -1, createdAt: -1 });
   const features = new APIFeatures(baseQuery, query, Announcement)
     .filter()
+    .search(['title', 'message'])
     .limitFields();
 
   await features.paginate();

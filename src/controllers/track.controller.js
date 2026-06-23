@@ -1,5 +1,4 @@
-// controllers/track.controller.js
-
+const enrollmentService = require('../services/enrollment.service');
 const trackService = require('../services/track.service');
 const catchAsync = require('../utils/catchAsync');
 
@@ -123,7 +122,7 @@ exports.removeSessionFromTrack = catchAsync(async (req, res, next) => {
 });
 
 exports.addStudent = catchAsync(async (req, res, next) => {
-  const track = await trackService.enrollStudentInTrack(
+  const track = await enrollmentService.enrollStudentInTrack(
     req.params.id,
     req.body.studentId,
   );
@@ -131,7 +130,7 @@ exports.addStudent = catchAsync(async (req, res, next) => {
 });
 
 exports.removeStudent = catchAsync(async (req, res, next) => {
-  const track = await trackService.removeStudentFromTrack(
+  const track = await enrollmentService.removeStudentFromTrack(
     req.params.id,
     req.params.studentId,
   );
@@ -139,7 +138,7 @@ exports.removeStudent = catchAsync(async (req, res, next) => {
 });
 
 exports.enrollMe = catchAsync(async (req, res, next) => {
-  const track = await trackService.enrollMeInTrack(req.params.id, req.user.id);
+  const track = await enrollmentService.enrollMeInTrack(req.params.id, req.user.id);
   res.status(200).json({
     status: 'success',
     message: 'Application submitted. Waiting for instructor approval.',
@@ -148,7 +147,7 @@ exports.enrollMe = catchAsync(async (req, res, next) => {
 });
 
 exports.getPendingStudents = catchAsync(async (req, res, next) => {
-  const pending = await trackService.getPendingStudents(req.params.id);
+  const pending = await enrollmentService.getPendingStudents(req.params.id);
   res.status(200).json({
     status: 'success',
     results: pending.length,
@@ -157,7 +156,7 @@ exports.getPendingStudents = catchAsync(async (req, res, next) => {
 });
 
 exports.approveStudent = catchAsync(async (req, res, next) => {
-  const track = await trackService.approveStudentInTrack(
+  const track = await enrollmentService.approveStudentInTrack(
     req.params.id,
     req.params.studentId,
   );
@@ -169,7 +168,7 @@ exports.approveStudent = catchAsync(async (req, res, next) => {
 });
 
 exports.rejectStudent = catchAsync(async (req, res, next) => {
-  const track = await trackService.rejectStudentInTrack(
+  const track = await enrollmentService.rejectStudentInTrack(
     req.params.id,
     req.params.studentId,
   );
@@ -181,7 +180,7 @@ exports.rejectStudent = catchAsync(async (req, res, next) => {
 });
 
 exports.requestLeaveTrack = catchAsync(async (req, res, next) => {
-  const track = await trackService.requestLeaveTrack(
+  const track = await enrollmentService.requestLeaveTrack(
     req.params.id,
     req.user.id,
   );
@@ -193,7 +192,7 @@ exports.requestLeaveTrack = catchAsync(async (req, res, next) => {
 });
 
 exports.approveLeaveTrack = catchAsync(async (req, res, next) => {
-  const track = await trackService.approveLeaveTrack(
+  const track = await enrollmentService.approveLeaveTrack(
     req.params.id,
     req.params.studentId,
   );
@@ -205,7 +204,7 @@ exports.approveLeaveTrack = catchAsync(async (req, res, next) => {
 });
 
 exports.rejectLeaveTrack = catchAsync(async (req, res, next) => {
-  const track = await trackService.rejectLeaveTrack(
+  const track = await enrollmentService.rejectLeaveTrack(
     req.params.id,
     req.params.studentId,
   );
@@ -217,7 +216,7 @@ exports.rejectLeaveTrack = catchAsync(async (req, res, next) => {
 });
 
 exports.getPendingLeaves = catchAsync(async (req, res, next) => {
-  const pending = await trackService.getPendingLeaves(req.params.id);
+  const pending = await enrollmentService.getPendingLeaves(req.params.id);
   res.status(200).json({
     status: 'success',
     results: pending.length,

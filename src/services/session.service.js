@@ -17,6 +17,7 @@ exports.createSession = async (sessionData) => {
 exports.getAllSessions = async (query) => {
   const features = new APIFeatures(Session.find(), query, Session)
     .filter()
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 
@@ -192,6 +193,7 @@ exports.removeStudentFromSession = async (sessionId, studentId) => {
 exports.getSessionsByInstructor = async (instructorId, query) => {
   const features = new APIFeatures(Session.find(), query, Session)
     .filter({ instructor: instructorId })
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 
@@ -211,6 +213,7 @@ exports.getSessionsByInstructor = async (instructorId, query) => {
 exports.getSessionsByTrack = async (trackId, query) => {
   const features = new APIFeatures(Session.find(), query, Session)
     .filter({ tracks: trackId })
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 
