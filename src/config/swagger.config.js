@@ -2,14 +2,15 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const path = require('path');
 
 const getBaseUrl = () => {
-  if (process.env.BASE_URL) {
-    return process.env.BASE_URL;
-  }
+  if (process.env.BASE_URL) return process.env.BASE_URL;
   const port = process.env.PORT || 5000;
   return process.env.NODE_ENV === 'production'
-    ? process.env.BASE_URL || `https://your-production-domain.com`
+    ? process.env.BASE_URL || 'https://your-production-domain.com'
     : `http://localhost:${port}`;
 };
+
+// Fix Windows backslashes in glob patterns
+const globPath = (rel) => path.join(__dirname, rel).replace(/\\/g, '/');
 
 const options = {
   definition: {
@@ -18,28 +19,15 @@ const options = {
       title: 'Trosc API Documentation',
       version: '1.0.0',
       description: 'Official API documentation for the Trosc platform.',
-      contact: {
-        name: 'Basem Esam',
-        url: 'https://github.com/basem3sam',
-      },
+      contact: { name: 'Basem Esam', url: 'https://github.com/basem3sam' },
     },
     servers: [
-      {
-        url: `${getBaseUrl()}/v1`,
-        description: `${process.env.NODE_ENV || 'development'} server`,
-      },
-      {
-        url: getBaseUrl(),
-        description: 'Root server',
-      },
+      { url: `${getBaseUrl()}/v1`, description: 'API server' },
+      { url: getBaseUrl(), description: 'Root server' },
     ],
     components: {
       securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-        },
+        bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       },
     },
     tags: [
@@ -68,12 +56,10 @@ const options = {
     ],
   },
   apis: [
-    path.join(__dirname, '../app.js'),
-    path.join(__dirname, '../routes/*.js'),
-    path.join(__dirname, '../models/*.js'),
-  ], // Path to the API docs
+    globPath('../app.js'),
+    globPath('../routes/*.js'),
+    globPath('../models/*.js'),
+  ],
 };
 
-const swaggerSpec = swaggerJsdoc(options);
-
-module.exports = swaggerSpec;
+module.exports = swaggerJsdoc(options);
