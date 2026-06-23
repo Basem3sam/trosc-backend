@@ -452,10 +452,6 @@ exports.approveStudentInTrack = async (trackId, studentId) => {
     throw new AppError('Student is not pending in this track', 400);
   }
 
-  track.pendingStudents.pull(studentId);
-  track.students.push(studentId);
-  await track.save();
-
   const claimed = await User.findOneAndUpdate(
     { _id: studentId, enrolledTrack: null },
     { $set: { enrolledTrack: trackId } },
@@ -467,6 +463,10 @@ exports.approveStudentInTrack = async (trackId, studentId) => {
       throw new AppError('Student is already enrolled in another track', 400);
     }
   }
+
+  track.pendingStudents.pull(studentId);
+  track.students.push(studentId);
+  await track.save();
 
   await cascade.syncUserEnrollments(studentId, trackId);
 

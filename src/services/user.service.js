@@ -48,6 +48,8 @@ exports.createUser = async (userData) => {
     bio: userData.bio,
     website: userData.website,
     socialMedia: userData.socialMedia,
+    active: userData.active,
+    emailVerified: userData.emailVerified,
   });
 
   newUser.password = undefined;
@@ -107,9 +109,8 @@ exports.updateMe = async (userId, data) => {
   }
 
   const current = await User.findById(userId).select('email');
-    if (current.email !== data.email) {
-      filteredData.emailVerified = false;
-    }
+  if (current.email !== data.email) {
+    filteredData.emailVerified = false;
   }
 
   const updatedUser = await User.findByIdAndUpdate(userId, filteredData, {
