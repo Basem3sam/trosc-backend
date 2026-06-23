@@ -1,6 +1,7 @@
 const User = require('../models/user.model');
 const Track = require('../models/track.model');
 const Course = require('../models/course.model');
+const Session = require('../models/session.model');
 const catchAsync = require('../utils/catchAsync');
 const userService = require('../services/user.service');
 
@@ -84,17 +85,20 @@ exports.bulkUserAction = catchAsync(async (req, res, next) => {
 });
 
 exports.getMyEnrollments = catchAsync(async (req, res, next) => {
-  const [tracks, courses] = await Promise.all([
+  const [tracks, courses, sessions] = await Promise.all([
     Track.find({ students: req.user.id }).select(
       'title description coverImage level published',
     ),
     Course.find({ students: req.user.id }).select(
       'title description coverImage level track published',
     ),
+    Session.find({ students: req.user.id }).select(
+      'title description coverImage level published startDate',
+    ),
   ]);
 
   res.status(200).json({
     status: 'success',
-    data: { tracks, courses },
+    data: { tracks, courses, sessions },
   });
 });

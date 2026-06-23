@@ -140,11 +140,88 @@ exports.removeStudent = catchAsync(async (req, res, next) => {
 
 exports.enrollMe = catchAsync(async (req, res, next) => {
   const track = await trackService.enrollMeInTrack(req.params.id, req.user.id);
-
   res.status(200).json({
     status: 'success',
-    message: 'Enrolled successfully',
+    message: 'Application submitted. Waiting for instructor approval.',
     data: { track },
+  });
+});
+
+exports.getPendingStudents = catchAsync(async (req, res, next) => {
+  const pending = await trackService.getPendingStudents(req.params.id);
+  res.status(200).json({
+    status: 'success',
+    results: pending.length,
+    data: { pendingStudents: pending },
+  });
+});
+
+exports.approveStudent = catchAsync(async (req, res, next) => {
+  const track = await trackService.approveStudentInTrack(
+    req.params.id,
+    req.params.studentId,
+  );
+  res.status(200).json({
+    status: 'success',
+    message: 'Student approved successfully',
+    data: { track },
+  });
+});
+
+exports.rejectStudent = catchAsync(async (req, res, next) => {
+  const track = await trackService.rejectStudentInTrack(
+    req.params.id,
+    req.params.studentId,
+  );
+  res.status(200).json({
+    status: 'success',
+    message: 'Application rejected',
+    data: { track },
+  });
+});
+
+exports.requestLeaveTrack = catchAsync(async (req, res, next) => {
+  const track = await trackService.requestLeaveTrack(
+    req.params.id,
+    req.user.id,
+  );
+  res.status(200).json({
+    status: 'success',
+    message: 'Leave request submitted. Waiting for instructor approval.',
+    data: { track },
+  });
+});
+
+exports.approveLeaveTrack = catchAsync(async (req, res, next) => {
+  const track = await trackService.approveLeaveTrack(
+    req.params.id,
+    req.params.studentId,
+  );
+  res.status(200).json({
+    status: 'success',
+    message: 'Leave request approved. Student removed from track.',
+    data: { track },
+  });
+});
+
+exports.rejectLeaveTrack = catchAsync(async (req, res, next) => {
+  const track = await trackService.rejectLeaveTrack(
+    req.params.id,
+    req.params.studentId,
+  );
+  res.status(200).json({
+    status: 'success',
+    message: 'Leave request rejected',
+    data: { track },
+  });
+});
+
+exports.getPendingLeaves = catchAsync(async (req, res, next) => {
+  const pending = await trackService.getPendingLeaves(req.params.id);
+  res.status(200).json({
+    status: 'success',
+    results: pending.length,
+    data: { pendingLeaves: pending },
   });
 });
 

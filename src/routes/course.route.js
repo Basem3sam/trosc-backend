@@ -418,7 +418,28 @@
  *         description: Track not found
  */
 
+/**
+ * @swagger
+ * /courses/student/{studentId}:
+ *   get:
+ *     operationId: getCoursesByStudent
+ *     summary: Get courses by student enrollment
+ *     description: Returns courses a student is enrolled in. Admin can view any student; students can only view themselves.
+ *     tags: [Courses]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: studentId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: List of courses }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+
 const express = require('express');
+const AppError = require('../utils/AppError');
 const courseController = require('../controllers/course.controller');
 const {
   protect,
@@ -475,30 +496,34 @@ router.get(
   courseController.getCoursesByStudent,
 );
 
+router.post('/:id/enroll-me', protect, courseController.enrollMe);
+
+router.delete('/:id/leave-me', protect, courseController.leaveMe);
+
 router
   .route('/:id')
   .get(validate(getCourseSchema, 'params'), courseController.getCourse)
   .patch(
     protect,
     restrictTo('admin', 'instructor'),
+    validate(getCourseSchema, 'params'),
     checkOwnership({
       model: 'Course',
       ownerField: 'instructor',
       paramName: 'id',
     }),
-    validate(getCourseSchema, 'params'),
     validate(updateCourseSchema),
     courseController.updateCourse,
   )
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
+    validate(deleteCourseSchema, 'params'),
     checkOwnership({
       model: 'Course',
       ownerField: 'instructor',
       paramName: 'id',
     }),
-    validate(deleteCourseSchema, 'params'),
     courseController.deleteCourse,
   );
 
@@ -511,23 +536,23 @@ router
   .patch(
     protect,
     restrictTo('admin', 'instructor'),
+    validate(manageSessionSchema, 'params'),
     checkOwnership({
       model: 'Course',
       ownerField: 'instructor',
       paramName: 'courseId',
     }),
-    validate(manageSessionSchema, 'params'),
     courseController.addSessionToCourse,
   )
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
+    validate(manageSessionSchema, 'params'),
     checkOwnership({
       model: 'Course',
       ownerField: 'instructor',
       paramName: 'courseId',
     }),
-    validate(manageSessionSchema, 'params'),
     courseController.removeSessionFromCourse,
   );
 
@@ -538,12 +563,12 @@ router
 router.route('/:id/students').post(
   protect,
   restrictTo('admin', 'instructor'),
+  validate(getCourseSchema, 'params'),
   checkOwnership({
     model: 'Course',
     ownerField: 'instructor',
     paramName: 'id',
   }),
-  validate(getCourseSchema, 'params'),
   validate(addStudentSchema),
   courseController.addStudent,
 );
@@ -551,13 +576,13 @@ router.route('/:id/students').post(
 router.route('/:id/students/:studentId').delete(
   protect,
   restrictTo('admin', 'instructor'),
+  validate(getCourseSchema, 'params'),
+  validate(studentIdSchema, 'params'),
   checkOwnership({
     model: 'Course',
     ownerField: 'instructor',
     paramName: 'id',
   }),
-  validate(getCourseSchema, 'params'),
-  validate(studentIdSchema, 'params'),
   courseController.removeStudent,
 );
 

@@ -1,6 +1,7 @@
 // controllers/course.controller.js
 
 const courseService = require('../services/course.service');
+const enrollmentService = require('../services/enrollment.service');
 const catchAsync = require('../utils/catchAsync');
 
 exports.createCourse = catchAsync(async (req, res, next) => {
@@ -20,7 +21,9 @@ exports.createCourse = catchAsync(async (req, res, next) => {
 });
 
 exports.getAllCourses = catchAsync(async (req, res, next) => {
-  const { courses, total, pagination } = await courseService.getAllCourses(req.query);
+  const { courses, total, pagination } = await courseService.getAllCourses(
+    req.query,
+  );
 
   res.status(200).json({
     status: 'success',
@@ -100,6 +103,30 @@ exports.removeSessionFromCourse = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.enrollMe = catchAsync(async (req, res, next) => {
+  const course = await enrollmentService.enrollInCourse(
+    req.user.id,
+    req.params.id,
+  );
+  res.status(200).json({
+    status: 'success',
+    message: 'Enrolled successfully',
+    data: { course },
+  });
+});
+
+exports.leaveMe = catchAsync(async (req, res, next) => {
+  const course = await enrollmentService.leaveCourse(
+    req.user.id,
+    req.params.id,
+  );
+  res.status(200).json({
+    status: 'success',
+    message: 'Left course successfully',
+    data: { course },
+  });
+});
+
 // --- Student Enrollment ---
 
 exports.addStudent = catchAsync(async (req, res, next) => {
@@ -133,10 +160,11 @@ exports.removeStudent = catchAsync(async (req, res, next) => {
 // --- Filtering Routes ---
 
 exports.getCoursesByInstructor = catchAsync(async (req, res, next) => {
-  const { courses, total, pagination } = await courseService.getCoursesByInstructor(
-    req.params.instructorId,
-    req.query,
-  );
+  const { courses, total, pagination } =
+    await courseService.getCoursesByInstructor(
+      req.params.instructorId,
+      req.query,
+    );
 
   res.status(200).json({
     status: 'success',
@@ -167,10 +195,8 @@ exports.getCoursesByTrack = catchAsync(async (req, res, next) => {
 });
 
 exports.getCoursesByStudent = catchAsync(async (req, res, next) => {
-  const { courses, total, pagination } = await courseService.getCoursesByStudent(
-    req.params.studentId,
-    req.query,
-  );
+  const { courses, total, pagination } =
+    await courseService.getCoursesByStudent(req.params.studentId, req.query);
 
   res.status(200).json({
     status: 'success',

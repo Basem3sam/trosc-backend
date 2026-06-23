@@ -95,7 +95,7 @@ app.use(
       ) {
         callback(null, true);
       } else {
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
+        callback(new AppError(`Origin ${origin} not allowed by CORS`, 403));
       }
     },
     credentials: true,
@@ -109,7 +109,7 @@ app.options('*', cors()); // Handle preflight requests
 const limiter = rateLimit({
   max: parseInt(process.env.RATE_LIMIT_MAX) || 300,
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 Minutes
-  message: 'Too many request from this IP, please try again in 15 minutes',
+  message: 'Too many requests from this IP, please try again in 15 minutes',
 });
 
 app.use(limiter);
@@ -123,15 +123,24 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true, // Don't count successful logins
 });
 
+
 app.use('/v1/users/login', authLimiter);
 app.use('/v1/users/signup', authLimiter);
 app.use('/v1/users/forgotPassword', authLimiter);
 app.use('/v1/users/resetPassword', authLimiter);
 
+app.use('/v1/tracks/:id/enroll-me', authLimiter);
+app.use('/v1/tracks/:id/leave-me', authLimiter);
+app.use('/v1/courses/:id/enroll-me', authLimiter);
+app.use('/v1/courses/:id/leave-me', authLimiter);
+app.use('/v1/sessions/:id/enroll-me', authLimiter);
+app.use('/v1/sessions/:id/leave-me', authLimiter);
+app.use('/v1/events/:id/rsvp', authLimiter);
+
 /* BODY PARSER */
 
 // Body parser, reading data from body into req.body
-app.use(express.json({ limit: '100kb' })); //limit the json by 10kb only to prevent attacks with too much data
+app.use(express.json({ limit: '100kb' })); //limit the json by 100kb only to prevent attacks with too much data
 
 // Handle form data
 app.use(
@@ -178,9 +187,34 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/health', (req, res) => {
+/**
+ * @swagger
+ * tags:
+ *   - name: Health
+ *     description: Server health and status checks
+ *
+ * /health:
+ *   get:
+ *     operationId: healthCheck
+ *     summary: Health check
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 timestamp: { type: string, format: date-time }
+ *                 uptime: { type: number }
+ *       503:
+ *         description: Database connection unavailable
+ */
+
+const healthHandler = (req, res) => {
   const dbState = mongoose.connection.readyState;
-  // 1 = connected, 2 = connecting, 3 = disconnecting, 0 = disconnected
   if (dbState !== 1) {
     return res.status(503).json({
       status: 'error',
@@ -192,7 +226,13 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
-});
+};
+
+// For hosting platforms
+app.get('/health', healthHandler);
+
+// For Swagger consistency
+app.get('/v1/health', healthHandler);
 
 if (!isProduction) {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

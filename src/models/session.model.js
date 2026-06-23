@@ -396,6 +396,11 @@ const sessionSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    access: {
+      type: String,
+      enum: ['public', 'track-only', 'private'],
+      default: 'track-only',
+    },
     startDate: {
       type: Date,
     },

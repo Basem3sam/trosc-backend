@@ -1,8 +1,10 @@
-const Session = require('../models/session.model');
-const Course = require('../models/course.model');
+const User = require('../models/user.model');
 const Track = require('../models/track.model');
+const Course = require('../models/course.model');
+const Session = require('../models/session.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
+const cascade = require('./cascade.service');
 
 exports.createSession = async (sessionData) => {
   const session = await Session.create(sessionData);
@@ -25,25 +27,35 @@ exports.getAllSessions = async (query) => {
     'name email role',
   );
 
+  // Always strip URLs from list view
+  const sanitized = sessions.map((s) => {
+    const obj = s.toObject();
+    delete obj.url;
+    delete obj.embedUrl;
+    delete obj.resources;
+    return obj;
+  });
+
   return {
-    sessions: sessions || [],
+    sessions: sanitized || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
 };
 
-exports.getSessionById = async (sessionId) => {
+exports.getSessionById = async (sessionId, userId = null) => {
   const session = await Session.findById(sessionId)
     .populate('instructor', 'name email role')
     .populate('students', 'name email role')
-    .populate('tracks', 'title description');
+    .populate('tracks', 'title description students');
 
   if (!session) {
     throw new AppError('Session not found', 404);
   }
 
-  // Add embed URL for frontend convenience
   const sessionObj = session.toObject();
+
+  // Add embed URL for frontend convenience
   if (sessionObj.url) {
     const youtubeMatch = sessionObj.url.match(
       /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
@@ -55,6 +67,28 @@ exports.getSessionById = async (sessionId) => {
     const driveMatch = sessionObj.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (driveMatch) {
       sessionObj.embedUrl = `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    }
+  }
+
+  // GATE: strip url if not enrolled
+  if (!userId) {
+    delete sessionObj.url;
+    delete sessionObj.embedUrl;
+    delete sessionObj.resources; // also hide attached PDFs/slides
+  } else {
+    // Check enrollment: direct, via track, or via course
+    const isDirectStudent = sessionObj.students?.some(
+      (s) => s._id?.toString() === userId || s.toString() === userId,
+    );
+
+    const isTrackStudent = sessionObj.tracks?.some((t) =>
+      t.students?.some((s) => s.toString() === userId),
+    );
+
+    if (!isDirectStudent && !isTrackStudent) {
+      delete sessionObj.url;
+      delete sessionObj.embedUrl;
+      delete sessionObj.resources;
     }
   }
 
@@ -97,6 +131,13 @@ exports.deleteSession = async (sessionId) => {
     { $pull: { sessions: sessionId } },
   );
 
+  if (session.students?.length) {
+    await User.updateMany(
+      { _id: { $in: session.students } },
+      { $pull: { enrolledSessions: sessionId } },
+    );
+  }
+
   return session;
 };
 
@@ -119,6 +160,8 @@ exports.addStudentToSession = async (sessionId, studentId) => {
     .populate('instructor', 'name email role')
     .populate('students', 'name email role');
 
+  await cascade.syncSessionEnrollment(studentId, sessionId);
+
   return updatedSession;
 };
 
@@ -140,6 +183,8 @@ exports.removeStudentFromSession = async (sessionId, studentId) => {
   )
     .populate('instructor', 'name email role')
     .populate('students', 'name email role');
+
+  await cascade.unsyncSessionEnrollment(studentId, sessionId);
 
   return updatedSession;
 };
@@ -175,5 +220,9 @@ exports.getSessionsByTrack = async (trackId, query) => {
     'instructor',
     'name email role',
   );
-  return { sessions: sessions || [], total: features.totalDocs || 0, pagination: features.pagination};
+  return {
+    sessions: sessions || [],
+    total: features.totalDocs || 0,
+    pagination: features.pagination,
+  };
 };

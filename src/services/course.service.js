@@ -1,8 +1,10 @@
+const User = require('../models/user.model');
 const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
+const cascade = require('./cascade.service');
 
 // ===================================================================
 // 🎯 COURSE CRUD OPERATIONS
@@ -145,6 +147,13 @@ exports.deleteCourse = async (courseId) => {
     await session.save();
   }
 
+  if (course.students?.length) {
+    await User.updateMany(
+      { _id: { $in: course.students } },
+      { $pull: { enrolledCourses: courseId } },
+    );
+  }
+
   return null;
 };
 
@@ -252,6 +261,8 @@ exports.enrollStudentInCourse = async (courseId, studentId) => {
     { new: true, runValidators: true },
   );
 
+  await cascade.syncCourseEnrollment(studentId, courseId);
+
   return updatedCourse;
 };
 
@@ -277,6 +288,8 @@ exports.removeStudentFromCourse = async (courseId, studentId) => {
     { $pull: { students: studentId } },
     { new: true, runValidators: true },
   );
+
+  await cascade.unsyncCourseEnrollment(studentId, courseId);
 
   return updatedCourse;
 };

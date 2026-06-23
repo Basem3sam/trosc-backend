@@ -1,4 +1,5 @@
 const sessionService = require('../services/session.service');
+const enrollmentService = require('../services/enrollment.service');
 const catchAsync = require('../utils/catchAsync');
 
 // Create a new session
@@ -40,7 +41,10 @@ exports.getAllSessions = catchAsync(async (req, res, next) => {
 
 // Get single session
 exports.getSession = catchAsync(async (req, res, next) => {
-  const session = await sessionService.getSessionById(req.params.id);
+  const session = await sessionService.getSessionById(
+    req.params.id,
+    req.user?.id,
+  );
 
   res.status(200).json({
     status: 'success',
@@ -57,6 +61,7 @@ exports.updateSession = catchAsync(async (req, res, next) => {
   delete req.body.students;
   delete req.body.course;
   delete req.body.tracks;
+  delete req.body.isStandalone;
 
   const session = await sessionService.updateSession(req.params.id, req.body);
 
@@ -140,5 +145,29 @@ exports.getSessionsByTrack = catchAsync(async (req, res, next) => {
     data: {
       sessions,
     },
+  });
+});
+
+exports.enrollMe = catchAsync(async (req, res, next) => {
+  const session = await enrollmentService.enrollInSession(
+    req.user.id,
+    req.params.id,
+  );
+  res.status(200).json({
+    status: 'success',
+    message: 'Enrolled successfully',
+    data: { session },
+  });
+});
+
+exports.leaveMe = catchAsync(async (req, res, next) => {
+  const session = await enrollmentService.leaveSession(
+    req.user.id,
+    req.params.id,
+  );
+  res.status(200).json({
+    status: 'success',
+    message: 'Left session successfully',
+    data: { session },
   });
 });

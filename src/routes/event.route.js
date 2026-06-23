@@ -54,7 +54,7 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Event'
+ *             $ref: '#/components/schemas/EventCreate'
  *           example:
  *             title: "Backend Bootcamp"
  *             description: "3-day Node.js workshop"
@@ -149,7 +149,7 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Event'
+ *             $ref: '#/components/schemas/EventUpdate'
  *     responses:
  *       200: { description: Updated }
  *       400: { $ref: '#/components/responses/ValidationError' }
@@ -244,7 +244,11 @@
 
 const express = require('express');
 const eventController = require('../controllers/event.controller');
-const { protect, restrictTo, checkOwnership } = require('../middlewares/auth.middleware');
+const {
+  protect,
+  restrictTo,
+  checkOwnership,
+} = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   createEventSchema,
@@ -281,12 +285,12 @@ router.post(
 router.patch(
   '/:id',
   restrictTo('admin', 'instructor'),
+  validate(eventIdSchema, 'params'),
   checkOwnership({
     model: 'Event',
     ownerField: 'createdBy',
     paramName: 'id',
   }),
-  validate(eventIdSchema, 'params'),
   validate(updateEventSchema),
   eventController.updateEvent,
 );
@@ -294,12 +298,12 @@ router.patch(
 router.delete(
   '/:id',
   restrictTo('admin', 'instructor'),
+  validate(eventIdSchema, 'params'),
   checkOwnership({
     model: 'Event',
     ownerField: 'createdBy',
     paramName: 'id',
   }),
-  validate(eventIdSchema, 'params'),
   eventController.deleteEvent,
 );
 

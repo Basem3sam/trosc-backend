@@ -112,6 +112,7 @@ exports.adminCreateUserSchema = Joi.object({
     'any.only': 'Passwords do not match',
     'any.required': 'Please confirm password',
   }),
+  role: Joi.string().valid('student', 'instructor', 'admin').optional(),
   photo: photoValidation,
   bio: Joi.string().max(500).trim().allow('').optional(),
   website: Joi.string().uri().allow('').optional(),

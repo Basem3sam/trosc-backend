@@ -1,12 +1,13 @@
 const { convert } = require('html-to-text');
 const createTransporter = require('../config/mailer.config');
+const logger = require('../utils/logger');
 
 class Email {
   constructor(user, url) {
     this.to = user.email;
     this.firstName = user.name.split(' ')[0];
     this.url = url;
-    this.from = process.env.EMAIL_FROM || 'Trosc Club <noreply@trosc.club>'; // Fixed typo: form -> from
+    this.from = process.env.EMAIL_FROM || 'Trosc Club <noreply@trosc.club>';
     this.transporter = createTransporter();
   }
 
@@ -21,7 +22,7 @@ class Email {
         text: convert(htmlContent, {
           wordwrap: 130, // Better text formatting
         }),
-        // Optional: Add headers for better email deliverability
+        // Add headers for better email deliverability
         headers: {
           'X-Priority': '3', // Normal priority
           'X-Mailer': 'Trosc Mailer 1.0',
@@ -29,10 +30,10 @@ class Email {
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email sent to ${this.to}: ${info.messageId}`);
+      logger.info(`Email sent to ${this.to}: ${info.messageId}`);
       return info;
     } catch (error) {
-      console.error(`❌ Failed to send email to ${this.to}:`, error.message);
+      logger.error(`Failed to send email to ${this.to}:`, error.message);
       throw new Error(`Email sending failed: ${error.message}`);
     }
   }

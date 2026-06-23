@@ -13,6 +13,10 @@
     {
       "url": "http://localhost:5000/v1",
       "description": "development server"
+    },
+    {
+      "url": "http://localhost:5000",
+      "description": "Root server"
     }
   ],
   "components": {
@@ -142,6 +146,86 @@
             "type": "string",
             "format": "date-time",
             "example": "2025-10-18T15:00:00.000Z"
+          }
+        }
+      },
+      "AnnouncementCreate": {
+        "type": "object",
+        "required": [
+          "title",
+          "message"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "New Track Available: Full Stack Web Development"
+          },
+          "message": {
+            "type": "string",
+            "example": "We are excited to launch our new track covering React, Node.js, and MongoDB."
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "all",
+              "track",
+              "course"
+            ],
+            "default": "all"
+          },
+          "targetTrack": {
+            "type": "string",
+            "example": "67123abc12ef4567890a1234"
+          },
+          "targetCourse": {
+            "type": "string",
+            "example": "67123abc12ef4567890a5678"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isPinned": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "AnnouncementUpdate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Updated Title"
+          },
+          "message": {
+            "type": "string",
+            "example": "Updated message content"
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "all",
+              "track",
+              "course"
+            ]
+          },
+          "targetTrack": {
+            "type": "string"
+          },
+          "targetCourse": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isPinned": {
+            "type": "boolean"
           }
         }
       },
@@ -570,6 +654,103 @@
             "type": "string",
             "format": "date-time",
             "example": "2025-10-18T15:00:00.000Z"
+          }
+        }
+      },
+      "EventCreate": {
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "date",
+          "locationType"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Backend Bootcamp: Introduction to Node.js"
+          },
+          "description": {
+            "type": "string",
+            "example": "A 3-day backend development workshop covering Node.js, Express, and MongoDB."
+          },
+          "track": {
+            "type": "string",
+            "example": "67123abc12ef4567890a1234"
+          },
+          "course": {
+            "type": "string",
+            "example": "67123abc12ef4567890a5678"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-11-10T10:00:00.000Z"
+          },
+          "locationType": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline"
+            ],
+            "example": "online"
+          },
+          "locationLink": {
+            "type": "string",
+            "example": "https://zoom.us/meeting/xyz"
+          },
+          "locationAddress": {
+            "type": "string",
+            "example": "ITI Smart Village, Cairo"
+          },
+          "coverImage": {
+            "type": "string",
+            "example": "bootcamp-cover.jpg"
+          }
+        }
+      },
+      "EventUpdate": {
+        "type": "object",
+        "description": "Data that can be updated for an event",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Updated Event Title"
+          },
+          "description": {
+            "type": "string"
+          },
+          "track": {
+            "type": "string"
+          },
+          "course": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "locationType": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline"
+            ]
+          },
+          "locationLink": {
+            "type": "string"
+          },
+          "locationAddress": {
+            "type": "string"
+          },
+          "coverImage": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -1023,6 +1204,22 @@
             "description": "Reference to the User who instructs this track",
             "example": "507f1f77bcf86cd799439011"
           },
+          "courses": {
+            "type": "array",
+            "description": "List of courses belonging to this track",
+            "items": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          },
+          "students": {
+            "type": "array",
+            "description": "List of enrolled students",
+            "items": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439012"
+            }
+          },
           "sessions": {
             "type": "array",
             "description": "List of sessions belonging to this track",
@@ -1079,6 +1276,14 @@
             "role": "instructor",
             "photo": "instructor-profile.jpg"
           },
+          "courses": [
+            "507f1f77bcf86cd799439041",
+            "507f1f77bcf86cd799439042"
+          ],
+          "students": [
+            "507f1f77bcf86cd799439012",
+            "507f1f77bcf86cd799439013"
+          ],
           "sessions": [
             "507f1f77bcf86cd799439031",
             "507f1f77bcf86cd799439032"
@@ -1647,6 +1852,43 @@
     }
   ],
   "paths": {
+    "/health": {
+      "get": {
+        "operationId": "healthCheck",
+        "summary": "Health check",
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "uptime": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database connection unavailable"
+          }
+        }
+      }
+    },
     "/announcements": {
       "get": {
         "operationId": "getAllAnnouncements",
@@ -1726,7 +1968,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Announcement"
+                "$ref": "#/components/schemas/AnnouncementCreate"
               }
             }
           }
@@ -1806,7 +2048,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Announcement"
+                "$ref": "#/components/schemas/AnnouncementUpdate"
               }
             }
           }
@@ -2489,6 +2731,42 @@
         }
       }
     },
+    "/courses/student/{studentId}": {
+      "get": {
+        "operationId": "getCoursesByStudent",
+        "summary": "Get courses by student enrollment",
+        "description": "Returns courses a student is enrolled in. Admin can view any student; students can only view themselves.",
+        "tags": [
+          "Courses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of courses"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/events": {
       "get": {
         "operationId": "getAllEvents",
@@ -2590,7 +2868,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Event"
+                "$ref": "#/components/schemas/EventCreate"
               },
               "example": {
                 "title": "Backend Bootcamp",
@@ -2765,7 +3043,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Event"
+                "$ref": "#/components/schemas/EventUpdate"
               }
             }
           }
@@ -4057,6 +4335,158 @@
         }
       }
     },
+    "/tracks/student/{studentId}": {
+      "get": {
+        "operationId": "getTracksByStudent",
+        "summary": "Get tracks by student enrollment",
+        "description": "Returns tracks a student is enrolled in. Admin can view any student; students can only view themselves.",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tracks"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/tracks/{trackId}/courses/{courseId}": {
+      "patch": {
+        "operationId": "addCourseToTrack",
+        "summary": "Add a course to a track",
+        "description": "Associate a course with a track (admin and instructors only)",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "trackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439021"
+            }
+          },
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Course added to track successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Course already exists in track"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Track or course not found"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeCourseFromTrack",
+        "summary": "Remove a course from a track",
+        "description": "Remove course association from a track (admin and instructors only)",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "trackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439021"
+            }
+          },
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Course removed from track successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Course not found in track or track would be empty"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Track or course not found"
+          }
+        }
+      }
+    },
     "/users/signup": {
       "post": {
         "operationId": "signup",
@@ -4747,6 +5177,10 @@
     }
   },
   "tags": [
+    {
+      "name": "Health",
+      "description": "Server health and status checks"
+    },
     {
       "name": "Announcements",
       "description": "Club announcements and news"

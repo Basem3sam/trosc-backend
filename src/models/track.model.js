@@ -28,6 +28,18 @@
  *           type: string
  *           description: Reference to the User who instructs this track
  *           example: "507f1f77bcf86cd799439011"
+ *         courses:
+ *           type: array
+ *           description: List of courses belonging to this track
+ *           items:
+ *             type: string
+ *             example: "507f1f77bcf86cd799439041"
+ *         students:
+ *           type: array
+ *           description: List of enrolled students
+ *           items:
+ *             type: string
+ *             example: "507f1f77bcf86cd799439012"
  *         sessions:
  *           type: array
  *           description: List of sessions belonging to this track
@@ -70,6 +82,8 @@
  *           email: "basem@example.com"
  *           role: "instructor"
  *           photo: "instructor-profile.jpg"
+ *         courses: ["507f1f77bcf86cd799439041", "507f1f77bcf86cd799439042"]
+ *         students: ["507f1f77bcf86cd799439012", "507f1f77bcf86cd799439013"]
  *         sessions: ["507f1f77bcf86cd799439031", "507f1f77bcf86cd799439032"]
  *         level: "beginner"
  *         coverImage: "web-dev-cover.jpg"
@@ -213,6 +227,18 @@ const trackSchema = new mongoose.Schema(
       },
     ],
     students: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'User',
+      },
+    ],
+    pendingStudents: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'User',
+      },
+    ],
+    pendingLeaves: [
       {
         type: mongoose.Schema.ObjectId,
         ref: 'User',

@@ -47,7 +47,7 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Announcement'
+ *             $ref: '#/components/schemas/AnnouncementCreate'
  *     responses:
  *       201: { description: Created }
  *       400: { $ref: '#/components/responses/ValidationError' }
@@ -88,7 +88,7 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Announcement'
+ *             $ref: '#/components/schemas/AnnouncementUpdate'
  *     responses:
  *       200: { description: Updated }
  *       401: { $ref: '#/components/responses/Unauthorized' }

@@ -178,6 +178,7 @@ Auto-generated Swagger UI with all endpoints, schemas, and auth.
 | Get track                  | `/v1/tracks/:id`                            | GET    | Public           |
 | Update track               | `/v1/tracks/:id`                            | PATCH  | Admin/Instructor |
 | Delete track               | `/v1/tracks/:id`                            | DELETE | Admin            |
+| By student                 | `/v1/tracks/student/:studentId`             | GET    | Self/Admin       |
 | Track analytics            | `/v1/tracks/:id/analytics`                  | GET    | Admin/Instructor |
 | Self-enroll                | `/v1/tracks/:id/enroll-me`                  | POST   | Protected        |
 | Add student                | `/v1/tracks/:id/students`                   | POST   | Admin/Instructor |
@@ -191,10 +192,10 @@ Auto-generated Swagger UI with all endpoints, schemas, and auth.
 | Create course              | `/v1/courses`                               | POST   | Admin/Instructor |
 | Get course                 | `/v1/courses/:id`                           | GET    | Public           |
 | Update course              | `/v1/courses/:id`                           | PATCH  | Admin/Instructor |
-| Delete course              | `/v1/courses/:id`                           | DELETE | Admin            |
+| Delete course              | `/v1/courses/:id`                           | DELETE | Admin/Instructor |
 | By instructor              | `/v1/courses/instructor/:instructorId`      | GET    | Public           |
 | By track                   | `/v1/courses/track/:trackId`                | GET    | Public           |
-| By student                 | `/v1/courses/student/:studentId`            | GET    | Public           |
+| By student                 | `/v1/courses/student/:studentId`            | GET    | Self/Admin       |
 | Add student                | `/v1/courses/:id/students`                  | POST   | Admin/Instructor |
 | Remove student             | `/v1/courses/:id/students/:studentId`       | DELETE | Admin/Instructor |
 | Add session to course      | `/v1/courses/:courseId/sessions/:sessionId` | PATCH  | Admin/Instructor |
@@ -204,7 +205,7 @@ Auto-generated Swagger UI with all endpoints, schemas, and auth.
 | Create session             | `/v1/sessions`                              | POST   | Admin/Instructor |
 | Get session                | `/v1/sessions/:id`                          | GET    | Protected        |
 | Update session             | `/v1/sessions/:id`                          | PATCH  | Admin/Instructor |
-| Delete session             | `/v1/sessions/:id`                          | DELETE | Admin            |
+| Delete session             | `/v1/sessions/:id`                          | DELETE | Admin/Instructor |
 | By instructor              | `/v1/sessions/instructor/:instructorId`     | GET    | Protected        |
 | By track                   | `/v1/sessions/track/:trackId`               | GET    | Protected        |
 | Add student                | `/v1/sessions/:id/students`                 | POST   | Admin/Instructor |
@@ -215,7 +216,7 @@ Auto-generated Swagger UI with all endpoints, schemas, and auth.
 | Get event                  | `/v1/events/:id`                            | GET    | Public           |
 | Create event               | `/v1/events`                                | POST   | Admin/Instructor |
 | Update event               | `/v1/events/:id`                            | PATCH  | Admin/Instructor |
-| Delete event               | `/v1/events/:id`                            | DELETE | Admin            |
+| Delete event               | `/v1/events/:id`                            | DELETE | Admin/Instructor |
 | RSVP                       | `/v1/events/:id/rsvp`                       | POST   | Protected        |
 | Cancel RSVP                | `/v1/events/:id/rsvp`                       | DELETE | Protected        |
 | **Announcements**          |                                             |        |                  |
@@ -223,7 +224,7 @@ Auto-generated Swagger UI with all endpoints, schemas, and auth.
 | Create announcement        | `/v1/announcements`                         | POST   | Admin/Instructor |
 | Get announcement           | `/v1/announcements/:id`                     | GET    | Public           |
 | Update announcement        | `/v1/announcements/:id`                     | PATCH  | Admin/Instructor |
-| Delete announcement        | `/v1/announcements/:id`                     | DELETE | Admin            |
+| Delete announcement        | `/v1/announcements/:id`                     | DELETE | Admin/Instructor |
 | **Feed**                   |                                             |        |                  |
 | Dashboard feed             | `/v1/feed`                                  | GET    | Public           |
 | **Health**                 |                                             |        |                  |

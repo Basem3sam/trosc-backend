@@ -194,3 +194,66 @@ eventSchema.virtual('locationAction').get(function () {
 const Event = mongoose.model('Event', eventSchema);
 
 module.exports = Event;
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     EventCreate:
+ *       type: object
+ *       required:
+ *         - title
+ *         - description
+ *         - date
+ *         - locationType
+ *       properties:
+ *         title:
+ *           type: string
+ *           example: "Backend Bootcamp: Introduction to Node.js"
+ *         description:
+ *           type: string
+ *           example: "A 3-day backend development workshop covering Node.js, Express, and MongoDB."
+ *         track:
+ *           type: string
+ *           example: 67123abc12ef4567890a1234
+ *         course:
+ *           type: string
+ *           example: 67123abc12ef4567890a5678
+ *         date:
+ *           type: string
+ *           format: date-time
+ *           example: 2025-11-10T10:00:00.000Z
+ *         locationType:
+ *           type: string
+ *           enum: [online, offline]
+ *           example: "online"
+ *         locationLink:
+ *           type: string
+ *           example: "https://zoom.us/meeting/xyz"
+ *         locationAddress:
+ *           type: string
+ *           example: "ITI Smart Village, Cairo"
+ *         coverImage:
+ *           type: string
+ *           example: "bootcamp-cover.jpg"
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     EventUpdate:
+ *       type: object
+ *       description: Data that can be updated for an event
+ *       properties:
+ *         title: { type: string, example: "Updated Event Title" }
+ *         description: { type: string }
+ *         track: { type: string }
+ *         course: { type: string }
+ *         date: { type: string, format: date-time }
+ *         locationType: { type: string, enum: [online, offline] }
+ *         locationLink: { type: string }
+ *         locationAddress: { type: string }
+ *         coverImage: { type: string }
+ *         attachments: { type: array, items: { type: string } }
+ */

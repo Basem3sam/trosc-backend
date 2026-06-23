@@ -463,7 +463,104 @@
  *         $ref: '#/components/responses/NotFound'
  */
 
+/**
+ * @swagger
+ * /tracks/student/{studentId}:
+ *   get:
+ *     operationId: getTracksByStudent
+ *     summary: Get tracks by student enrollment
+ *     description: Returns tracks a student is enrolled in. Admin can view any student; students can only view themselves.
+ *     tags: [Tracks]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - name: studentId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: List of tracks }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+
+/**
+ * @swagger
+ * /tracks/{trackId}/courses/{courseId}:
+ *   patch:
+ *     operationId: addCourseToTrack
+ *     summary: Add a course to a track
+ *     description: Associate a course with a track (admin and instructors only)
+ *     tags: [Tracks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: trackId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439021"
+ *       - name: courseId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439041"
+ *     responses:
+ *       200:
+ *         description: Course added to track successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TrackResponse'
+ *       400:
+ *         description: Course already exists in track
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         description: Track or course not found
+ *
+ *   delete:
+ *     operationId: removeCourseFromTrack
+ *     summary: Remove a course from a track
+ *     description: Remove course association from a track (admin and instructors only)
+ *     tags: [Tracks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: trackId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439021"
+ *       - name: courseId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439041"
+ *     responses:
+ *       200:
+ *         description: Course removed from track successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TrackResponse'
+ *       400:
+ *         description: Course not found in track or track would be empty
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         description: Track or course not found
+ */
+
 const express = require('express');
+const AppError = require('../utils/AppError');
 const trackController = require('../controllers/track.controller');
 const {
   protect,
@@ -481,6 +578,7 @@ const {
   addStudentSchema,
   studentIdSchema,
 } = require('../validations/track.validation');
+const selfApproval = require('../middlewares/selfApproval')
 
 const router = express.Router();
 
@@ -500,7 +598,6 @@ router
   )
   .get(trackController.getAllTracks);
 
-
 router.get(
   '/student/:studentId',
   protect,
@@ -510,8 +607,57 @@ router.get(
     }
     next();
   },
-  trackController.getTracksByStudent
+  trackController.getTracksByStudent,
 );
+
+// --- ENROLLMENT MANAGEMENT ---
+
+router.get(
+  '/:id/pending',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(getTrackSchema, 'params'),
+  checkOwnership({
+    model: 'Track',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  trackController.getPendingStudents,
+);
+
+router.post(
+  '/:id/students/:studentId/approve',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(getTrackSchema, 'params'),
+  validate(studentIdSchema, 'params'),
+  checkOwnership({
+    model: 'Track',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  selfApproval,
+  trackController.approveStudent,
+);
+
+router.post(
+  '/:id/students/:studentId/reject',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(getTrackSchema, 'params'),
+  validate(studentIdSchema, 'params'),
+  checkOwnership({
+    model: 'Track',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  trackController.rejectStudent,
+);
+
+// Existing enroll-me route stays, but now creates a pending request
+router
+  .route('/:id/enroll-me')
+  .post(protect, validate(getTrackSchema, 'params'), trackController.enrollMe);
 
 // --- TRACK ANALYTICS (must be before /:id) ---
 
@@ -529,24 +675,24 @@ router
   .patch(
     protect,
     restrictTo('admin', 'instructor'),
+    validate(getTrackSchema, 'params'),
     checkOwnership({
       model: 'Track',
       ownerField: 'instructor',
       paramName: 'id',
     }),
-    validate(getTrackSchema, 'params'),
     validate(updateTrackSchema),
     trackController.updateTrack,
   )
   .delete(
     protect,
     restrictTo('admin'),
+    validate(deleteTrackSchema, 'params'),
     checkOwnership({
       model: 'Track',
       ownerField: 'instructor',
       paramName: 'id',
     }),
-    validate(deleteTrackSchema, 'params'),
     trackController.deleteTrack,
   );
 
@@ -557,23 +703,23 @@ router
   .patch(
     protect,
     restrictTo('admin', 'instructor'),
+    validate(manageCourseSchema, 'params'), // Reuse or create manageCourseSchema
     checkOwnership({
       model: 'Track',
       ownerField: 'instructor',
       paramName: 'trackId',
     }),
-    validate(manageCourseSchema, 'params'), // Reuse or create manageCourseSchema
     trackController.addCourseToTrack,
   )
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
+    validate(manageCourseSchema, 'params'),
     checkOwnership({
       model: 'Track',
       ownerField: 'instructor',
       paramName: 'trackId',
     }),
-    validate(manageCourseSchema, 'params'),
     trackController.removeCourseFromTrack,
   );
 
@@ -582,60 +728,87 @@ router
   .patch(
     protect,
     restrictTo('admin', 'instructor'),
+    validate(manageSessionSchema, 'params'),
     checkOwnership({
       model: 'Track',
       ownerField: 'instructor',
       paramName: 'trackId',
     }),
-    validate(manageSessionSchema, 'params'),
     trackController.addSessionToTrack,
   )
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
+    validate(manageSessionSchema, 'params'),
     checkOwnership({
       model: 'Track',
       ownerField: 'instructor',
       paramName: 'trackId',
     }),
-    validate(manageSessionSchema, 'params'),
     trackController.removeSessionFromTrack,
   );
 
 // --- STUDENT ENROLLMENT FOR TRACKS ---
 
-router
-  .route('/:id/students')
-  .post(
-    protect,
-    restrictTo('admin', 'instructor'),
-    checkOwnership({
-      model: 'Track',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
-    validate(getTrackSchema, 'params'),
-    validate(addStudentSchema),
-    trackController.addStudent,
-  );
+router.route('/:id/students').post(
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(getTrackSchema, 'params'),
+  checkOwnership({
+    model: 'Track',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  validate(addStudentSchema),
+  trackController.addStudent,
+);
 
-router
-  .route('/:id/students/:studentId')
-  .delete(
-    protect,
-    restrictTo('admin', 'instructor'),
-    checkOwnership({
-      model: 'Track',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
-    validate(getTrackSchema, 'params'),
-    validate(studentIdSchema, 'params'),
-    trackController.removeStudent,
-  );
+router.route('/:id/students/:studentId').delete(
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(getTrackSchema, 'params'),
+  validate(studentIdSchema, 'params'),
+  checkOwnership({
+    model: 'Track',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  trackController.removeStudent,
+);
 
-router
-  .route('/:id/enroll-me')
-  .post(protect, validate(getTrackSchema, 'params'), trackController.enrollMe);
+// --- LEAVE REQUESTS ---
+router.get(
+  '/:id/leaves',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(getTrackSchema, 'params'),
+  trackController.getPendingLeaves,
+);
+
+router.post(
+  '/:id/leave-me',
+  protect,
+  validate(getTrackSchema, 'params'),
+  trackController.requestLeaveTrack,
+);
+
+router.post(
+  '/:id/leaves/:studentId/approve',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(getTrackSchema, 'params'),
+  validate(studentIdSchema, 'params'),
+  selfApproval,
+  trackController.approveLeaveTrack,
+);
+
+router.post(
+  '/:id/leaves/:studentId/reject',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(getTrackSchema, 'params'),
+  validate(studentIdSchema, 'params'),
+  trackController.rejectLeaveTrack,
+);
 
 module.exports = router;

@@ -394,6 +394,8 @@ const userSchema = new mongoose.Schema(
         ref: 'Track',
       },
     ],
+    enrolledCourses: [{ type: mongoose.Schema.ObjectId, ref: 'Course' }],
+    enrolledSessions: [{ type: mongoose.Schema.ObjectId, ref: 'Session' }],
     active: {
       type: Boolean,
       default: true,

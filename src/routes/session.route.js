@@ -288,6 +288,10 @@ router.get(
 
 router.get('/track/:trackId', sessionController.getSessionsByTrack);
 
+router.post('/:id/enroll-me', protect, sessionController.enrollMe);
+
+router.delete('/:id/leave-me', protect, sessionController.leaveMe);
+
 router
   .route('/:id')
   .get(
@@ -296,23 +300,23 @@ router
   )
   .patch(
     restrictTo('admin', 'instructor'),
+    validateMiddleware(sessionIdValidation, 'params'),
     checkOwnership({
       model: 'Session',
       ownerField: 'instructor',
       paramName: 'id',
     }),
-    validateMiddleware(sessionIdValidation, 'params'),
     validateMiddleware(updateSessionValidation),
     sessionController.updateSession,
   )
   .delete(
     restrictTo('admin', 'instructor'),
+    validateMiddleware(sessionIdValidation, 'params'),
     checkOwnership({
       model: 'Session',
       ownerField: 'instructor',
       paramName: 'id',
     }),
-    validateMiddleware(sessionIdValidation, 'params'),
     sessionController.deleteSession,
   );
 
@@ -322,25 +326,25 @@ router
 
 router.route('/:id/students').post(
   restrictTo('admin', 'instructor'),
+  validateMiddleware(sessionIdValidation, 'params'),
   checkOwnership({
     model: 'Session',
     ownerField: 'instructor',
     paramName: 'id',
   }),
-  validateMiddleware(sessionIdValidation, 'params'),
   validateMiddleware(addStudentValidation),
   sessionController.addStudent,
 );
 
 router.route('/:id/students/:studentId').delete(
   restrictTo('admin', 'instructor'),
+  validateMiddleware(sessionIdValidation, 'params'),
+  validateMiddleware(studentIdParamValidation, 'params'),
   checkOwnership({
     model: 'Session',
     ownerField: 'instructor',
     paramName: 'id',
   }),
-  validateMiddleware(sessionIdValidation, 'params'),
-  validateMiddleware(studentIdParamValidation, 'params'),
   sessionController.removeStudent,
 );
 

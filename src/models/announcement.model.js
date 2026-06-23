@@ -132,3 +132,66 @@ announcementSchema.index({ isPinned: -1, createdAt: -1 });
 const Announcement = mongoose.model('Announcement', announcementSchema);
 
 module.exports = Announcement;
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     AnnouncementCreate:
+ *       type: object
+ *       required:
+ *         - title
+ *         - message
+ *       properties:
+ *         title:
+ *           type: string
+ *           example: "New Track Available: Full Stack Web Development"
+ *         message:
+ *           type: string
+ *           example: "We are excited to launch our new track covering React, Node.js, and MongoDB."
+ *         audience:
+ *           type: string
+ *           enum: [all, track, course]
+ *           default: all
+ *         targetTrack:
+ *           type: string
+ *           example: 67123abc12ef4567890a1234
+ *         targetCourse:
+ *           type: string
+ *           example: 67123abc12ef4567890a5678
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
+ *         isPinned:
+ *           type: boolean
+ *           default: false
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     AnnouncementUpdate:
+ *       type: object
+ *       properties:
+ *         title:
+ *           type: string
+ *           example: "Updated Title"
+ *         message:
+ *           type: string
+ *           example: "Updated message content"
+ *         audience:
+ *           type: string
+ *           enum: [all, track, course]
+ *         targetTrack:
+ *           type: string
+ *         targetCourse:
+ *           type: string
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
+ *         isPinned:
+ *           type: boolean
+ */

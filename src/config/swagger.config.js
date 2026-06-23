@@ -28,6 +28,10 @@ const options = {
         url: `${getBaseUrl()}/v1`,
         description: `${process.env.NODE_ENV || 'development'} server`,
       },
+      {
+        url: getBaseUrl(),
+        description: 'Root server',
+      },
     ],
     components: {
       securitySchemes: {
@@ -41,6 +45,7 @@ const options = {
     security: [{ bearerAuth: [] }],
   },
   apis: [
+    path.join(__dirname, '../app.js'),
     path.join(__dirname, '../routes/*.js'),
     path.join(__dirname, '../models/*.js'),
     path.join(__dirname, '../validations/*.js'),

@@ -3,6 +3,7 @@ const User = require('../models/user.model');
 const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
 const signToken = require('../utils/generateToken');
+const logger = require('../utils/logger');
 
 // Create and send token (with cookie)
 const createSendToken = (user) => {
@@ -31,6 +32,14 @@ exports.signUp = async (data, url) => {
   if (data.website) allowedData.website = data.website;
   if (data.socialMedia) allowedData.socialMedia = data.socialMedia;
 
+  const existingUser = await User.findOne({ email: allowedData.email });
+  if (existingUser) {
+    throw new AppError(
+      'Email already registered. Please use another one.',
+      409,
+    );
+  }
+
   // Create user with ONLY allowed fields
   const newUser = await User.create(allowedData);
 
@@ -38,8 +47,7 @@ exports.signUp = async (data, url) => {
   try {
     await new Email(newUser, url).sendWelcome();
   } catch (err) {
-    console.error('Welcome email failed:', err.message);
-    // TODO: send to a logging service (e.g., Sentry) instead of console
+    logger.error('Welcome email failed:', err.message);
   }
 
   const token = createSendToken(newUser);
@@ -53,7 +61,7 @@ exports.login = async (email, password) => {
   }
 
   // (note) we added .select(+[field]) to select a field the select of it is false
-  const user = await User.findOne({ email }).select('+password');
+  const user = await User.findOne({ email }).select('+password +active');
 
   // Check if user exists && password is correct
   if (!user || !(await user.correctPassword(password, user.password))) {
@@ -77,7 +85,7 @@ exports.login = async (email, password) => {
 
 exports.forgotPassword = async (email) => {
   // 1) Get user based on POSTed email
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email }).select('+active');
   if (!user || !user.active) {
     await new Promise((resolve) => setTimeout(resolve, 1000)); // Artificial delay to prevent email enumeration
     return; // Do not reveal if user exists or not for security reasons
@@ -108,7 +116,7 @@ exports.resetPassword = async (token, password, passwordConfirm) => {
   const user = await User.findOne({
     passwordResetToken: hashedToken,
     passwordResetExpires: { $gte: Date.now() },
-  });
+  }).select('+active');
 
   // 2) If token has not expired, and there is user, set the new password
 
@@ -164,6 +172,6 @@ exports.logoutUser = (res) => {
     expires: new Date(Date.now() + 10 * 1000), // expires in 10s
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   });
 };
