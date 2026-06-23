@@ -137,7 +137,7 @@ exports.updateTrack = async (trackId, updateBody) => {
 
   if (!track) throw new AppError('No track found', 404);
 
-  Object.assign(track, updateBody);
+  track.set(updateBody);
 
   await track.save(); // triggers pre('save') validation
 
@@ -171,22 +171,33 @@ exports.deleteTrack = async (trackId) => {
     await session.save();
   }
 
-  await User.updateMany(
-    { enrolledTrack: trackId },
-    { $unset: { enrolledTrack: 1 } },
-  );
-
-  if (track.courses?.length) {
-    await User.updateMany(
-      { enrolledCourses: { $in: track.courses } },
-      { $pull: { enrolledCourses: { $in: track.courses } } },
-    );
+  // Remove all track students from track courses and sessions
+  if (track.students?.length) {
+    if (track.courses?.length) {
+      await Course.updateMany(
+        { _id: { $in: track.courses } },
+        { $pull: { students: { $in: track.students } } },
+      );
+    }
+    if (track.sessions?.length) {
+      await Session.updateMany(
+        { _id: { $in: track.sessions } },
+        { $pull: { students: { $in: track.students } } },
+      );
+    }
   }
 
-  if (track.sessions?.length) {
+  // Clean up User enrollments ONLY for actual track students
+  if (track.students?.length) {
     await User.updateMany(
-      { enrolledSessions: { $in: track.sessions } },
-      { $pull: { enrolledSessions: { $in: track.sessions } } },
+      { _id: { $in: track.students } },
+      {
+        $unset: { enrolledTrack: 1 },
+        $pull: {
+          enrolledCourses: { $in: track.courses || [] },
+          enrolledSessions: { $in: track.sessions || [] },
+        },
+      },
     );
   }
 
