@@ -40,7 +40,8 @@
  *     summary: Get all sessions
  *     description: |
  *       Retrieve all sessions with filtering and pagination.
- *       **Note:** The list view omits `url`, `embedUrl`, and `resources` for non-enrolled users.
+ *       **Note:** The list view unconditionally omits `url`, `embedUrl`, and `resources`.
+ *       Full content is only returned in `GET /:id` for enrolled users.
  *       Supports MongoDB-style query filters, e.g.
  *       `?level=intermediate&published=true`.
  *     tags: [Sessions]
@@ -83,7 +84,10 @@
  *   get:
  *     operationId: getSessionById
  *     summary: Get a specific session by ID
- *     description: Retrieve detailed information about a session
+ *     description: |
+ *       Retrieve detailed information about a session.
+ *       `url`, `embedUrl`, and `resources` are stripped if the caller is
+ *       not enrolled in the session, its parent track, or its parent course.
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []
@@ -362,6 +366,7 @@ const {
   addStudentValidation,
   studentIdParamValidation,
 } = require('../validations/session.validation');
+const { authLimiter } = require('../middlewares/rateLimit.middleware');
 
 const router = express.Router();
 
@@ -392,9 +397,9 @@ router.get(
 
 router.get('/track/:trackId', sessionController.getSessionsByTrack);
 
-router.post('/:id/enroll-me', protect, sessionController.enrollMe);
+router.post('/:id/enroll-me', authLimiter, protect, sessionController.enrollMe);
 
-router.delete('/:id/leave-me', protect, sessionController.leaveMe);
+router.delete('/:id/leave-me', authLimiter, protect, sessionController.leaveMe);
 
 router
   .route('/:id')

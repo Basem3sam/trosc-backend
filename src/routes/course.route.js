@@ -109,7 +109,10 @@
  *     security: []
  *     operationId: getCourseById
  *     summary: Get a specific course by ID
- *     description: Retrieve detailed information about a course
+ *     description: |
+ *       Retrieve detailed information about a course.
+ *       Returns 404 if the course is unpublished and the caller is neither
+ *       the instructor nor an admin.
  *     tags: [Courses]
  *     parameters:
  *       - name: id
@@ -524,6 +527,7 @@ const {
   addStudentSchema,
   studentIdSchema,
 } = require('../validations/course.validation');
+const { authLimiter } = require('../middlewares/rateLimit.middleware');
 
 const router = express.Router();
 
@@ -564,9 +568,9 @@ router.get(
   courseController.getCoursesByStudent,
 );
 
-router.post('/:id/enroll-me', protect, courseController.enrollMe);
+router.post('/:id/enroll-me', authLimiter, protect, courseController.enrollMe);
 
-router.delete('/:id/leave-me', protect, courseController.leaveMe);
+router.delete('/:id/leave-me', authLimiter, protect, courseController.leaveMe);
 
 router
   .route('/:id')

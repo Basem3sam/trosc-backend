@@ -133,9 +133,6 @@
  *         description:
  *           type: string
  *           example: "Updated track description"
- *         instructor:
- *           type: string
- *           example: "507f1f77bcf86cd799439012"
  *         level:
  *           type: string
  *           enum: [beginner, intermediate, advanced, all]
@@ -180,6 +177,7 @@
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/Track'
+ *     
  *     TrackAnalytics:
  *       type: object
  *       properties:

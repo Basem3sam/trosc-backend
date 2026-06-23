@@ -284,6 +284,7 @@ const {
   updateEventSchema,
   eventIdSchema,
 } = require('../validations/event.validation');
+const { authLimiter } = require('../middlewares/rateLimit.middleware');
 
 const router = express.Router();
 
@@ -338,12 +339,14 @@ router.delete(
 
 router.post(
   '/:id/rsvp',
+  authLimiter,
   validate(eventIdSchema, 'params'),
   eventController.rsvpEvent,
 );
 
 router.delete(
   '/:id/rsvp',
+  authLimiter,
   validate(eventIdSchema, 'params'),
   eventController.cancelRsvp,
 );

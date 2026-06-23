@@ -147,7 +147,8 @@ exports.updateTrack = async (trackId, updateBody) => {
 };
 
 /**
- * Permanently delete a track and handle related sessions
+ * Permanently delete a track. Courses are orphaned (track: null) and sessions
+ * recalculate isStandalone; they are NOT cascade-deleted.
  * @param {string} trackId - MongoDB track ID
  * @returns {Promise<null>} Null on successful deletion
  * @throws {AppError} 404 if track not found

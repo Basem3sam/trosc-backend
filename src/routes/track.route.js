@@ -101,7 +101,10 @@
  *     security: []
  *     operationId: getTrackById
  *     summary: Get a specific track by ID
- *     description: Retrieve detailed information about a track (public endpoint)
+ *     description: |
+ *       Retrieve detailed information about a track.
+ *       Returns 404 if the track is unpublished and the caller is neither
+ *       the instructor nor an admin.
  *     tags: [Tracks]
  *     parameters:
  *       - name: id
@@ -763,6 +766,7 @@ const {
   addStudentSchema,
   studentIdSchema,
 } = require('../validations/track.validation');
+const { authLimiter } = require('../middlewares/rateLimit.middleware');
 const selfApproval = require('../middlewares/selfApproval');
 
 const router = express.Router();
@@ -842,7 +846,12 @@ router.post(
 // Existing enroll-me route stays, but now creates a pending request
 router
   .route('/:id/enroll-me')
-  .post(protect, validate(getTrackSchema, 'params'), trackController.enrollMe);
+  .post(
+    authLimiter,
+    protect,
+    validate(getTrackSchema, 'params'),
+    trackController.enrollMe,
+  );
 
 // --- TRACK ANALYTICS (must be before /:id) ---
 
@@ -972,6 +981,7 @@ router.get(
 
 router.post(
   '/:id/leave-me',
+  authLimiter,
   protect,
   validate(getTrackSchema, 'params'),
   trackController.requestLeaveTrack,

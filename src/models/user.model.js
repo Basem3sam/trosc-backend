@@ -442,7 +442,7 @@ const userSchema = new mongoose.Schema(
 );
 
 // For enrollment lookups
-userSchema.index({ enrolledTracks: 1 });
+userSchema.index({ enrolledTrack: 1 });
 
 /* 🧩 MIDDLEWARES */
 

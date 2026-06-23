@@ -521,6 +521,7 @@ const {
   adminUpdateUserSchema,
   bulkUserActionSchema,
 } = require('../validations/user.validation');
+const { authLimiter } = require('../middlewares/rateLimit.middleware');
 
 const router = express.Router();
 

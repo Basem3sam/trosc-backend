@@ -65,7 +65,6 @@ flowchart TD
     Admin -->|manual add / bulk manage| P5
     P5 -->|update enrolledTracks / Courses / Sessions| DS1
     P5 -->|update students / pending / pendingLeaves| DS2
-    P5 -->|update attendees| DS3
 
     %% Public browsing & Feed
     Student -->|browse / view / search| P2
@@ -73,6 +72,5 @@ flowchart TD
     Student -->|request dashboard| P6
     P6 -->|pinned + upcoming + creator info| Student
     DS1 -->|user / creator data| P6
-    DS2 -->|public content metadata| P6
     DS3 -->|upcoming events| P6
     DS4 -->|pinned announcements| P6

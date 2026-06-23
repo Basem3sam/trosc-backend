@@ -21,6 +21,8 @@ const announcementRouter = require('./routes/announcement.route');
 const feedRouter = require('./routes/feed.route');
 const logger = require('./utils/logger');
 
+const { authLimiter } = require('./middlewares/rateLimit.middleware');
+
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Initialize Express app
@@ -115,26 +117,11 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Stricter rate limit for auth endpoints (login, signup, forgotPassword)
-const authLimiter = rateLimit({
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || 5,
-  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  message:
-    'Too many auth attempts from this IP, please try again in 15 minutes',
-  skipSuccessfulRequests: true, // Don't count successful logins
-});
 
 app.use('/v1/users/login', authLimiter);
 app.use('/v1/users/signup', authLimiter);
 app.use('/v1/users/forgotPassword', authLimiter);
 app.use('/v1/users/resetPassword', authLimiter);
-
-app.use('/v1/tracks/:id/enroll-me', authLimiter);
-app.use('/v1/tracks/:id/leave-me', authLimiter);
-app.use('/v1/courses/:id/enroll-me', authLimiter);
-app.use('/v1/courses/:id/leave-me', authLimiter);
-app.use('/v1/sessions/:id/enroll-me', authLimiter);
-app.use('/v1/sessions/:id/leave-me', authLimiter);
-app.use('/v1/events/:id/rsvp', authLimiter);
 
 /* BODY PARSER */
 

@@ -1174,10 +1174,6 @@
             "format": "uri",
             "example": "https://drive.google.com/file/d/abc123"
           },
-          "instructor": {
-            "type": "string",
-            "example": "507f1f77bcf86cd799439012"
-          },
           "tracks": {
             "type": "array",
             "items": {
@@ -1469,10 +1465,6 @@
           "description": {
             "type": "string",
             "example": "Updated track description"
-          },
-          "instructor": {
-            "type": "string",
-            "example": "507f1f77bcf86cd799439012"
           },
           "level": {
             "type": "string",
@@ -2624,7 +2616,7 @@
         "security": [],
         "operationId": "getCourseById",
         "summary": "Get a specific course by ID",
-        "description": "Retrieve detailed information about a course",
+        "description": "Retrieve detailed information about a course.\nReturns 404 if the course is unpublished and the caller is neither\nthe instructor nor an admin.\n",
         "tags": [
           "Courses"
         ],
@@ -3822,7 +3814,7 @@
       "get": {
         "operationId": "getAllSessions",
         "summary": "Get all sessions",
-        "description": "Retrieve all sessions with filtering and pagination.\n**Note:** The list view omits `url`, `embedUrl`, and `resources` for non-enrolled users.\nSupports MongoDB-style query filters, e.g.\n`?level=intermediate&published=true`.\n",
+        "description": "Retrieve all sessions with filtering and pagination.\n**Note:** The list view unconditionally omits `url`, `embedUrl`, and `resources`.\nFull content is only returned in `GET /:id` for enrolled users.\nSupports MongoDB-style query filters, e.g.\n`?level=intermediate&published=true`.\n",
         "tags": [
           "Sessions"
         ],
@@ -3889,7 +3881,7 @@
       "get": {
         "operationId": "getSessionById",
         "summary": "Get a specific session by ID",
-        "description": "Retrieve detailed information about a session",
+        "description": "Retrieve detailed information about a session.\n`url`, `embedUrl`, and `resources` are stripped if the caller is\nnot enrolled in the session, its parent track, or its parent course.\n",
         "tags": [
           "Sessions"
         ],
@@ -4486,7 +4478,7 @@
         "security": [],
         "operationId": "getTrackById",
         "summary": "Get a specific track by ID",
-        "description": "Retrieve detailed information about a track (public endpoint)",
+        "description": "Retrieve detailed information about a track.\nReturns 404 if the track is unpublished and the caller is neither\nthe instructor nor an admin.\n",
         "tags": [
           "Tracks"
         ],

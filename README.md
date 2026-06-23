@@ -42,34 +42,34 @@
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| 🔐 **Authentication** | JWT (bearer + httpOnly cookie), role-based access control (`student` / `instructor` / `admin`) |
-| 📚 **Learning Tracks** | Structured curricula grouping courses and sessions |
-| 🎬 **Courses & Sessions** | YouTube / Google Drive integration — zero storage cost |
-| 📅 **Events** | Online/offline events with RSVP and attendance tracking |
-| 📌 **Announcements** | Pinned posts with audience targeting (`all` / `track` / `course`) |
-| 📊 **Dashboard Feed** | Aggregated pinned announcements + upcoming events |
-| 🛡️ **Ownership Model** | Instructors edit only their own content; admins bypass restrictions |
-| ⚡ **Bulk Actions** | Admin tools for mass user activation, deactivation, or deletion |
-| 🔍 **Full-Text Search** | MongoDB text indexes on tracks, courses, and sessions |
-| 📈 **Track Analytics** | Enrollment rates, student counts, and engagement metrics |
+| Feature                   | Description                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| 🔐 **Authentication**     | JWT (bearer + httpOnly cookie), role-based access control (`student` / `instructor` / `admin`) |
+| 📚 **Learning Tracks**    | Structured curricula grouping courses and sessions                                             |
+| 🎬 **Courses & Sessions** | YouTube / Google Drive integration — zero storage cost                                         |
+| 📅 **Events**             | Online/offline events with RSVP and attendance tracking                                        |
+| 📌 **Announcements**      | Pinned posts with audience targeting (`all` / `track` / `course`)                              |
+| 📊 **Dashboard Feed**     | Aggregated pinned announcements + upcoming events                                              |
+| 🛡️ **Ownership Model**    | Instructors edit only their own content; admins bypass restrictions                            |
+| ⚡ **Bulk Actions**       | Admin tools for mass user activation, deactivation, or deletion                                |
+| 🔍 **Full-Text Search**   | MongoDB text indexes on tracks, courses, and sessions                                          |
+| 📈 **Track Analytics**    | Enrollment rates, student counts, and engagement metrics                                       |
 
 ---
 
 ## 🧰 Tech Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| **Runtime** | Node.js | ≥ 18 LTS |
-| **Framework** | Express.js | 4.x |
-| **Database** | MongoDB (Mongoose ODM) | 7.x+ |
-| **Auth** | JWT (jsonwebtoken) + bcrypt | — |
-| **Validation** | Joi | 17.x |
-| **Security** | Helmet, express-rate-limit, mongo-sanitize, hpp | — |
-| **Email** | Nodemailer + html-to-text | — |
-| **Docs** | Swagger (swagger-jsdoc + swagger-ui-express) | 3.0 |
-| **Logging** | Winston | — |
+| Layer          | Technology                                      | Version  |
+| -------------- | ----------------------------------------------- | -------- |
+| **Runtime**    | Node.js                                         | ≥ 18 LTS |
+| **Framework**  | Express.js                                      | 4.x      |
+| **Database**   | MongoDB (Mongoose ODM)                          | 7.x+     |
+| **Auth**       | JWT (jsonwebtoken) + bcrypt                     | —        |
+| **Validation** | Joi                                             | 17.x     |
+| **Security**   | Helmet, express-rate-limit, mongo-sanitize, hpp | —        |
+| **Email**      | Nodemailer + html-to-text                       | —        |
+| **Docs**       | Swagger (swagger-jsdoc + swagger-ui-express)    | 3.0      |
+| **Logging**    | Winston                                         | —        |
 
 > **Design Principle:** No file uploads. All media (images, videos, PDFs) are referenced via URLs from trusted hosts (YouTube, Google Drive, Cloudinary, Imgur, GitHub, Dropbox). This keeps hosting 100% free.
 
@@ -165,12 +165,14 @@ src/
 <summary>📐 Data Flow Diagram (Level 1) (click to expand)</summary>
 
 ![DFD Level 1](./design/DFD.svg)
+
 </details>
 <br>
 <details>
 <summary>📊 Entity Relationship Diagram (click to expand)</summary>
 
 ![ERD](./design/ERD.svg)
+
 </details>
 <br>
 
@@ -180,21 +182,22 @@ src/
 
 ## 🗄️ Database Overview
 
-| Collection | Purpose | Key Indexes |
-|------------|---------|-------------|
-| `users` | Authentication, profiles, enrollments | `email` (unique), `enrolledTracks`, `role` |
-| `tracks` | Learning paths | `title` (text), `instructor`, `students`, `published+level` |
-| `courses` | Course content | `title` (text), `track`, `instructor`, `students`, `published+level` |
-| `sessions` | Video sessions | `tracks`, `course`, `instructor`, `published+level` |
-| `events` | Club events & RSVP | `date` (for upcoming feed), `createdBy` |
-| `announcements` | Pinned posts | `isPinned` + `createdAt` (compound) |
+| Collection      | Purpose                               | Key Indexes                                                          |
+| --------------- | ------------------------------------- | -------------------------------------------------------------------- |
+| `users`         | Authentication, profiles, enrollments | `email` (unique), `enrolledTrack`                                    |
+| `tracks`        | Learning paths                        | `title` (text), `instructor`, `students`, `published+level`          |
+| `courses`       | Course content                        | `title` (text), `track`, `instructor`, `students`, `published+level` |
+| `sessions`      | Video sessions                        | `tracks`, `course`, `instructor`, `published+level`                  |
+| `events`        | Club events & RSVP                    | `date` (for upcoming feed)                                           |
+| `announcements` | Pinned posts                          | `isPinned` + `createdAt` (compound)                                  |
 
 ### Enrollment Cascade Rules
 
 When a student joins a **track**, the system automatically enrolls them in:
+
 - All courses within that track
 - All sessions within that track
-- Updates `User.enrolledTracks`, `User.enrolledCourses`, `User.enrolledSessions`
+- Updates `User.enrolledTrack`, `User.enrolledCourses`, `User.enrolledSessions`
 
 When a student **leaves** (or is removed), all of the above are reversed atomically.
 
@@ -253,28 +256,28 @@ open http://localhost:5000/api-docs
 
 ## 🔧 Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `NODE_ENV` | ✅ | `development` | `development` or `production` |
-| `PORT` | ❌ | `5000` | Server port |
-| `DATABASE_URL` | ✅ | — | MongoDB connection string |
-| `DATABASE_PASSWORD` | ❌ | — | If using `<PASSWORD>` placeholder in URL |
-| `DATABASE_USERNAME` | ❌ | — | If using `<USERNAME>` placeholder in URL |
-| `JWT_SECRET` | ✅ | — | Min 32 characters |
-| `JWT_EXPIRES_IN` | ✅ | `30d` | Token lifetime (e.g., `90d`, `7d`) |
-| `JWT_COOKIE_EXPIRES_IN` | ❌ | `7` | Cookie expiry in days |
-| `FRONTEND_URL` | ✅ | — | For CORS and password reset links |
-| `BASE_URL` | ❌ | `http://localhost:5000` | Server base URL |
-| `RATE_LIMIT_MAX` | ❌ | `300` | Max requests per window per IP |
-| `RATE_LIMIT_WINDOW_MS` | ❌ | `900000` | Rate limit window (15 min in ms) |
-| `AUTH_RATE_LIMIT_MAX` | ❌ | `5` | Max auth attempts per window |
-| `AUTH_RATE_LIMIT_WINDOW_MS` | ❌ | `900000` | Auth rate limit window |
-| `EMAIL_HOST` | ✅* | — | SMTP host (dev: Mailtrap) |
-| `EMAIL_PORT` | ✅* | `2525` | SMTP port |
-| `EMAIL_USER` | ✅* | — | SMTP username |
-| `EMAIL_PASS` | ✅* | — | SMTP password |
-| `EMAIL_FROM` | ❌ | `Trosc Club <noreply@trosc.club>` | Sender address |
-| `EMAIL_SERVICE` | ❌ | `SendGrid` | Used in production instead of host/port |
+| Variable                    | Required | Default                           | Description                              |
+| --------------------------- | -------- | --------------------------------- | ---------------------------------------- |
+| `NODE_ENV`                  | ✅       | `development`                     | `development` or `production`            |
+| `PORT`                      | ❌       | `5000`                            | Server port                              |
+| `DATABASE_URL`              | ✅       | —                                 | MongoDB connection string                |
+| `DATABASE_PASSWORD`         | ❌       | —                                 | If using `<PASSWORD>` placeholder in URL |
+| `DATABASE_USERNAME`         | ❌       | —                                 | If using `<USERNAME>` placeholder in URL |
+| `JWT_SECRET`                | ✅       | —                                 | Min 32 characters                        |
+| `JWT_EXPIRES_IN`            | ✅       | `30d`                             | Token lifetime (e.g., `90d`, `7d`)       |
+| `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days                    |
+| `FRONTEND_URL`              | ✅       | —                                 | For CORS and password reset links        |
+| `BASE_URL`                  | ❌       | `http://localhost:5000`           | Server base URL                          |
+| `RATE_LIMIT_MAX`            | ❌       | `300`                             | Max requests per window per IP           |
+| `RATE_LIMIT_WINDOW_MS`      | ❌       | `900000`                          | Rate limit window (15 min in ms)         |
+| `AUTH_RATE_LIMIT_MAX`       | ❌       | `5`                               | Max auth attempts per window             |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | ❌       | `900000`                          | Auth rate limit window                   |
+| `EMAIL_HOST`                | ✅\*     | —                                 | SMTP host (dev: Mailtrap)                |
+| `EMAIL_PORT`                | ✅\*     | `2525`                            | SMTP port                                |
+| `EMAIL_USER`                | ✅\*     | —                                 | SMTP username                            |
+| `EMAIL_PASS`                | ✅\*     | —                                 | SMTP password                            |
+| `EMAIL_FROM`                | ❌       | `Trosc Club <noreply@trosc.club>` | Sender address                           |
+| `EMAIL_SERVICE`             | ❌       | `SendGrid`                        | Used in production instead of host/port  |
 
 \* Required if sending emails (password reset, welcome). Not required for basic API operation.
 
@@ -310,17 +313,17 @@ EMAIL_FROM=Trosc Club <noreply@trosc.club>
 
 ### Quick Reference
 
-| Resource | Base Endpoint | Key Capabilities |
-|----------|---------------|------------------|
-| **Auth** | `/v1/users` | signup, login, logout, password reset |
-| **Users** | `/v1/users` | profiles, enrollments, bulk actions |
-| **Tracks** | `/v1/tracks` | CRUD, enrollment approval, analytics |
-| **Courses** | `/v1/courses` | CRUD, session management, prerequisites |
-| **Sessions** | `/v1/sessions` | CRUD, student gating, YouTube/Drive URLs |
-| **Events** | `/v1/events` | CRUD, RSVP, online/offline locations |
-| **Announcements** | `/v1/announcements` | Pinned posts, audience targeting |
-| **Feed** | `/v1/feed` | Dashboard aggregation |
-| **Health** | `/health` | Server & DB status |
+| Resource          | Base Endpoint       | Key Capabilities                         |
+| ----------------- | ------------------- | ---------------------------------------- |
+| **Auth**          | `/v1/users`         | signup, login, logout, password reset    |
+| **Users**         | `/v1/users`         | profiles, enrollments, bulk actions      |
+| **Tracks**        | `/v1/tracks`        | CRUD, enrollment approval, analytics     |
+| **Courses**       | `/v1/courses`       | CRUD, session management, prerequisites  |
+| **Sessions**      | `/v1/sessions`      | CRUD, student gating, YouTube/Drive URLs |
+| **Events**        | `/v1/events`        | CRUD, RSVP, online/offline locations     |
+| **Announcements** | `/v1/announcements` | Pinned posts, audience targeting         |
+| **Feed**          | `/v1/feed`          | Dashboard aggregation                    |
+| **Health**        | `/health`           | Server & DB status                       |
 
 📖 **Full endpoint table →** [`API.md`](./API.md)
 
@@ -337,6 +340,7 @@ The Swagger UI includes request schemas, response formats, authentication helper
 ### Authentication
 
 The API uses **dual-token delivery**:
+
 1. **Authorization Header** for API clients: `Authorization: Bearer <jwt>`
 2. **httpOnly Cookie** for browser clients: `jwt=<token>`
 
@@ -439,40 +443,40 @@ Validation schemas (Joi) are defined in `validations/` and referenced in route J
 
 ## 🛡️ Security
 
-| Layer | Implementation |
-|-------|---------------|
-| **HTTP Headers** | Helmet (CSP, HSTS, X-Frame-Options, etc.) |
-| **Rate Limiting** | 300 req / 15 min (global); 5 req / 15 min (auth endpoints) |
-| **NoSQL Injection** | `express-mongo-sanitize` strips `$` and `.` from user input |
-| **Parameter Pollution** | `hpp` whitelists array fields (`role`, `level`, `prerequisites`, etc.) |
-| **CORS** | Whitelist-based with credentials; ngrok allowed in dev |
-| **Passwords** | bcrypt (cost 12), never returned in queries (`select: false`) |
-| **JWT** | `httpOnly` cookie + `SameSite` strict; 30-day expiry |
-| **Input Validation** | Joi on all body/params/query; custom URL validators for attachments |
-| **Ownership** | Instructors can only mutate their own content; admins bypass |
-| **Body Spoofing** | Controllers delete `req.body.instructor`, `req.body.students`, etc. before saving |
+| Layer                   | Implementation                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| **HTTP Headers**        | Helmet (CSP, HSTS, X-Frame-Options, etc.)                                         |
+| **Rate Limiting**       | 300 req / 15 min (global); 5 req / 15 min (auth endpoints)                        |
+| **NoSQL Injection**     | `express-mongo-sanitize` strips `$` and `.` from user input                       |
+| **Parameter Pollution** | `hpp` whitelists array fields (`role`, `level`, `prerequisites`, etc.)            |
+| **CORS**                | Whitelist-based with credentials; ngrok allowed in dev                            |
+| **Passwords**           | bcrypt (cost 12), never returned in queries (`select: false`)                     |
+| **JWT**                 | `httpOnly` cookie + `SameSite` strict; 30-day expiry                              |
+| **Input Validation**    | Joi on all body/params/query; custom URL validators for attachments               |
+| **Ownership**           | Instructors can only mutate their own content; admins bypass                      |
+| **Body Spoofing**       | Controllers delete `req.body.instructor`, `req.body.students`, etc. before saving |
 
 ---
 
 ## 💰 Cost Strategy
 
-| Feature | Solution | Cost |
-|---------|----------|------|
-| Video hosting | YouTube / Google Drive | Free |
-| Images | External URLs (Cloudinary, Imgur, etc.) | Free |
-| Database | MongoDB Atlas M0 (512 MB) | Free |
-| Backend hosting | Render / Railway / Fly.io | Free tier |
-| Email | Mailtrap (dev) / SendGrid (prod) | Free tier |
-| File storage | None — we don't store files | $0 |
+| Feature         | Solution                                | Cost      |
+| --------------- | --------------------------------------- | --------- |
+| Video hosting   | YouTube / Google Drive                  | Free      |
+| Images          | External URLs (Cloudinary, Imgur, etc.) | Free      |
+| Database        | MongoDB Atlas M0 (512 MB)               | Free      |
+| Backend hosting | Render / Railway / Fly.io               | Free tier |
+| Email           | Mailtrap (dev) / SendGrid (prod)        | Free tier |
+| File storage    | None — we don't store files             | $0        |
 
 ---
 
 ## 🛠️ Scripts & Utilities
 
-| Command | Description |
-|---------|-------------|
-| `npm start` | Development mode with nodemon |
-| `npm start:prod` | Production mode |
+| Command                     | Description                                       |
+| --------------------------- | ------------------------------------------------- |
+| `npm start`                 | Development mode with nodemon                     |
+| `npm start:prod`            | Production mode                                   |
 | `node testEmail.js <email>` | Diagnose SMTP configuration and send a test email |
 
 ### Email Diagnostic Tool
@@ -537,12 +541,12 @@ open http://localhost:5000/api-docs
 
 For a production-grade test suite, consider adding:
 
-| Type | Tool | Purpose |
-|------|------|---------|
-| Unit | Jest | Service logic, utilities |
-| Integration | Jest + Supertest | HTTP endpoints, auth flows |
-| DB | mongodb-memory-server | Isolated in-memory MongoDB |
-| Coverage | Jest `--coverage` | Track test coverage |
+| Type        | Tool                  | Purpose                    |
+| ----------- | --------------------- | -------------------------- |
+| Unit        | Jest                  | Service logic, utilities   |
+| Integration | Jest + Supertest      | HTTP endpoints, auth flows |
+| DB          | mongodb-memory-server | Isolated in-memory MongoDB |
+| Coverage    | Jest `--coverage`     | Track test coverage        |
 
 ### Example Test Structure (Future)
 
@@ -564,6 +568,7 @@ tests/
 ## 🗺️ Roadmap
 
 ### Implemented ✅
+
 - [x] JWT Authentication (bearer + cookie)
 - [x] Role-based access control
 - [x] Track / Course / Session CRUD
@@ -577,6 +582,7 @@ tests/
 - [x] Swagger documentation
 
 ### Planned 🔮
+
 - [ ] **MongoDB Transactions** for cascade enrollment operations
 - [ ] **Activity Logs** (`activityLog.model.js`) — audit trail for user actions
 - [ ] **Assignments** (`assignment.model.js`) — deadlines, submissions, grading

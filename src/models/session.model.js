@@ -210,9 +210,6 @@
  *           type: string
  *           format: uri
  *           example: "https://drive.google.com/file/d/abc123"
- *         instructor:
- *           type: string
- *           example: "507f1f77bcf86cd799439012"
  *         tracks:
  *           type: array
  *           items:

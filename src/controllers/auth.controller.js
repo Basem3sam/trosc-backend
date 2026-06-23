@@ -15,7 +15,7 @@ const setAuthCookie = (res, token) => {
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  const url = `${req.protocol}://${req.get('host')}/me`;
+  const url = `${req.protocol}://${req.get('host')}/v1/users/me`;
   const { token, user } = await authService.signUp(req.body, url);
 
   setAuthCookie(res, token);
