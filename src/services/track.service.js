@@ -227,6 +227,18 @@ exports.addCourseToTrack = async (trackId, courseId) => {
   course.track = trackId;
 
   await Promise.all([track.save(), course.save()]);
+
+  // Enroll existing track students into the new course
+  if (track.students?.length) {
+    await Course.findByIdAndUpdate(courseId, {
+      $addToSet: { students: { $each: track.students } },
+    });
+    await User.updateMany(
+      { _id: { $in: track.students } },
+      { $addToSet: { enrolledCourses: courseId } },
+    );
+  }
+
   return track;
 };
 
@@ -255,6 +267,18 @@ exports.addSessionToTrack = async (trackId, sessionId) => {
   session.isStandalone = !session.tracks.length && !session.course;
 
   await Promise.all([track.save(), session.save()]);
+
+  // Enroll existing track students into the new session
+  if (track.students?.length) {
+    await Session.findByIdAndUpdate(sessionId, {
+      $addToSet: { students: { $each: track.students } },
+    });
+    await User.updateMany(
+      { _id: { $in: track.students } },
+      { $addToSet: { enrolledSessions: sessionId } },
+    );
+  }
+
   return track;
 };
 
