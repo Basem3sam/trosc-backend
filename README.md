@@ -54,6 +54,7 @@
 | ⚡ **Bulk Actions**       | Admin tools for mass user activation, deactivation, or deletion                                |
 | 🔍 **Full-Text Search**   | MongoDB text indexes on tracks, courses, and sessions                                          |
 | 📈 **Track Analytics**    | Enrollment rates, student counts, and engagement metrics                                       |
+| ✉️ **Contact Form**       | Public contact submission, stored + emailed to admin                                           |
 
 ---
 
@@ -257,28 +258,29 @@ open http://localhost:5000/api-docs
 
 ## 🔧 Environment Variables
 
-| Variable                    | Required | Default                           | Description                              |
-| --------------------------- | -------- | --------------------------------- | ---------------------------------------- |
-| `NODE_ENV`                  | ✅       | `development`                     | `development` or `production`            |
-| `PORT`                      | ❌       | `5000`                            | Server port                              |
-| `DATABASE_URL`              | ✅       | —                                 | MongoDB connection string                |
-| `DATABASE_PASSWORD`         | ❌       | —                                 | If using `<PASSWORD>` placeholder in URL |
-| `DATABASE_USERNAME`         | ❌       | —                                 | If using `<USERNAME>` placeholder in URL |
-| `JWT_SECRET`                | ✅       | —                                 | Min 32 characters                        |
-| `JWT_EXPIRES_IN`            | ✅       | `30d`                             | Token lifetime (e.g., `90d`, `7d`)       |
-| `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days                    |
-| `FRONTEND_URL`              | ✅       | —                                 | For CORS and password reset links        |
-| `BASE_URL`                  | ❌       | `http://localhost:5000`           | Server base URL                          |
-| `RATE_LIMIT_MAX`            | ❌       | `300`                             | Max requests per window per IP           |
-| `RATE_LIMIT_WINDOW_MS`      | ❌       | `900000`                          | Rate limit window (15 min in ms)         |
-| `AUTH_RATE_LIMIT_MAX`       | ❌       | `5`                               | Max auth attempts per window             |
-| `AUTH_RATE_LIMIT_WINDOW_MS` | ❌       | `900000`                          | Auth rate limit window                   |
-| `EMAIL_HOST`                | ✅\*     | —                                 | SMTP host (dev: Mailtrap)                |
-| `EMAIL_PORT`                | ✅\*     | `2525`                            | SMTP port                                |
-| `EMAIL_USER`                | ✅\*     | —                                 | SMTP username                            |
-| `EMAIL_PASS`                | ✅\*     | —                                 | SMTP password                            |
-| `EMAIL_FROM`                | ❌       | `Trosc Club <noreply@trosc.club>` | Sender address                           |
-| `EMAIL_SERVICE`             | ❌       | `SendGrid`                        | Used in production instead of host/port  |
+| Variable                    | Required | Default                           | Description                                    |
+| --------------------------- | -------- | --------------------------------- | ---------------------------------------------- |
+| `NODE_ENV`                  | ✅       | `development`                     | `development` or `production`                  |
+| `PORT`                      | ❌       | `5000`                            | Server port                                    |
+| `DATABASE_URL`              | ✅       | —                                 | MongoDB connection string                      |
+| `DATABASE_PASSWORD`         | ❌       | —                                 | If using `<PASSWORD>` placeholder in URL       |
+| `DATABASE_USERNAME`         | ❌       | —                                 | If using `<USERNAME>` placeholder in URL       |
+| `JWT_SECRET`                | ✅       | —                                 | Min 32 characters                              |
+| `JWT_EXPIRES_IN`            | ✅       | `30d`                             | Token lifetime (e.g., `90d`, `7d`)             |
+| `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days                          |
+| `FRONTEND_URL`              | ✅       | —                                 | For CORS and password reset links              |
+| `BASE_URL`                  | ❌       | `http://localhost:5000`           | Server base URL                                |
+| `RATE_LIMIT_MAX`            | ❌       | `300`                             | Max requests per window per IP                 |
+| `RATE_LIMIT_WINDOW_MS`      | ❌       | `900000`                          | Rate limit window (15 min in ms)               |
+| `AUTH_RATE_LIMIT_MAX`       | ❌       | `5`                               | Max auth attempts per window                   |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | ❌       | `900000`                          | Auth rate limit window                         |
+| `EMAIL_HOST`                | ✅\*     | —                                 | SMTP host (dev: Mailtrap)                      |
+| `EMAIL_PORT`                | ✅\*     | `2525`                            | SMTP port                                      |
+| `EMAIL_USER`                | ✅\*     | —                                 | SMTP username                                  |
+| `EMAIL_PASS`                | ✅\*     | —                                 | SMTP password                                  |
+| `EMAIL_FROM`                | ❌       | `Trosc Club <noreply@trosc.club>` | Sender address                                 |
+| `EMAIL_SERVICE`             | ❌       | `SendGrid`                        | Used in production instead of host/port        |
+| `ADMIN_EMAIL`               | ❌       | —                                 | Inbox notified on new contact form submissions |
 
 \* Required if sending emails (password reset, welcome). Not required for basic API operation.
 
@@ -306,6 +308,8 @@ EMAIL_PORT=2525
 EMAIL_USER=your_mailtrap_user
 EMAIL_PASS=your_mailtrap_pass
 EMAIL_FROM=Trosc Club <noreply@trosc.club>
+
+ADMIN_EMAIL=admin@trosc.club
 ```
 
 ---
@@ -324,6 +328,7 @@ EMAIL_FROM=Trosc Club <noreply@trosc.club>
 | **Events**        | `/v1/events`        | CRUD, RSVP, online/offline locations     |
 | **Announcements** | `/v1/announcements` | Pinned posts, audience targeting         |
 | **Feed**          | `/v1/feed`          | Dashboard aggregation                    |
+| **Contact**       | `/v1/contact`       | Public contact form submission           |
 | **Health**        | `/health`           | Server & DB status                       |
 
 📖 **Full endpoint table →** [`API.md`](./API.md)
@@ -581,6 +586,7 @@ tests/
 - [x] Track analytics
 - [x] Email service (welcome, password reset)
 - [x] Swagger documentation
+- [x] Public contact form (stored + admin email notification)
 
 ### Planned 🔮
 
