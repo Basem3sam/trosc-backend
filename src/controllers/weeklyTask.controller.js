@@ -76,3 +76,11 @@ exports.uncompleteItem = catchAsync(async (req, res, next) => {
     message: 'Item marked as incomplete',
   });
 });
+
+exports.updateWeeklyTask = catchAsync(async (req, res, next) => {
+  const task = await weeklyTaskService.updateWeeklyTask(
+    req.params.taskId,
+    req.body,
+  );
+  res.status(200).json({ status: 'success', data: { task } });
+});
