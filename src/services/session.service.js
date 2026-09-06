@@ -229,3 +229,29 @@ exports.getSessionsByTrack = async (trackId, query) => {
     pagination: features.pagination,
   };
 };
+
+/**
+ * Get all sessions a student is enrolled in
+ * @param {string} studentId - MongoDB user ID
+ * @param {Object} query - Filtering options
+ * @returns {Promise<{sessions: Array, total: Number}>}
+ */
+exports.getSessionsByStudent = async (studentId, query) => {
+  const features = new APIFeatures(Session.find(), query, Session)
+    .filter({ students: studentId })
+    .sort()
+    .limitFields();
+
+  await features.paginate();
+
+  const sessions = await features.query.populate(
+    'instructor',
+    'name email role',
+  );
+
+  return {
+    sessions: sessions || [],
+    total: features.totalDocs || 0,
+    pagination: features.pagination,
+  };
+};

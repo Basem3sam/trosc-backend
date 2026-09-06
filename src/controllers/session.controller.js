@@ -171,3 +171,18 @@ exports.leaveMe = catchAsync(async (req, res, next) => {
     data: { session },
   });
 });
+
+exports.getSessionsByStudent = catchAsync(async (req, res, next) => {
+  const { sessions, total, pagination } =
+    await sessionService.getSessionsByStudent(req.params.studentId, req.query);
+
+  res.status(200).json({
+    status: 'success',
+    results: sessions.length,
+    total,
+    pagination,
+    data: {
+      sessions,
+    },
+  });
+});

@@ -115,3 +115,65 @@ exports.getTrackAssignments = async (trackId, requestingUser) => {
 
   return withMySubmission(assignments, requestingUser.id);
 };
+
+/**
+ * Create a new assignment for a course or session.
+ * @param {'course'|'session'} resourceType
+ * @param {string} resourceId
+ * @param {string} instructorId - req.user.id (auto-assigned owner)
+ * @param {Object} data - { title, description, deadline, attachments }
+ * @returns {Promise<Assignment>}
+ */
+exports.createAssignment = async (
+  resourceType,
+  resourceId,
+  instructorId,
+  data,
+) => {
+  const { Model, field, label } = getConfig(resourceType);
+
+  const resource = await Model.findById(resourceId).select('_id');
+  if (!resource) {
+    throw new AppError(`No ${label} found with that ID`, 404);
+  }
+
+  const assignment = await Assignment.create({
+    ...data,
+    [field]: resourceId,
+    instructor: instructorId,
+  });
+
+  return assignment;
+};
+
+/**
+ * Update an assignment's title, description, deadline, and/or attachments.
+ * Ownership (instructor === requester, or admin) is enforced by the
+ * checkOwnership middleware before this runs.
+ * @param {string} assignmentId
+ * @param {Object} data
+ * @returns {Promise<Assignment>}
+ */
+exports.updateAssignment = async (assignmentId, data) => {
+  const assignment = await Assignment.findByIdAndUpdate(assignmentId, data, {
+    new: true,
+    runValidators: true,
+  });
+  if (!assignment) {
+    throw new AppError('No assignment found with that ID', 404);
+  }
+  return assignment;
+};
+
+/**
+ * Delete an assignment (and all of its submissions with it). Ownership
+ * (instructor === requester, or admin) is enforced by the checkOwnership
+ * middleware before this runs.
+ * @param {string} assignmentId
+ */
+exports.deleteAssignment = async (assignmentId) => {
+  const assignment = await Assignment.findByIdAndDelete(assignmentId);
+  if (!assignment) {
+    throw new AppError('No assignment found with that ID', 404);
+  }
+};

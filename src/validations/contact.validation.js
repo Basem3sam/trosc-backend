@@ -24,3 +24,18 @@ exports.createContactSchema = Joi.object({
     'string.min': 'Message must be at least 10 characters',
   }),
 });
+
+const objectId = Joi.string().regex(/^[0-9a-fA-F]{24}$/, 'MongoDB ObjectId');
+
+exports.contactIdSchema = Joi.object({
+  id: objectId.required().messages({
+    'string.pattern.base': 'Contact ID must be a valid MongoDB ID',
+  }),
+});
+
+exports.updateContactSchema = Joi.object({
+  status: Joi.string().valid('new', 'read', 'archived').required().messages({
+    'any.only': 'Status must be one of: new, read, archived',
+    'any.required': 'Status is required',
+  }),
+});

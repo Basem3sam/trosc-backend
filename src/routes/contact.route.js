@@ -45,6 +45,11 @@ const contactController = require('../controllers/contact.controller');
 const validate = require('../middlewares/validate.middleware');
 const { createContactSchema } = require('../validations/contact.validation');
 const { authLimiter } = require('../middlewares/rateLimit.middleware');
+const { protect, restrictTo } = require('../middlewares/auth.middleware');
+const {
+  contactIdSchema,
+  updateContactSchema,
+} = require('../validations/contact.validation');
 
 const router = express.Router();
 
@@ -53,6 +58,27 @@ router.post(
   authLimiter, // reuse the existing strict limiter — public unauthenticated endpoint, prevent spam
   validate(createContactSchema),
   contactController.submitContactForm,
+);
+
+// ===================================================================
+// ADMIN ROUTES — everything below requires an authenticated admin
+// ===================================================================
+
+router.use(protect, restrictTo('admin'));
+
+router.get('/', contactController.getAllContacts);
+
+router.get(
+  '/:id',
+  validate(contactIdSchema, 'params'),
+  contactController.getContact,
+);
+
+router.patch(
+  '/:id',
+  validate(contactIdSchema, 'params'),
+  validate(updateContactSchema),
+  contactController.updateContact,
 );
 
 module.exports = router;

@@ -493,6 +493,7 @@
  */
 
 const express = require('express');
+const AppError = require('../utils/AppError');
 const reviewRouter = require('./review.route');
 const resourceAssignmentRouter = require('./resourceAssignment.route');
 const sessionController = require('../controllers/session.controller');
@@ -598,6 +599,18 @@ router.route('/:id/students/:studentId').delete(
     paramName: 'id',
   }),
   sessionController.removeStudent,
+);
+
+router.get(
+  '/student/:studentId',
+  protect,
+  (req, res, next) => {
+    if (req.user.role !== 'admin' && req.params.studentId !== req.user.id) {
+      return next(new AppError('You can only view your own enrollments', 403));
+    }
+    next();
+  },
+  sessionController.getSessionsByStudent,
 );
 
 router.use('/:id/reviews', reviewRouter('session'));

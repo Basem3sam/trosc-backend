@@ -112,6 +112,11 @@
 
 const express = require('express');
 const assignmentSubmissionController = require('../controllers/assignmentSubmission.controller');
+const assignmentController = require('../controllers/assignment.controller');
+const {
+  updateAssignmentSchema,
+} = require('../validations/assignment.validation');
+
 const {
   protect,
   restrictTo,
@@ -150,6 +155,33 @@ router.patch(
     paramName: 'id',
   }),
   assignmentSubmissionController.gradeSubmission,
+);
+
+router.patch(
+  '/:id',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(assignmentIdSchema, 'params'),
+  checkOwnership({
+    model: 'Assignment',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  validate(updateAssignmentSchema),
+  assignmentController.updateAssignment,
+);
+
+router.delete(
+  '/:id',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(assignmentIdSchema, 'params'),
+  checkOwnership({
+    model: 'Assignment',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  assignmentController.deleteAssignment,
 );
 
 module.exports = router;

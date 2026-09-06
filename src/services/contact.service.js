@@ -1,4 +1,6 @@
 const Contact = require('../models/contact.model');
+const APIFeatures = require('../utils/APIFeatures');
+const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
 const logger = require('../utils/logger');
 
@@ -43,5 +45,57 @@ exports.submitContactForm = async (data) => {
     );
   }
 
+  return contact;
+};
+
+/**
+ * Get all contact submissions, newest first. Admin only.
+ * @param {Object} query
+ * @returns {Promise<{contacts, total, pagination}>}
+ */
+exports.getAllContacts = async (query) => {
+  const baseQuery = Contact.find().sort({ createdAt: -1 });
+  const features = new APIFeatures(baseQuery, query, Contact)
+    .filter()
+    .limitFields();
+
+  await features.paginate();
+  const contacts = await features.query;
+
+  return {
+    contacts: contacts || [],
+    total: features.totalDocs || 0,
+    pagination: features.pagination,
+  };
+};
+
+/**
+ * Get a single contact submission by ID. Admin only.
+ * @param {string} id
+ * @returns {Promise<Contact>}
+ */
+exports.getContactById = async (id) => {
+  const contact = await Contact.findById(id);
+  if (!contact) {
+    throw new AppError('No contact submission found with that ID', 404);
+  }
+  return contact;
+};
+
+/**
+ * Update a contact submission's status (new/read/archived). Admin only.
+ * @param {string} id
+ * @param {string} status
+ * @returns {Promise<Contact>}
+ */
+exports.updateContactStatus = async (id, status) => {
+  const contact = await Contact.findByIdAndUpdate(
+    id,
+    { status },
+    { new: true, runValidators: true },
+  );
+  if (!contact) {
+    throw new AppError('No contact submission found with that ID', 404);
+  }
   return contact;
 };
