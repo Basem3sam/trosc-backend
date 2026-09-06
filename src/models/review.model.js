@@ -23,6 +23,14 @@
  *           type: string
  *           description: ObjectId reference to the reviewed assignment (optional)
  *           example: 67123abc12ef4567890a9999
+ *         track:
+ *           type: string
+ *           description: ObjectId reference to the reviewed track (optional)
+ *           example: 67123abc12ef4567890a2222
+ *         session:
+ *           type: string
+ *           description: ObjectId reference to the reviewed session (optional)
+ *           example: 67123abc12ef4567890a3333
  *         rating:
  *           type: integer
  *           minimum: 1
@@ -59,8 +67,17 @@ const reviewSchema = new mongoose.Schema(
       type: mongoose.Schema.ObjectId,
       ref: 'Assignment',
     },
+    track: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'Track',
+    },
+    session: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'Session',
+    },
     rating: {
       type: Number,
+      required: [true, 'A review must have a rating'],
       min: 1,
       max: 5,
     },
@@ -84,10 +101,17 @@ reviewSchema.index(
   { unique: true, partialFilterExpression: { assignment: { $exists: true } } },
 );
 
-// TODO - Future feature: Course and assignment reviews - This model will allow students to leave reviews and ratings for courses and assignments. It will include fields for the reviewer (user), the course or assignment being reviewed, a rating (e.g., 1-5 stars), and a text review. This can help other students make informed decisions and provide feedback to instructors for improvement.
-// const Review = mongoose.model('Review', reviewSchema);
-// module.exports = Review;
+// One review per user per track
+reviewSchema.index(
+  { track: 1, user: 1 },
+  { unique: true, partialFilterExpression: { track: { $exists: true } } },
+);
 
-module.exports = () => {
-  throw new Error('Review model is not implemented');
-};
+// One review per user per session
+reviewSchema.index(
+  { session: 1, user: 1 },
+  { unique: true, partialFilterExpression: { session: { $exists: true } } },
+);
+
+const Review = mongoose.model('Review', reviewSchema);
+module.exports = Review;

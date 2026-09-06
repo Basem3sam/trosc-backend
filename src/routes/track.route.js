@@ -747,8 +747,105 @@
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 
+/**
+ * @swagger
+ * /tracks/{id}/reviews:
+ *   post:
+ *     operationId: createTrackReview
+ *     summary: Submit a review for a track
+ *     description: Only students currently enrolled in the track may review it (one review per student per track).
+ *     tags: [Reviews]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439021"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [rating, content]
+ *             properties:
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 4
+ *               content:
+ *                 type: string
+ *                 example: "Great track!"
+ *     responses:
+ *       201:
+ *         description: Review created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     review:
+ *                       $ref: '#/components/schemas/Review'
+ *       400:
+ *         description: Already reviewed / validation error
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Only enrolled students can review
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *
+ *   get:
+ *     security: []
+ *     operationId: getTrackReviews
+ *     summary: Get reviews for a track
+ *     description: Public endpoint. Supports the standard pagination query params.
+ *     tags: [Reviews]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439021"
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *       - name: limit
+ *         in: query
+ *         schema: { type: integer, default: 10 }
+ *     responses:
+ *       200:
+ *         description: List of reviews
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 results: { type: integer, example: 5 }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     reviews:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Review'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
 const express = require('express');
 const AppError = require('../utils/AppError');
+const reviewRouter = require('./review.route');
 const trackController = require('../controllers/track.controller');
 const {
   protect,
@@ -1005,5 +1102,8 @@ router.post(
   validate(studentIdSchema, 'params'),
   trackController.rejectLeaveTrack,
 );
+
+// 
+router.use('/:id/reviews', reviewRouter('track'));
 
 module.exports = router;
