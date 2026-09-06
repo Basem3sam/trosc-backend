@@ -1183,6 +1183,11 @@ router.post(
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
   validate(studentIdSchema, 'params'),
+  checkOwnership({
+    model: 'Track',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
   selfApproval,
   trackController.approveLeaveTrack,
 );
@@ -1193,10 +1198,15 @@ router.post(
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
   validate(studentIdSchema, 'params'),
+  checkOwnership({
+    model: 'Track',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
   trackController.rejectLeaveTrack,
 );
 
-// 
+//
 router.use('/:id/reviews', reviewRouter('track'));
 router.use('/:id/assignments', assignmentRouter);
 router.use('/:id/weekly-tasks', trackWeeklyTaskRouter);

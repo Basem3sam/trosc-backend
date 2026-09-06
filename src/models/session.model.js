@@ -285,6 +285,7 @@
 
 const mongoose = require('mongoose');
 const validator = require('validator');
+const ALLOWED_HOSTS = require('../utils/trustedHosts');
 
 const resourceSchema = new mongoose.Schema({
   title: {
@@ -299,19 +300,9 @@ const resourceSchema = new mongoose.Schema({
         if (!v) return true;
         try {
           const parsed = new URL(v);
-          const allowedHosts = [
-            'drive.google.com',
-            'docs.google.com',
-            'youtube.com',
-            'youtu.be',
-            'github.com',
-            'raw.githubusercontent.com',
-            'res.cloudinary.com',
-            'i.imgur.com',
-            'cdn.discordapp.com',
-          ];
+          const isAllowed = ALLOWED_HOSTS.some((host) => parsed.hostname.endsWith(host));
           return (
-            allowedHosts.some((h) => parsed.hostname.endsWith(h)) &&
+            isAllowed &&
             parsed.protocol === 'https:'
           );
         } catch {
@@ -342,7 +333,7 @@ const sessionSchema = new mongoose.Schema(
         validator: function (v) {
           if (!v) return true;
           const youtubeRegex =
-            /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/i;
+            /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
           const driveRegex =
             /^(https?:\/\/)?(drive\.google\.com|docs\.google\.com)\/.+/i;
           return (

@@ -65,6 +65,17 @@
     "prettier": "^3.6.2",
     "supertest": "^7.0.0"
   },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "git add"
+    ]
+  },
   "engines": {
     "node": ">=18.0.0"
   }

@@ -2,6 +2,9 @@ const User = require('../models/user.model');
 const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
+const Assignment = require('../models/assignment.model');
+const Review = require('../models/review.model');
+const WeeklyTask = require('../models/weeklyTask.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
@@ -162,11 +165,14 @@ exports.deleteTrack = async (trackId) => {
   const track = await Track.findById(trackId);
   if (!track) throw new AppError('No track found with that ID', 404);
 
-  await Promise.all([
-    Assignment.deleteMany({ track: trackId }),
-    Review.deleteMany({ track: trackId }),
-    WeeklyTask.deleteMany({ track: trackId }), // also deletes embedded completions
-  ]);
+  await Assignment.deleteMany({
+    $or: [
+      { course: { $in: track.courses } },
+      { session: { $in: track.sessions } },
+    ],
+  });
+  await WeeklyTask.deleteMany({ course: { $in: track.courses } });
+  await Review.deleteMany({ track: trackId }); // this one's fine — Review does have a track field
 
   // Courses become standalone (no track)
   await Course.updateMany(

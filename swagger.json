@@ -28,6 +28,86 @@
       }
     },
     "schemas": {
+      "WeeklyTaskItem": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "example": "6713b5ac12ef4567890aaaa1"
+          },
+          "title": {
+            "type": "string",
+            "example": "Read Chapter 1"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "reading",
+              "quiz",
+              "video",
+              "assignment",
+              "other"
+            ],
+            "default": "other",
+            "example": "reading"
+          },
+          "done": {
+            "type": "boolean",
+            "description": "Whether the requesting user has completed this item (computed per-request, not stored on the item itself)",
+            "example": false
+          }
+        }
+      },
+      "WeeklyTask": {
+        "type": "object",
+        "required": [
+          "course",
+          "week",
+          "title"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "example": "6713b5ac12ef4567890a6666"
+          },
+          "course": {
+            "type": "string",
+            "description": "ObjectId reference to the parent course",
+            "example": "67123abc12ef4567890a5678"
+          },
+          "instructor": {
+            "type": "string",
+            "description": "ObjectId reference to the owning instructor (copied from the course at creation time)",
+            "example": "67123abc12ef4567890a1234"
+          },
+          "week": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "example": "Week 1: Networking Basics"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeeklyTaskItem"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "UserBase": {
         "type": "object",
         "properties": {
@@ -1200,6 +1280,11 @@
             "description": "ObjectId reference to the reviewed track (optional)",
             "example": "67123abc12ef4567890a2222"
           },
+          "session": {
+            "type": "string",
+            "description": "ObjectId reference to the reviewed session (optional)",
+            "example": "67123abc12ef4567890a3333"
+          },
           "rating": {
             "type": "integer",
             "minimum": 1,
@@ -1887,6 +1972,99 @@
           }
         }
       },
+      "Submission": {
+        "type": "object",
+        "properties": {
+          "student": {
+            "type": "string",
+            "description": "ObjectId reference to the submitting student",
+            "example": "67123abc12ef4567890a1234"
+          },
+          "file": {
+            "type": "string",
+            "example": "https://drive.google.com/file/d/xyz"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "grade": {
+            "type": "number",
+            "example": 85
+          }
+        }
+      },
+      "Assignment": {
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "instructor",
+          "deadline"
+        ],
+        "description": "Exactly one of `course` or `session` must be set — an assignment belongs to either a course or a standalone session, never both.\n",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "example": "6713b5ac12ef4567890a7777"
+          },
+          "title": {
+            "type": "string",
+            "example": "Build a REST API"
+          },
+          "description": {
+            "type": "string",
+            "example": "Create a full CRUD API with Node.js"
+          },
+          "course": {
+            "type": "object",
+            "nullable": true,
+            "description": "Populated course reference (mutually exclusive with session)"
+          },
+          "session": {
+            "type": "object",
+            "nullable": true,
+            "description": "Populated session reference (mutually exclusive with course)"
+          },
+          "instructor": {
+            "type": "object",
+            "description": "Populated instructor reference"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "https://drive.google.com/file/d/abc"
+            ]
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-01-15T23:59:00.000Z"
+          },
+          "submissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Submission"
+            }
+          },
+          "mySubmission": {
+            "type": "object",
+            "nullable": true,
+            "description": "The requesting user's own submission, or null if not submitted (only present on the track-assignments list endpoint)"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "Announcement": {
         "type": "object",
         "required": [
@@ -2194,20 +2372,24 @@
       "description": "Pinned posts & targeted news"
     },
     {
+      "name": "Reviews",
+      "description": "Track feedback & ratings from enrolled students"
+    },
+    {
+      "name": "Contact",
+      "description": "Public contact form submission"
+    },
+    {
+      "name": "Weekly Tasks",
+      "description": "Per-item completion tracking and task deletion"
+    },
+    {
       "name": "Feed",
       "description": "Dashboard announcements + upcoming events"
     },
     {
       "name": "Health",
       "description": "Server & database health checks"
-    },
-    {
-      "name": "Reviews",
-      "description": "Track feedback / ratings from enrolled students"
-    },
-    {
-      "name": "Contact",
-      "description": "Public contact form submission"
     }
   ],
   "paths": {
@@ -2245,6 +2427,256 @@
           },
           "503": {
             "description": "Database connection unavailable"
+          }
+        }
+      }
+    },
+    "/weekly-tasks/{taskId}": {
+      "patch": {
+        "operationId": "updateWeeklyTask",
+        "summary": "Update a weekly task's week, title, and/or items",
+        "description": "Owner instructor or admin only. Items sent with their existing `_id` are edited in place, preserving students' completion history for that item. Items sent without an `_id` are treated as new. Any previously existing item left out of the new `items` array is removed, along with its now-orphaned completion records.\n",
+        "tags": [
+          "Weekly Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a6666"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "At least one of week, title, or items must be provided.",
+                "properties": {
+                  "week": {
+                    "type": "integer",
+                    "example": 2
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "Week 2: Advanced Routing"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "title"
+                      ],
+                      "properties": {
+                        "_id": {
+                          "type": "string",
+                          "description": "Include to edit this item in place; omit to create a new item.",
+                          "example": "6713b5ac12ef4567890aaaa1"
+                        },
+                        "title": {
+                          "type": "string",
+                          "example": "Read Chapter 2"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "reading",
+                            "quiz",
+                            "video",
+                            "assignment",
+                            "other"
+                          ],
+                          "example": "reading"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Weekly task updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "task": {
+                          "$ref": "#/components/schemas/WeeklyTask"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Week already exists for this course / validation error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWeeklyTask",
+        "summary": "Delete a weekly task",
+        "description": "Owner instructor or admin only.",
+        "tags": [
+          "Weekly Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a6666"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/weekly-tasks/{taskId}/items/{itemId}/complete": {
+      "post": {
+        "operationId": "completeWeeklyTaskItem",
+        "summary": "Mark a weekly task item as completed",
+        "description": "The requesting student must be enrolled in the task's course. Idempotent.",
+        "tags": [
+          "Weekly Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a6666"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890aaaa1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item marked as completed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can track progress on this weekly task"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "uncompleteWeeklyTaskItem",
+        "summary": "Unmark a weekly task item as completed",
+        "description": "The requesting student must be enrolled in the task's course. Idempotent.",
+        "tags": [
+          "Weekly Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a6666"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890aaaa1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item marked as incomplete"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can track progress on this weekly task"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -4198,6 +4630,304 @@
         }
       }
     },
+    "/tracks/{id}/weekly-tasks": {
+      "get": {
+        "operationId": "getTrackWeeklyTasks",
+        "summary": "Get all weekly tasks across every course in a track",
+        "description": "Only courses carry weekly tasks — standalone sessions mounted directly on the track are not included. Each item includes a `done` flag computed for the requesting user. Accessible to admins, any instructor, or a student enrolled in the track.\n",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439021"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of weekly tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "results": {
+                      "type": "integer",
+                      "example": 6
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tasks": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/WeeklyTask"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can view this track's weekly tasks"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/tracks/{id}/assignments": {
+      "get": {
+        "operationId": "getTrackAssignments",
+        "summary": "Get all assignments across every course in a track",
+        "description": "Returns every assignment belonging to any course in the track, plus any assignment on a standalone session mounted directly on the track, sorted by deadline. Each assignment includes `mySubmission` — the requesting user's own submission, or null if they haven't submitted. Accessible to admins, any instructor, or a student enrolled in the track.\n",
+        "tags": [
+          "Tracks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439021"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of assignments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "results": {
+                      "type": "integer",
+                      "example": 3
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "assignments": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Assignment"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can view this track's assignments"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/tracks/{id}/reviews": {
+      "post": {
+        "operationId": "createTrackReview",
+        "summary": "Submit a review for a track",
+        "description": "Only students currently enrolled in the track may review it (one review per student per track).",
+        "tags": [
+          "Reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439021"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "rating",
+                  "content"
+                ],
+                "properties": {
+                  "rating": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "example": 4
+                  },
+                  "content": {
+                    "type": "string",
+                    "example": "Great track!"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Review created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "review": {
+                          "$ref": "#/components/schemas/Review"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Already reviewed / validation error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can review"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "get": {
+        "security": [],
+        "operationId": "getTrackReviews",
+        "summary": "Get reviews for a track",
+        "description": "Public endpoint. Supports the standard pagination query params.",
+        "tags": [
+          "Reviews"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439021"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of reviews",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "results": {
+                      "type": "integer",
+                      "example": 5
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reviews": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Review"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/sessions": {
       "post": {
         "operationId": "createSession",
@@ -4773,11 +5503,79 @@
         }
       }
     },
-    "/tracks/{id}/reviews": {
+    "/sessions/{id}/assignments": {
+      "get": {
+        "operationId": "getSessionAssignments",
+        "summary": "Get all assignments for a standalone session",
+        "description": "Each assignment includes `mySubmission` — the requesting user's own submission, or null if they haven't submitted. Accessible to admins, any instructor, or a student enrolled in the session.\n",
+        "tags": [
+          "Sessions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439031"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of assignments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "results": {
+                      "type": "integer",
+                      "example": 1
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "assignments": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Assignment"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can view this session's assignments"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/sessions/{id}/reviews": {
       "post": {
-        "operationId": "createTrackReview",
-        "summary": "Submit a review for a track",
-        "description": "Only students currently enrolled in the track may review it (one review per student per track).",
+        "operationId": "createSessionReview",
+        "summary": "Submit a review for a session",
+        "description": "Only students currently enrolled in the session may review it (one review per student per session).",
         "tags": [
           "Reviews"
         ],
@@ -4793,7 +5591,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "example": "507f1f77bcf86cd799439021"
+              "example": "507f1f77bcf86cd799439031"
             }
           }
         ],
@@ -4812,11 +5610,11 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 5,
-                    "example": 4
+                    "example": 5
                   },
                   "content": {
                     "type": "string",
-                    "example": "Great track!"
+                    "example": "Clear explanation, great pacing."
                   }
                 }
               }
@@ -4864,8 +5662,8 @@
       },
       "get": {
         "security": [],
-        "operationId": "getTrackReviews",
-        "summary": "Get reviews for a track",
+        "operationId": "getSessionReviews",
+        "summary": "Get reviews for a session",
         "description": "Public endpoint. Supports the standard pagination query params.",
         "tags": [
           "Reviews"
@@ -4877,7 +5675,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "example": "507f1f77bcf86cd799439021"
+              "example": "507f1f77bcf86cd799439031"
             }
           },
           {
@@ -6240,6 +7038,417 @@
         }
       }
     },
+    "/courses/{id}/weekly-tasks": {
+      "post": {
+        "operationId": "createWeeklyTask",
+        "summary": "Create a weekly task bucket for a course",
+        "description": "Owner instructor or admin only. One bucket per week number per course.",
+        "tags": [
+          "Courses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "week",
+                  "title",
+                  "items"
+                ],
+                "properties": {
+                  "week": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "Week 1: Networking Basics"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "title"
+                      ],
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "example": "Read Chapter 1"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "reading",
+                            "quiz",
+                            "video",
+                            "assignment",
+                            "other"
+                          ],
+                          "example": "reading"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Weekly task created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "task": {
+                          "$ref": "#/components/schemas/WeeklyTask"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Week already exists for this course / validation error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "get": {
+        "operationId": "getCourseWeeklyTasks",
+        "summary": "Get all weekly tasks for a course",
+        "description": "Each item includes a `done` flag computed for the requesting user. Accessible to admins, any instructor, or a student enrolled in the course.\n",
+        "tags": [
+          "Courses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of weekly tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "results": {
+                      "type": "integer",
+                      "example": 4
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tasks": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/WeeklyTask"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can view this course's weekly tasks"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/courses/{id}/assignments": {
+      "get": {
+        "operationId": "getCourseAssignments",
+        "summary": "Get all assignments for a course",
+        "description": "Each assignment includes `mySubmission` — the requesting user's own submission, or null if they haven't submitted. Accessible to admins, any instructor, or a student enrolled in the course.\n",
+        "tags": [
+          "Courses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of assignments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "results": {
+                      "type": "integer",
+                      "example": 2
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "assignments": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Assignment"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can view this course's assignments"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/courses/{id}/reviews": {
+      "post": {
+        "operationId": "createCourseReview",
+        "summary": "Submit a review for a course",
+        "description": "Only students currently enrolled in the course may review it (one review per student per course).",
+        "tags": [
+          "Reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "rating",
+                  "content"
+                ],
+                "properties": {
+                  "rating": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "example": 5
+                  },
+                  "content": {
+                    "type": "string",
+                    "example": "Really solid course, learned a lot."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Review created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "review": {
+                          "$ref": "#/components/schemas/Review"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Already reviewed / validation error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can review"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "get": {
+        "security": [],
+        "operationId": "getCourseReviews",
+        "summary": "Get reviews for a course",
+        "description": "Public endpoint. Supports the standard pagination query params.",
+        "tags": [
+          "Reviews"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of reviews",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "results": {
+                      "type": "integer",
+                      "example": 5
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reviews": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Review"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/contact": {
       "post": {
         "security": [],
@@ -6289,6 +7498,187 @@
           },
           "400": {
             "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/assignments/{id}/submissions": {
+      "post": {
+        "operationId": "submitAssignment",
+        "summary": "Submit (or resubmit) your work for an assignment",
+        "description": "The requesting student must be enrolled in the assignment's course or session. Submitting again overwrites the previous file and clears any existing grade — a new file means the old grade no longer applies. The response's top-level `late` flag reflects whether this submission landed after the deadline; it isn't stored.\n",
+        "tags": [
+          "Courses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a7777"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "example": "https://drive.google.com/file/d/xyz"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Submission created or updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "late": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "submission": {
+                          "$ref": "#/components/schemas/Submission"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (bad or untrusted file URL)"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Only enrolled students can submit this assignment"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/assignments/{id}/submissions/{studentId}/grade": {
+      "patch": {
+        "operationId": "gradeSubmission",
+        "summary": "Grade a student's submission for an assignment",
+        "description": "Owner instructor (the assignment's own instructor) or admin only.",
+        "tags": [
+          "Courses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a7777"
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "67123abc12ef4567890a1234"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "grade"
+                ],
+                "properties": {
+                  "grade": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "example": 85
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Submission graded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "submission": {
+                          "$ref": "#/components/schemas/Submission"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Assignment not found, or this student hasn't submitted yet"
           }
         }
       }

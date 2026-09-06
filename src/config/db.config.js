@@ -34,7 +34,7 @@ const connectDB = async () => {
     // Connect to MongoDB with better options
     const conn = await mongoose.connect(DB, {
       // Recommended settings
-      maxPoolSize: 10,
+      maxPoolSize: parseInt(process.env.MONGODB_POOL_SIZE, 10) || 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     });
