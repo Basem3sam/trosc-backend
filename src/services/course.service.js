@@ -90,7 +90,7 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
   const isAdmin = requestingUser?.role === 'admin';
   const isEnrolled =
     requestingUser &&
-    course.students.some((s) => s.toString() === requestingUser.id);
+    course.students?.some((studentId) => studentId.toString() === requestingUser.id);
 
   if (!course.published && !isOwner && !isAdmin) {
     throw new AppError('No course found with that ID', 404);

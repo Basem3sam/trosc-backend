@@ -89,22 +89,26 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
       path: 'sessions',
       select: 'title description duration level published startDate students',
       match: { published: true },
-    })
-    .populate({
-      path: 'students',
-      select: 'name email photo',
     });
 
   if (!track) {
     throw new AppError('No track found with that ID', 404);
   }
 
-  if (!track.published) {
-    const isOwner = requestingUser?.id === track.instructor?._id?.toString();
-    const isAdmin = requestingUser?.role === 'admin';
-    if (!isOwner && !isAdmin) {
-      throw new AppError('No track found with that ID', 404);
-    }
+  const isOwner = requestingUser?.id === track.instructor?._id?.toString();
+  const isAdmin = requestingUser?.role === 'admin';
+  const isEnrolled =
+    requestingUser &&
+    track.students?.some(
+      (studentId) => studentId.toString() === requestingUser.id,
+    );
+
+  if (!track.published && !isOwner && !isAdmin) {
+    throw new AppError('No track found with that ID', 404);
+  }
+
+  if (isOwner || isAdmin || isEnrolled) {
+    await track.populate({ path: 'students', select: 'name email photo' });
   }
 
   return track;
