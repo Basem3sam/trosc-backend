@@ -1,10 +1,11 @@
 const express = require('express');
 const reviewController = require('../controllers/review.controller');
-const { protect } = require('../middlewares/auth.middleware');
+const { protect, checkOwnership } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   resourceIdSchema,
   createReviewSchema,
+  deleteReviewSchema,
 } = require('../validations/review.validation');
 
 /**
@@ -33,6 +34,19 @@ module.exports = (resourceType) => {
     .get(
       validate(resourceIdSchema, 'params'),
       reviewController.getReviews(resourceType),
+    );
+
+  router
+    .route('/:reviewId')
+    .delete(
+      protect,
+      validate(deleteReviewSchema, 'params'),
+      checkOwnership({
+        model: 'Review',
+        ownerField: 'user',
+        paramName: 'reviewId',
+      }),
+      reviewController.deleteReview,
     );
 
   return router;

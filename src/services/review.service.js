@@ -43,10 +43,7 @@ exports.createReview = async (resourceType, resourceId, userId, data) => {
     (studentId) => studentId.toString() === userId,
   );
   if (!isEnrolled) {
-    throw new AppError(
-      `Only enrolled students can review this ${label}`,
-      403,
-    );
+    throw new AppError(`Only enrolled students can review this ${label}`, 403);
   }
 
   const existing = await Review.findOne({ [field]: resourceId, user: userId });
@@ -92,4 +89,17 @@ exports.getReviews = async (resourceType, resourceId, query) => {
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
+};
+
+/**
+ * Delete a review. Authorization (author or admin) is enforced by the
+ * checkOwnership middleware before this runs.
+ * @param {string} reviewId
+ */
+exports.deleteReview = async (reviewId) => {
+  const review = await Review.findByIdAndDelete(reviewId);
+  if (!review) {
+    throw new AppError('No review found with that ID', 404);
+  }
+  return null;
 };

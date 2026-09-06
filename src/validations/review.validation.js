@@ -20,3 +20,14 @@ exports.createReviewSchema = Joi.object({
     'string.empty': 'Review content is required',
   }),
 });
+
+// Both :id (parent resource, from the mergeParams mount) and :reviewId
+// are present on the delete route.
+exports.deleteReviewSchema = Joi.object({
+  id: objectId.required().messages({
+    'string.pattern.base': 'ID must be a valid MongoDB ID',
+  }),
+  reviewId: objectId.required().messages({
+    'string.pattern.base': 'Review ID must be a valid MongoDB ID',
+  }),
+});
