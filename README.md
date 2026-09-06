@@ -42,21 +42,22 @@
 
 ## ✨ Features
 
-| Feature                   | Description                                                                                    |
-| ------------------------- | ---------------------------------------------------------------------------------------------- |
-| 🔐 **Authentication**     | JWT (bearer + httpOnly cookie), role-based access control (`student` / `instructor` / `admin`) |
-| 📚 **Learning Tracks**    | Structured curricula grouping courses and sessions                                             |
-| 🎬 **Courses & Sessions** | YouTube / Google Drive integration — zero storage cost                                         |
-| 📅 **Events**             | Online/offline events with RSVP and attendance tracking                                        |
-| 📌 **Announcements**      | Pinned posts with audience targeting (`all` / `track` / `course`)                              |
-| 📊 **Dashboard Feed**     | Aggregated pinned announcements + upcoming events                                              |
-| 🛡️ **Ownership Model**    | Instructors edit only their own content; admins bypass restrictions                            |
-| ⚡ **Bulk Actions**       | Admin tools for mass user activation, deactivation, or deletion                                |
-| 🔍 **Full-Text Search**   | MongoDB text indexes on tracks, courses, and sessions                                          |
-| 📈 **Track Analytics**    | Enrollment rates, student counts, and engagement metrics                                       |
-| ✉️ **Contact Form**       | Public contact submission, stored + emailed to admin                                          |
-| ⭐ **Reviews**            | Enrolled students rate & review tracks, courses, and sessions (1–5 stars, one per student per resource) |
-| 📅 **Weekly Tasks**       | Per-course weekly task buckets with typed items (reading/quiz/video) and per-student completion tracking |
+| Feature                   | Description                                                                                                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔐 **Authentication**     | JWT (bearer + httpOnly cookie), role-based access control (`student` / `instructor` / `admin`)                                                                                                            |
+| 📚 **Learning Tracks**    | Structured curricula grouping courses and sessions                                                                                                                                                        |
+| 🎬 **Courses & Sessions** | YouTube / Google Drive integration — zero storage cost                                                                                                                                                    |
+| 📅 **Events**             | Online/offline events with RSVP and attendance tracking                                                                                                                                                   |
+| 📌 **Announcements**      | Pinned posts with audience targeting (`all` / `track` / `course`)                                                                                                                                         |
+| 📊 **Dashboard Feed**     | Aggregated pinned announcements + upcoming events                                                                                                                                                         |
+| 🛡️ **Ownership Model**    | Instructors edit only their own content; admins bypass restrictions                                                                                                                                       |
+| ⚡ **Bulk Actions**       | Admin tools for mass user activation, deactivation, or deletion                                                                                                                                           |
+| 🔍 **Full-Text Search**   | MongoDB text indexes on tracks, courses, and sessions                                                                                                                                                     |
+| 📈 **Track Analytics**    | Enrollment rates, student counts, and engagement metrics                                                                                                                                                  |
+| ✉️ **Contact Form**       | Public contact submission, stored + emailed to admin; admins can list, view, and triage submissions (`new` / `read` / `archived`)                                                                         |
+| ⭐ **Reviews**            | Enrolled students rate & review tracks, courses, and sessions (1–5 stars, one per student per resource); review's own author or an admin can delete it                                                    |
+| 📝 **Assignments**        | Full CRUD (owner instructor / admin) at the course and standalone-session level, plus track-aggregated listing; student submission/resubmission with a computed `late` flag, and instructor/admin grading |
+| 📅 **Weekly Tasks**       | Per-course weekly task buckets with typed items (reading/quiz/video) and per-student completion tracking                                                                                                  |
 
 ---
 
@@ -93,6 +94,11 @@ src/
 │   ├── session.controller.js
 │   ├── event.controller.js
 │   ├── announcement.controller.js
+│   ├── review.controller.js
+│   ├── assignment.controller.js
+│   ├── assignmentSubmission.controller.js
+│   ├── weeklyTask.controller.js
+│   ├── contact.controller.js
 │   └── feed.controller.js
 │
 ├── services/              # Business logic & database operations
@@ -103,6 +109,11 @@ src/
 │   ├── session.service.js
 │   ├── event.service.js
 │   ├── announcement.service.js
+│   ├── review.service.js
+│   ├── assignment.service.js
+│   ├── assignmentSubmission.service.js
+│   ├── weeklyTask.service.js
+│   ├── contact.service.js
 │   ├── enrollment.service.js    # Enrollment rules & prerequisites
 │   └── cascade.service.js       # Keeps User enrollments in sync across collections
 │
@@ -112,7 +123,11 @@ src/
 │   ├── course.model.js
 │   ├── session.model.js
 │   ├── event.model.js
-│   └── announcement.model.js
+│   ├── announcement.model.js
+│   ├── review.model.js
+│   ├── assignment.model.js
+│   ├── weeklyTask.model.js
+│   └── contact.model.js
 │
 ├── routes/                # Route definitions + Swagger JSDoc annotations
 │   ├── user.route.js
@@ -121,6 +136,11 @@ src/
 │   ├── session.route.js
 │   ├── event.route.js
 │   ├── announcement.route.js
+│   ├── review.route.js              # generic factory, mounted per resource type
+│   ├── resourceAssignment.route.js  # generic factory, mounted per resource type
+│   ├── assignmentSubmission.route.js
+│   ├── weeklyTask.route.js
+│   ├── contact.route.js
 │   └── feed.route.js
 │
 ├── validations/           # Joi schemas for request body/params/query
@@ -128,7 +148,11 @@ src/
 │   ├── track.validation.js
 │   ├── course.validation.js
 │   ├── session.validation.js
-│   └── event.validation.js
+│   ├── event.validation.js
+│   ├── review.validation.js
+│   ├── assignment.validation.js
+│   ├── weeklyTask.validation.js
+│   └── contact.validation.js
 │
 ├── middlewares/           # Reusable Express middleware
 │   ├── auth.middleware.js       # protect, restrictTo, checkOwnership
@@ -143,6 +167,8 @@ src/
 │   ├── Email.js               # HTML email templates with plaintext fallback
 │   ├── generateToken.js
 │   ├── logger.js              # Winston configuration
+│   ├── trustedHosts.js        # single source of truth for the attachment/resource host allowlist
+│   ├── validateAttachments.js
 │   ├── attachmentValidation.js
 │   └── photoValidation.js
 │
@@ -157,7 +183,8 @@ src/
 
 - **Service Layer**: Controllers are thin; all business logic lives in services.
 - **Cascade Service**: Centralized synchronization of `User.enrolledTracks`, `enrolledCourses`, and `enrolledSessions` to prevent data drift.
-- **Ownership Middleware**: Generic, reusable authorization factory that checks `instructor` or `createdBy` fields before allowing mutations.
+- **Ownership Middleware**: Generic, reusable authorization factory that checks `instructor`, `createdBy`, or `user` fields before allowing mutations — used consistently across tracks, courses, sessions, announcements, events, weekly tasks, assignments, and reviews.
+- **Resource-Type Factories**: `review.route.js` and `resourceAssignment.route.js` each export a single factory function mounted three times (`track` / `course` / `session`), so create/list/delete logic for reviews and assignments is written once and shared, not duplicated per resource type.
 - **Factory Functions**: `catchAsync`, `checkOwnership`, and `APIFeatures` reduce boilerplate.
 
 ---
@@ -186,14 +213,18 @@ src/
 
 ## 🗄️ Database Overview
 
-| Collection      | Purpose                               | Key Indexes                                                          |
-| --------------- | ------------------------------------- | -------------------------------------------------------------------- |
-| `users`         | Authentication, profiles, enrollments | `email` (unique), `enrolledTrack`                                    |
-| `tracks`        | Learning paths                        | `title` (text), `instructor`, `students`, `published+level`          |
-| `courses`       | Course content                        | `title` (text), `track`, `instructor`, `students`, `published+level` |
-| `sessions`      | Video sessions                        | `tracks`, `course`, `instructor`, `published+level`                  |
-| `events`        | Club events & RSVP                    | `date` (for upcoming feed)                                           |
-| `announcements` | Pinned posts                          | `isPinned` + `createdAt` (compound)                                  |
+| Collection      | Purpose                               | Key Indexes                                                                              |
+| --------------- | ------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `users`         | Authentication, profiles, enrollments | `email` (unique), `enrolledTrack`                                                        |
+| `tracks`        | Learning paths                        | `title` (text), `instructor`, `students`, `published+level`                              |
+| `courses`       | Course content                        | `title` (text), `track`, `instructor`, `students`, `published+level`                     |
+| `sessions`      | Video sessions                        | `tracks`, `course`, `instructor`, `published+level`                                      |
+| `events`        | Club events & RSVP                    | `date` (for upcoming feed)                                                               |
+| `announcements` | Pinned posts                          | `isPinned` + `createdAt` (compound)                                                      |
+| `reviews`       | Ratings & feedback                    | one partial-unique index per resource type (`track+user`, `course+user`, `session+user`) |
+| `assignments`   | Course/session assignments            | `course`, `session`, `instructor`                                                        |
+| `weeklytasks`   | Per-course weekly task buckets        | `course + week` (unique), `instructor`                                                   |
+| `contacts`      | Contact form submissions              | none beyond `_id` — low volume, admin-triaged                                            |
 
 ### Enrollment Cascade Rules
 
@@ -204,6 +235,8 @@ When a student joins a **track**, the system automatically enrolls them in:
 - Updates `User.enrolledTrack`, `User.enrolledCourses`, `User.enrolledSessions`
 
 When a student **leaves** (or is removed), all of the above are reversed atomically.
+
+Deleting a **course** or **track** also cascades to remove its assignments, reviews, and weekly tasks, so nothing is left pointing at a deleted parent.
 
 > ⚠️ **Note:** MongoDB transactions are recommended for production deployments to ensure cascade operations remain consistent under race conditions.
 
@@ -260,28 +293,28 @@ open http://localhost:5000/api-docs
 
 ## 🔧 Environment Variables
 
-| Variable                    | Required | Default                           | Description                              |
-| --------------------------- | -------- | --------------------------------- | ---------------------------------------- |
-| `NODE_ENV`                  | ✅       | `development`                     | `development` or `production`            |
-| `PORT`                      | ❌       | `5000`                            | Server port                              |
-| `DATABASE_URL`              | ✅       | —                                 | MongoDB connection string                |
-| `DATABASE_PASSWORD`         | ❌       | —                                 | If using `<PASSWORD>` placeholder in URL |
-| `DATABASE_USERNAME`         | ❌       | —                                 | If using `<USERNAME>` placeholder in URL |
-| `JWT_SECRET`                | ✅       | —                                 | Min 32 characters                        |
-| `JWT_EXPIRES_IN`            | ✅       | `30d`                             | Token lifetime (e.g., `90d`, `7d`)       |
-| `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days                    |
-| `FRONTEND_URL`              | ✅       | —                                 | For CORS and password reset links        |
-| `BASE_URL`                  | ❌       | `http://localhost:5000`           | Server base URL                          |
-| `RATE_LIMIT_MAX`            | ❌       | `300`                             | Max requests per window per IP           |
-| `RATE_LIMIT_WINDOW_MS`      | ❌       | `900000`                          | Rate limit window (15 min in ms)         |
-| `AUTH_RATE_LIMIT_MAX`       | ❌       | `5`                               | Max auth attempts per window             |
-| `AUTH_RATE_LIMIT_WINDOW_MS` | ❌       | `900000`                          | Auth rate limit window                   |
-| `EMAIL_HOST`                | ✅\*     | —                                 | SMTP host (dev: Mailtrap)                |
-| `EMAIL_PORT`                | ✅\*     | `2525`                            | SMTP port                                |
-| `EMAIL_USER`                | ✅\*     | —                                 | SMTP username                            |
-| `EMAIL_PASS`                | ✅\*     | —                                 | SMTP password                            |
-| `EMAIL_FROM`                | ❌       | `Trosc Club <noreply@trosc.club>` | Sender address                           |
-| `EMAIL_SERVICE`             | ❌       | `SendGrid`                        | Used in production instead of host/port  |
+| Variable                    | Required | Default                           | Description                                    |
+| --------------------------- | -------- | --------------------------------- | ---------------------------------------------- |
+| `NODE_ENV`                  | ✅       | `development`                     | `development` or `production`                  |
+| `PORT`                      | ❌       | `5000`                            | Server port                                    |
+| `DATABASE_URL`              | ✅       | —                                 | MongoDB connection string                      |
+| `DATABASE_PASSWORD`         | ❌       | —                                 | If using `<PASSWORD>` placeholder in URL       |
+| `DATABASE_USERNAME`         | ❌       | —                                 | If using `<USERNAME>` placeholder in URL       |
+| `JWT_SECRET`                | ✅       | —                                 | Min 32 characters                              |
+| `JWT_EXPIRES_IN`            | ✅       | `30d`                             | Token lifetime (e.g., `90d`, `7d`)             |
+| `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days                          |
+| `FRONTEND_URL`              | ✅       | —                                 | For CORS and password reset links              |
+| `BASE_URL`                  | ❌       | `http://localhost:5000`           | Server base URL                                |
+| `RATE_LIMIT_MAX`            | ❌       | `300`                             | Max requests per window per IP                 |
+| `RATE_LIMIT_WINDOW_MS`      | ❌       | `900000`                          | Rate limit window (15 min in ms)               |
+| `AUTH_RATE_LIMIT_MAX`       | ❌       | `5`                               | Max auth attempts per window                   |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | ❌       | `900000`                          | Auth rate limit window                         |
+| `EMAIL_HOST`                | ✅\*     | —                                 | SMTP host (dev: Mailtrap)                      |
+| `EMAIL_PORT`                | ✅\*     | `2525`                            | SMTP port                                      |
+| `EMAIL_USER`                | ✅\*     | —                                 | SMTP username                                  |
+| `EMAIL_PASS`                | ✅\*     | —                                 | SMTP password                                  |
+| `EMAIL_FROM`                | ❌       | `Trosc Club <noreply@trosc.club>` | Sender address                                 |
+| `EMAIL_SERVICE`             | ❌       | `SendGrid`                        | Used in production instead of host/port        |
 | `ADMIN_EMAIL`               | ❌       | —                                 | Inbox notified on new contact form submissions |
 
 \* Required if sending emails (password reset, welcome). Not required for basic API operation.
@@ -320,18 +353,21 @@ ADMIN_EMAIL=admin@trosc.club
 
 ### Quick Reference
 
-| Resource          | Base Endpoint       | Key Capabilities                         |
-| ----------------- | ------------------- | ---------------------------------------- |
-| **Auth**          | `/v1/users`         | signup, login, logout, password reset    |
-| **Users**         | `/v1/users`         | profiles, enrollments, bulk actions      |
-| **Tracks**        | `/v1/tracks`        | CRUD, enrollment approval, analytics     |
-| **Courses**       | `/v1/courses`       | CRUD, session management, prerequisites  |
-| **Sessions**      | `/v1/sessions`      | CRUD, student gating, YouTube/Drive URLs |
-| **Events**        | `/v1/events`        | CRUD, RSVP, online/offline locations     |
-| **Announcements** | `/v1/announcements` | Pinned posts, audience targeting         |
-| **Feed**          | `/v1/feed`          | Dashboard aggregation                    |
-| **Contact**       | `/v1/contact`       | Public contact form submission           |
-| **Health**        | `/health`           | Server & DB status                       |
+| Resource          | Base Endpoint                                               | Key Capabilities                          |
+| ----------------- | ----------------------------------------------------------- | ----------------------------------------- |
+| **Auth**          | `/v1/users`                                                 | signup, login, logout, password reset     |
+| **Users**         | `/v1/users`                                                 | profiles, enrollments, bulk actions       |
+| **Tracks**        | `/v1/tracks`                                                | CRUD, enrollment approval, analytics      |
+| **Courses**       | `/v1/courses`                                               | CRUD, session management, prerequisites   |
+| **Sessions**      | `/v1/sessions`                                              | CRUD, student gating, YouTube/Drive URLs  |
+| **Events**        | `/v1/events`                                                | CRUD, RSVP, online/offline locations      |
+| **Announcements** | `/v1/announcements`                                         | Pinned posts, audience targeting          |
+| **Reviews**       | `/v1/{tracks,courses,sessions}/:id/reviews`                 | Create, list, delete (author/admin)       |
+| **Assignments**   | `/v1/{courses,sessions}/:id/assignments`, `/v1/assignments` | CRUD, submissions, grading                |
+| **Weekly Tasks**  | `/v1/courses/:id/weekly-tasks`, `/v1/weekly-tasks`          | CRUD, per-item completion tracking        |
+| **Feed**          | `/v1/feed`                                                  | Dashboard aggregation                     |
+| **Contact**       | `/v1/contact`                                               | Public submission; admin list/view/triage |
+| **Health**        | `/health`                                                   | Server & DB status                        |
 
 📖 **Full endpoint table →** [`API.md`](./API.md)
 
@@ -433,17 +469,21 @@ All successful list responses follow this structure:
 
 ### 1. No File Uploads
 
-Instead of S3/Cloudinary storage costs, all media is referenced by URL. The system validates URLs against a whitelist of trusted hosts (YouTube, Drive, Dropbox, GitHub, Cloudinary, Imgur, Discord CDN). This makes the backend stateless and free to host.
+Instead of S3/Cloudinary storage costs, all media is referenced by URL. The system validates URLs against a single, shared whitelist of trusted hosts (`src/utils/trustedHosts.js` — YouTube, Drive, Dropbox, GitHub, Cloudinary, Imgur, Discord CDN), used consistently by both the Mongoose-level and Joi-level attachment validators. This makes the backend stateless and free to host.
 
 ### 2. Cascade Enrollment Service
 
-Instead of scattering enrollment logic across controllers, a dedicated `cascade.service.js` handles the many-to-many synchronization between `User` and `Track`/`Course`/`Session`. This prevents bugs where a user is in a track but not its courses.
+Instead of scattering enrollment logic across controllers, a dedicated `cascade.service.js` handles the many-to-many synchronization between `User` and `Track`/`Course`/`Session`. This prevents bugs where a user is in a track but not its courses. Deleting a course or track similarly cascades to clean up its assignments, reviews, and weekly tasks rather than leaving them orphaned.
 
 ### 3. Generic Ownership Middleware
 
-Rather than writing `if (req.user.id !== resource.instructor)` in every controller, the `checkOwnership` factory accepts a model name, owner field, and param name. This keeps authorization DRY and testable.
+Rather than writing `if (req.user.id !== resource.instructor)` in every controller, the `checkOwnership` factory accepts a model name, owner field, and param name. This keeps authorization DRY and testable, and is applied uniformly — including to review deletion (`ownerField: 'user'`) and assignment mutation (`ownerField: 'instructor'`), not just the original track/course/session/event/announcement set.
 
-### 4. Joi + Swagger Co-location
+### 4. Resource-Type Factories for Reviews & Assignments
+
+Reviews and assignments both attach to three different parent types (track, course, session) with identical business rules (enrollment required to create, one review per student, owner-or-admin required to mutate). Rather than triplicating that logic, `review.route.js` and `resourceAssignment.route.js` each export a single factory function parameterized by resource type, mounted once per parent router.
+
+### 5. Joi + Swagger Co-location
 
 Validation schemas (Joi) are defined in `validations/` and referenced in route JSDoc. This ensures the API docs never drift from the actual validation rules.
 
@@ -451,18 +491,19 @@ Validation schemas (Joi) are defined in `validations/` and referenced in route J
 
 ## 🛡️ Security
 
-| Layer                   | Implementation                                                                    |
-| ----------------------- | --------------------------------------------------------------------------------- |
-| **HTTP Headers**        | Helmet (CSP, HSTS, X-Frame-Options, etc.)                                         |
-| **Rate Limiting**       | 300 req / 15 min (global); 5 req / 15 min (auth endpoints)                        |
-| **NoSQL Injection**     | `express-mongo-sanitize` strips `$` and `.` from user input                       |
-| **Parameter Pollution** | `hpp` whitelists array fields (`role`, `level`, `prerequisites`, etc.)            |
-| **CORS**                | Whitelist-based with credentials; ngrok allowed in dev                            |
-| **Passwords**           | bcrypt (cost 12), never returned in queries (`select: false`)                     |
-| **JWT**                 | `httpOnly` cookie + `SameSite` strict; 30-day expiry                              |
-| **Input Validation**    | Joi on all body/params/query; custom URL validators for attachments               |
-| **Ownership**           | Instructors can only mutate their own content; admins bypass                      |
-| **Body Spoofing**       | Controllers delete `req.body.instructor`, `req.body.students`, etc. before saving |
+| Layer                   | Implementation                                                                                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **HTTP Headers**        | Helmet (CSP, HSTS, X-Frame-Options, etc.)                                                                                                                                                        |
+| **Rate Limiting**       | 300 req / 15 min (global); 5 req / 15 min (auth endpoints)                                                                                                                                       |
+| **NoSQL Injection**     | `express-mongo-sanitize` strips `$` and `.` from user input                                                                                                                                      |
+| **Parameter Pollution** | `hpp` whitelists array fields (`role`, `level`, `prerequisites`, etc.)                                                                                                                           |
+| **CORS**                | Whitelist-based with credentials; ngrok allowed in dev                                                                                                                                           |
+| **Passwords**           | bcrypt (cost 12), never returned in queries (`select: false`)                                                                                                                                    |
+| **JWT**                 | `httpOnly` cookie + `SameSite` strict; 30-day expiry                                                                                                                                             |
+| **Input Validation**    | Joi on all body/params/query; custom URL validators for attachments                                                                                                                              |
+| **Ownership**           | Instructors can only mutate their own content; review authors can only delete their own review; admins bypass both                                                                               |
+| **Body Spoofing**       | Controllers delete `req.body.instructor`, `req.body.students`, etc. before saving                                                                                                                |
+| **Data Exposure**       | Enrolled-student lists (name/email/photo) on public track/course detail pages are only populated for the owner, an admin, or an enrolled caller — never shown to anonymous or unrelated visitors |
 
 ---
 
@@ -566,7 +607,7 @@ tests/
 └── weeklyTask.test.js   # example: auth, roles, ownership, full create→complete flow
 ```
 
-Coverage so far is intentionally small (two example route files) — the pattern is established, and the natural next step is writing tests for one more route file at a time.
+Coverage so far is intentionally small (two example route files) — the pattern is established, and the natural next step is writing tests for one more route file at a time. Assignment CRUD, review deletion, and the new contact admin endpoints don't have tests yet — see [TESTING.md](./TESTING.md) for suggested next tests.
 
 ---
 
@@ -583,10 +624,14 @@ Coverage so far is intentionally small (two example route files) — the pattern
 - [x] Dashboard feed
 - [x] Bulk user actions
 - [x] Track analytics
+- [x] Session enrollment lookup by student (`GET /v1/sessions/student/:studentId`, matching Track/Course)
 - [x] Email service (welcome, password reset)
 - [x] Swagger documentation
 - [x] Public contact form (stored + admin email notification)
+- [x] Contact form admin management — admins can list, view, and update a submission's status (`new` / `read` / `archived`)
 - [x] Track reviews (enrolled-student ratings & feedback) — extended to also cover courses and sessions
+- [x] Review deletion — the review's own author, or an admin, can remove it
+- [x] Assignments — full CRUD (create/update/delete) for owner instructor or admin, at the course and standalone-session level
 - [x] Assignments list — track (aggregated), course, and standalone-session level (`GET .../assignments`, each with per-user submission status)
 - [x] Weekly tasks — per-course buckets of items (reading/quiz/video/etc.) with per-student completion tracking, aggregated at the track level; full CRUD (create/update/delete) plus per-item completion toggling
 - [x] Assignment submissions — students submit/resubmit work (`POST /assignments/:id/submissions`), with a computed `late` flag
@@ -597,6 +642,8 @@ Coverage so far is intentionally small (two example route files) — the pattern
 - [ ] **MongoDB Transactions** for cascade enrollment operations
 - [ ] **Activity Logs** (`activityLog.model.js`) — audit trail for user actions
 - [ ] **Admin Analytics Dashboard** (`dashboardStats.model.js`)
+- [ ] **Email verification flow** — the `emailVerified` flag exists and resets on email change, but there's no self-service send/verify-token endpoint yet; currently only an admin can flip it
+- [ ] **Announcement audience filtering** — `audience`/`targetTrack`/`targetCourse` are stored but not yet used to filter what `GET /v1/announcements` returns
 - [x] Jest + Supertest test setup — in-memory MongoDB, test-user helper, two example route test files (see TESTING.md; growing coverage is ongoing)
 - [ ] **Request Correlation IDs** for distributed tracing
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
