@@ -57,6 +57,7 @@
  */
 
 const mongoose = require('mongoose');
+const validateAttachments = require('../utils/validateAttachments');
 
 const announcementSchema = new mongoose.Schema(
   {
@@ -83,35 +84,10 @@ const announcementSchema = new mongoose.Schema(
     },
     attachments: {
       type: [String],
-      validate: {
-        validator: function (arr) {
-          if (!arr || !arr.length) return true;
-          return arr.every((url) => {
-            try {
-              const parsed = new URL(url);
-              const allowedHosts = [
-                'drive.google.com',
-                'docs.google.com',
-                'dropbox.com',
-                'dl.dropboxusercontent.com',
-                'github.com',
-                'raw.githubusercontent.com',
-                'res.cloudinary.com',
-                'i.imgur.com',
-                'imgur.com',
-                'cdn.discordapp.com',
-              ];
-              return (
-                allowedHosts.some((h) => parsed.hostname.endsWith(h)) &&
-                parsed.protocol === 'https:'
-              );
-            } catch {
-              return false;
-            }
-          });
-        },
-        message: 'Attachments must be valid URLs from trusted hosts',
-      },
+      validate: [
+        validateAttachments,
+        'Attachments must be valid URLs from trusted hosts',
+      ],
     },
     createdBy: {
       type: mongoose.Schema.ObjectId,

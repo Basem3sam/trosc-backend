@@ -270,6 +270,7 @@
 
 const mongoose = require('mongoose');
 const validator = require('validator');
+const validateAttachments = require('../utils/validateAttachments');
 
 const syllabusItemSchema = new mongoose.Schema(
   {
@@ -362,32 +363,10 @@ const courseSchema = new mongoose.Schema(
     syllabus: [syllabusItemSchema],
     attachments: {
       type: [String],
-      validate: {
-        validator: function (arr) {
-          if (!arr || !arr.length) return true;
-          return arr.every((url) => {
-            try {
-              const parsed = new URL(url);
-              const allowedHosts = [
-                'drive.google.com',
-                'docs.google.com',
-                'dropbox.com',
-                'github.com',
-                'raw.githubusercontent.com',
-                'res.cloudinary.com',
-                'i.imgur.com',
-              ];
-              return (
-                allowedHosts.some((h) => parsed.hostname.endsWith(h)) &&
-                parsed.protocol === 'https:'
-              );
-            } catch {
-              return false;
-            }
-          });
-        },
-        message: 'Course attachments must be valid URLs from trusted hosts',
-      },
+      validate: [
+        validateAttachments,
+        'Course attachments must be valid URLs from trusted hosts',
+      ],
     },
   },
   {

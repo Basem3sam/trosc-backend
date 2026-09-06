@@ -1,19 +1,7 @@
 const Joi = require('joi');
 
 // Free hosting services Trosc uses
-const ALLOWED_HOSTS = [
-  'drive.google.com',
-  'docs.google.com',
-  'dropbox.com',
-  'dl.dropboxusercontent.com',
-  'github.com',
-  'raw.githubusercontent.com',
-  'res.cloudinary.com',
-  'i.imgur.com',
-  'imgur.com',
-  'cdn.discordapp.com',
-  'media.discordapp.net',
-];
+const ALLOWED_HOSTS = require('./validateAttachments');
 
 const attachmentValidation = Joi.array()
   .items(
