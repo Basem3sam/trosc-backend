@@ -79,28 +79,24 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
   const course = await Course.findById(courseId)
     .populate({
       path: 'sessions',
-      select: 'title description duration level published startDate students',
+      select: 'title description duration level published startDate',
       match: { published: true },
     })
-    .populate({
-      path: 'students',
-      select: 'name email photo',
-    })
-    .populate({
-      path: 'prerequisites',
-      select: 'title description level',
-    });
+    .populate({ path: 'prerequisites', select: 'title description level' });
 
-  if (!course) {
+  if (!course) throw new AppError('No course found with that ID', 404);
+
+  const isOwner = requestingUser?.id === course.instructor?._id?.toString();
+  const isAdmin = requestingUser?.role === 'admin';
+  const isEnrolled =
+    requestingUser &&
+    course.students.some((s) => s.toString() === requestingUser.id);
+
+  if (!course.published && !isOwner && !isAdmin) {
     throw new AppError('No course found with that ID', 404);
   }
-
-  if (!course.published) {
-    const isOwner = requestingUser?.id === course.instructor?._id?.toString();
-    const isAdmin = requestingUser?.role === 'admin';
-    if (!isOwner && !isAdmin) {
-      throw new AppError('No course found with that ID', 404);
-    }
+  if (isOwner || isAdmin || isEnrolled) {
+    await course.populate({ path: 'students', select: 'name email photo' });
   }
 
   return course;
