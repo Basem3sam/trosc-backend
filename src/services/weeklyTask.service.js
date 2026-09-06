@@ -1,4 +1,4 @@
-const WeeklyTask = require('../models/weeklyTask.model');
+const WeeklyTask = require('../models/weeklytask.model');
 const Course = require('../models/course.model');
 const Track = require('../models/track.model');
 const AppError = require('../utils/AppError');

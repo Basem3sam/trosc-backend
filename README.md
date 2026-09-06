@@ -545,31 +545,28 @@ curl http://localhost:5000/v1/tracks
 open http://localhost:5000/api-docs
 ```
 
-### Recommended Test Stack (Not Yet Implemented)
+### Automated Testing (Jest + Supertest)
 
-For a production-grade test suite, consider adding:
+```bash
+npm test              # run the full suite once
+npm run test:watch    # re-run automatically as you edit
+npm run test:coverage # run once + generate a coverage report
+```
 
-| Type        | Tool                  | Purpose                    |
-| ----------- | --------------------- | -------------------------- |
-| Unit        | Jest                  | Service logic, utilities   |
-| Integration | Jest + Supertest      | HTTP endpoints, auth flows |
-| DB          | mongodb-memory-server | Isolated in-memory MongoDB |
-| Coverage    | Jest `--coverage`     | Track test coverage        |
-
-### Example Test Structure (Future)
+Tests run against a real, throwaway in-memory MongoDB instance (`mongodb-memory-server`) — never your real dev or production database. See **[TESTING.md](./TESTING.md)** for a full walkthrough of how the setup works and how to write your next test.
 
 ```
 tests/
-├── unit/
-│   ├── services/
-│   └── utils/
-├── integration/
-│   ├── auth.test.js
-│   ├── track.test.js
-│   └── course.test.js
-└── fixtures/
-    └── users.js
+├── globalSetup.js       # starts the in-memory MongoDB once per run
+├── globalTeardown.js    # stops it once per run
+├── setupAfterEnv.js     # per-file: connects Mongoose, clears data between tests
+├── helpers/
+│   └── testUser.js      # creates a user + valid JWT without hitting /signup
+├── contact.test.js      # example: public endpoint
+└── weeklyTask.test.js   # example: auth, roles, ownership, full create→complete flow
 ```
+
+Coverage so far is intentionally small (two example route files) — the pattern is established, and the natural next step is writing tests for one more route file at a time.
 
 ---
 
@@ -600,7 +597,7 @@ tests/
 - [ ] **MongoDB Transactions** for cascade enrollment operations
 - [ ] **Activity Logs** (`activityLog.model.js`) — audit trail for user actions
 - [ ] **Admin Analytics Dashboard** (`dashboardStats.model.js`)
-- [ ] **Jest + Supertest** integration test suite
+- [x] Jest + Supertest test setup — in-memory MongoDB, test-user helper, two example route test files (see TESTING.md; growing coverage is ongoing)
 - [ ] **Request Correlation IDs** for distributed tracing
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
 

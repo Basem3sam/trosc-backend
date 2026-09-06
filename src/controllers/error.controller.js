@@ -68,7 +68,14 @@ module.exports = (err, req, res, next) => {
 
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
-  } else if (process.env.NODE_ENV === 'production') {
+  } else {
+    // Anything that isn't explicitly 'development' (production, test, or
+    // any other value) gets the safe, non-leaking response path. Using a
+    // plain `else` here — rather than `else if (NODE_ENV === 'production')`
+    // — means an unrecognized NODE_ENV can never fall through with no
+    // response sent at all (which silently hangs every request until the
+    // caller's own timeout, exactly what happened when NODE_ENV was 'test'
+    // and neither branch matched).
     // Mongoose errors lose their name property when spread; manually preserve it
     let error = { ...err, name: err.name };
     error.message = err.message;

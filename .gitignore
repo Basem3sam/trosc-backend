@@ -20,3 +20,10 @@ combined_output.txt
 # Scripts
 script.js
 combine.js
+
+# Test artifacts
+coverage/
+
+# Test env file — dummy values, but keep the habit consistent
+# with your other .env* files
+.env.test

@@ -90,7 +90,9 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
   const isAdmin = requestingUser?.role === 'admin';
   const isEnrolled =
     requestingUser &&
-    course.students?.some((studentId) => studentId.toString() === requestingUser.id);
+    course.students?.some(
+      (studentId) => studentId.toString() === requestingUser.id,
+    );
 
   if (!course.published && !isOwner && !isAdmin) {
     throw new AppError('No course found with that ID', 404);
@@ -135,6 +137,12 @@ exports.updateCourse = async (courseId, updateBody) => {
 exports.deleteCourse = async (courseId) => {
   const course = await Course.findByIdAndDelete(courseId);
   if (!course) throw new AppError('No course found with that ID', 404);
+
+  await Promise.all([
+    Assignment.deleteMany({ course: courseId }),
+    Review.deleteMany({ course: courseId }),
+    WeeklyTask.deleteMany({ course: courseId }), // also deletes embedded completions
+  ]);
 
   // Remove from parent track
   await Track.updateMany(

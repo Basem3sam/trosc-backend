@@ -162,6 +162,12 @@ exports.deleteTrack = async (trackId) => {
   const track = await Track.findById(trackId);
   if (!track) throw new AppError('No track found with that ID', 404);
 
+  await Promise.all([
+    Assignment.deleteMany({ track: trackId }),
+    Review.deleteMany({ track: trackId }),
+    WeeklyTask.deleteMany({ track: trackId }), // also deletes embedded completions
+  ]);
+
   // Courses become standalone (no track)
   await Course.updateMany(
     { _id: { $in: track.courses } },
