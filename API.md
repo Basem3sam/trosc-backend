@@ -107,6 +107,7 @@ List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `
 | `POST` | `/v1/tracks/:id/reviews` | Protected (enrolled student) | Submit a rating + review for a track (one per student) |
 | `GET` | `/v1/tracks/:id/reviews` | Public | List reviews for a track (paginated) |
 | `GET` | `/v1/tracks/:id/assignments` | Protected (enrolled student / any instructor / admin) | All assignments across every course + standalone session in the track, with `mySubmission` attached |
+| `GET` | `/v1/tracks/:id/weekly-tasks` | Protected (enrolled student / any instructor / admin) | All weekly task buckets across every course in the track, with per-item `done` flags |
 
 ### Courses
 
@@ -129,6 +130,8 @@ List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `
 | `POST` | `/v1/courses/:id/reviews` | Protected (enrolled student) | Submit a rating + review for a course (one per student) |
 | `GET` | `/v1/courses/:id/reviews` | Public | List reviews for a course (paginated) |
 | `GET` | `/v1/courses/:id/assignments` | Protected (enrolled student / any instructor / admin) | Assignments for this course, with `mySubmission` attached |
+| `POST` | `/v1/courses/:id/weekly-tasks` | Admin / owner instructor | Create a weekly task bucket for a course (one per week number) |
+| `GET` | `/v1/courses/:id/weekly-tasks` | Protected (enrolled student / any instructor / admin) | Weekly task buckets for this course, with per-item `done` flags |
 
 ### Sessions
 
@@ -177,6 +180,16 @@ List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
 | `POST` | `/v1/contact` | Public | Submit the contact us form (stores submission + notifies admin by email; rate limited) |
+
+### Weekly Tasks
+
+Creation and listing live under `/v1/courses/:id/weekly-tasks` and `/v1/tracks/:id/weekly-tasks` (see above). These are the standalone, top-level actions keyed by the task's own ID:
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `DELETE` | `/v1/weekly-tasks/:taskId` | Admin / owner instructor | Delete a weekly task bucket |
+| `POST` | `/v1/weekly-tasks/:taskId/items/:itemId/complete` | Protected (enrolled student) | Mark an item as completed (idempotent) |
+| `DELETE` | `/v1/weekly-tasks/:taskId/items/:itemId/complete` | Protected (enrolled student) | Unmark an item as completed (idempotent) |
 
 ### Feed & Health
 

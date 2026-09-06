@@ -20,6 +20,7 @@ const eventRouter = require('./routes/event.route');
 const announcementRouter = require('./routes/announcement.route');
 const feedRouter = require('./routes/feed.route');
 const contactRouter = require('./routes/contact.route');
+const weeklyTaskProgressRouter = require('./routes/weeklyTaskProgress.route');
 const logger = require('./utils/logger');
 
 const { authLimiter } = require('./middlewares/rateLimit.middleware');
@@ -165,6 +166,7 @@ app.use('/v1/events', eventRouter);
 app.use('/v1/announcements', announcementRouter);
 app.use('/v1/feed', feedRouter);
 app.use('/v1/contact', contactRouter);
+app.use('/v1/weekly-tasks', weeklyTaskProgressRouter);
 
 // Test route
 app.get('/', (req, res) => {

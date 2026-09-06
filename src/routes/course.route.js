@@ -511,6 +511,104 @@
 
 /**
  * @swagger
+ * /courses/{id}/weekly-tasks:
+ *   post:
+ *     operationId: createWeeklyTask
+ *     summary: Create a weekly task bucket for a course
+ *     description: Owner instructor or admin only. One bucket per week number per course.
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "507f1f77bcf86cd799439041" }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [week, title, items]
+ *             properties:
+ *               week: { type: integer, example: 1 }
+ *               title: { type: string, example: "Week 1: Networking Basics" }
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [title]
+ *                   properties:
+ *                     title: { type: string, example: "Read Chapter 1" }
+ *                     type:
+ *                       type: string
+ *                       enum: [reading, quiz, video, assignment, other]
+ *                       example: reading
+ *     responses:
+ *       201:
+ *         description: Weekly task created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     task:
+ *                       $ref: '#/components/schemas/WeeklyTask'
+ *       400:
+ *         description: Week already exists for this course / validation error
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *
+ *   get:
+ *     operationId: getCourseWeeklyTasks
+ *     summary: Get all weekly tasks for a course
+ *     description: >
+ *       Each item includes a `done` flag computed for the requesting user.
+ *       Accessible to admins, any instructor, or a student enrolled in the course.
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "507f1f77bcf86cd799439041" }
+ *     responses:
+ *       200:
+ *         description: List of weekly tasks
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 results: { type: integer, example: 4 }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     tasks:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/WeeklyTask'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Only enrolled students can view this course's weekly tasks
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
  * /courses/{id}/assignments:
  *   get:
  *     operationId: getCourseAssignments
@@ -654,6 +752,7 @@ const express = require('express');
 const AppError = require('../utils/AppError');
 const reviewRouter = require('./review.route');
 const resourceAssignmentRouter = require('./resourceAssignment.route');
+const weeklyTaskRouter = require('./weeklyTask.route');
 const courseController = require('../controllers/course.controller');
 const {
   protect,
@@ -803,5 +902,6 @@ router.route('/:id/students/:studentId').delete(
 
 router.use('/:id/reviews', reviewRouter('course'));
 router.use('/:id/assignments', resourceAssignmentRouter('course'));
+router.use('/:id/weekly-tasks', weeklyTaskRouter);
 
 module.exports = router;

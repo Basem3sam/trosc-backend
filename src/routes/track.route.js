@@ -749,6 +749,50 @@
 
 /**
  * @swagger
+ * /tracks/{id}/weekly-tasks:
+ *   get:
+ *     operationId: getTrackWeeklyTasks
+ *     summary: Get all weekly tasks across every course in a track
+ *     description: >
+ *       Only courses carry weekly tasks — standalone sessions mounted directly
+ *       on the track are not included. Each item includes a `done` flag computed
+ *       for the requesting user. Accessible to admins, any instructor, or a
+ *       student enrolled in the track.
+ *     tags: [Tracks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "507f1f77bcf86cd799439021" }
+ *     responses:
+ *       200:
+ *         description: List of weekly tasks
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 results: { type: integer, example: 6 }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     tasks:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/WeeklyTask'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Only enrolled students can view this track's weekly tasks
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
  * /tracks/{id}/assignments:
  *   get:
  *     operationId: getTrackAssignments
@@ -894,6 +938,7 @@ const express = require('express');
 const AppError = require('../utils/AppError');
 const reviewRouter = require('./review.route');
 const assignmentRouter = require('./assignment.route');
+const trackWeeklyTaskRouter = require('./trackWeeklyTask.route');
 const trackController = require('../controllers/track.controller');
 const {
   protect,
@@ -1154,5 +1199,6 @@ router.post(
 // 
 router.use('/:id/reviews', reviewRouter('track'));
 router.use('/:id/assignments', assignmentRouter);
+router.use('/:id/weekly-tasks', trackWeeklyTaskRouter);
 
 module.exports = router;

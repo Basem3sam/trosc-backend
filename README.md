@@ -56,6 +56,7 @@
 | 📈 **Track Analytics**    | Enrollment rates, student counts, and engagement metrics                                       |
 | ✉️ **Contact Form**       | Public contact submission, stored + emailed to admin                                          |
 | ⭐ **Reviews**            | Enrolled students rate & review tracks, courses, and sessions (1–5 stars, one per student per resource) |
+| 📅 **Weekly Tasks**       | Per-course weekly task buckets with typed items (reading/quiz/video) and per-student completion tracking |
 
 ---
 
@@ -590,6 +591,7 @@ tests/
 - [x] Public contact form (stored + admin email notification)
 - [x] Track reviews (enrolled-student ratings & feedback) — extended to also cover courses and sessions
 - [x] Assignments list — track (aggregated), course, and standalone-session level (`GET .../assignments`, each with per-user submission status)
+- [x] Weekly tasks — per-course buckets of items (reading/quiz/video/etc.) with per-student completion tracking, aggregated at the track level
 
 ### Planned 🔮
 
