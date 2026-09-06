@@ -87,7 +87,11 @@ const submissionSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  grade: Number,
+  grade: {
+    type: Number,
+    min: [0, 'Grade cannot be negative'],
+    max: [100, 'Grade cannot exceed 100'],
+  },
 });
 
 const assignmentSchema = new mongoose.Schema(

@@ -1,4 +1,5 @@
 const winston = require('winston');
+const DailyRotateFile = require('winston-daily-rotate-file');
 
 const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
@@ -8,7 +9,6 @@ const logger = winston.createLogger({
     winston.format.json(),
   ),
   transports: [
-    // Always log to console
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
@@ -18,12 +18,24 @@ const logger = winston.createLogger({
   ],
 });
 
-// In production, also log to file
 if (process.env.NODE_ENV === 'production') {
   logger.add(
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
+    new DailyRotateFile({
+      filename: 'logs/error-%DATE%.log',
+      level: 'error',
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '14d',
+    }),
   );
-  logger.add(new winston.transports.File({ filename: 'logs/combined.log' }));
+  logger.add(
+    new DailyRotateFile({
+      filename: 'logs/combined-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '14d',
+    }),
+  );
 }
 
 module.exports = logger;

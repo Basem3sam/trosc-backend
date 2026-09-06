@@ -188,8 +188,16 @@ Creation and listing live under `/v1/courses/:id/weekly-tasks` and `/v1/tracks/:
 | Method | Endpoint | Access | Description |
 |--------|----------|--------|-------------|
 | `DELETE` | `/v1/weekly-tasks/:taskId` | Admin / owner instructor | Delete a weekly task bucket |
+| `PATCH` | `/v1/weekly-tasks/:taskId` | Admin / owner instructor | Update week/title/items (items with an existing `_id` are edited in place, preserving completion history) |
 | `POST` | `/v1/weekly-tasks/:taskId/items/:itemId/complete` | Protected (enrolled student) | Mark an item as completed (idempotent) |
 | `DELETE` | `/v1/weekly-tasks/:taskId/items/:itemId/complete` | Protected (enrolled student) | Unmark an item as completed (idempotent) |
+
+### Assignment Submissions
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `POST` | `/v1/assignments/:id/submissions` | Protected (enrolled student) | Submit or resubmit your work (resubmitting clears any existing grade) |
+| `PATCH` | `/v1/assignments/:id/submissions/:studentId/grade` | Admin / owner instructor | Grade a student's submission (0–100) |
 
 ### Feed & Health
 

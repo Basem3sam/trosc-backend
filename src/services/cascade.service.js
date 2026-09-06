@@ -2,64 +2,97 @@ const User = require('../models/user.model');
 const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
+const mongoose = require('mongoose');
 const AppError = require('../utils/AppError');
 
 // Called when a student joins a track (self-approve or instructor add)
 exports.syncUserEnrollments = async (userId, trackId) => {
-  const [trackCourses, trackSessions] = await Promise.all([
-    Course.find({ track: trackId }),
-    Session.find({ tracks: trackId }),
-  ]);
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  const courseIds = trackCourses.map((c) => c._id);
-  const sessionIds = trackSessions.map((s) => s._id);
+  try {
+    const trackCourses = await Course.find({ track: trackId }).session(session);
+    const trackSessions = await Session.find({ tracks: trackId }).session(
+      session,
+    );
 
-  await Promise.all([
-    Course.updateMany(
-      { _id: { $in: courseIds }, students: { $ne: userId } },
-      { $push: { students: userId } },
-    ),
-    Session.updateMany(
-      { _id: { $in: sessionIds }, students: { $ne: userId } },
-      { $push: { students: userId } },
-    ),
-    User.findByIdAndUpdate(userId, {
-      $set: { enrolledTrack: trackId },
-      $addToSet: {
-        enrolledCourses: { $each: courseIds },
-        enrolledSessions: { $each: sessionIds },
-      },
-    }),
-  ]);
+    const courseIds = trackCourses.map((c) => c._id);
+    const sessionIds = trackSessions.map((s) => s._id);
+
+    await Promise.all([
+      Course.updateMany(
+        { _id: { $in: courseIds }, students: { $ne: userId } },
+        { $push: { students: userId } },
+      ).session(session),
+      Session.updateMany(
+        { _id: { $in: sessionIds }, students: { $ne: userId } },
+        { $push: { students: userId } },
+      ).session(session),
+      User.findByIdAndUpdate(
+        userId,
+        {
+          $set: { enrolledTrack: trackId },
+          $addToSet: {
+            enrolledCourses: { $each: courseIds },
+            enrolledSessions: { $each: sessionIds },
+          },
+        },
+        { session },
+      ),
+    ]);
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
 };
 
 // Called when a student leaves a track (approve leave or instructor kick)
 exports.unsyncUserEnrollments = async (userId, trackId) => {
-  const [trackCourses, trackSessions] = await Promise.all([
-    Course.find({ track: trackId }),
-    Session.find({ tracks: trackId }),
-  ]);
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  const courseIds = trackCourses.map((c) => c._id);
-  const sessionIds = trackSessions.map((s) => s._id);
+  try {
+    const trackCourses = await Course.find({ track: trackId }).session(session);
+    const trackSessions = await Session.find({ tracks: trackId }).session(
+      session,
+    );
 
-  await Promise.all([
-    Course.updateMany(
-      { _id: { $in: courseIds } },
-      { $pull: { students: userId } },
-    ),
-    Session.updateMany(
-      { _id: { $in: sessionIds } },
-      { $pull: { students: userId } },
-    ),
-    User.findByIdAndUpdate(userId, {
-      $unset: { enrolledTrack: 1 },
-      $pull: {
-        enrolledCourses: { $in: courseIds },
-        enrolledSessions: { $in: sessionIds },
-      },
-    }),
-  ]);
+    const courseIds = trackCourses.map((c) => c._id);
+    const sessionIds = trackSessions.map((s) => s._id);
+
+    await Promise.all([
+      Course.updateMany(
+        { _id: { $in: courseIds } },
+        { $pull: { students: userId } },
+      ).session(session),
+      Session.updateMany(
+        { _id: { $in: sessionIds } },
+        { $pull: { students: userId } },
+      ).session(session),
+      User.findByIdAndUpdate(
+        userId,
+        {
+          $unset: { enrolledTrack: 1 },
+          $pull: {
+            enrolledCourses: { $in: courseIds },
+            enrolledSessions: { $in: sessionIds },
+          },
+        },
+        { session },
+      ),
+    ]);
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
 };
 
 // Called when instructor manually adds student to a standalone course

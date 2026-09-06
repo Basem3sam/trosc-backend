@@ -591,13 +591,14 @@ tests/
 - [x] Public contact form (stored + admin email notification)
 - [x] Track reviews (enrolled-student ratings & feedback) — extended to also cover courses and sessions
 - [x] Assignments list — track (aggregated), course, and standalone-session level (`GET .../assignments`, each with per-user submission status)
-- [x] Weekly tasks — per-course buckets of items (reading/quiz/video/etc.) with per-student completion tracking, aggregated at the track level
+- [x] Weekly tasks — per-course buckets of items (reading/quiz/video/etc.) with per-student completion tracking, aggregated at the track level; full CRUD (create/update/delete) plus per-item completion toggling
+- [x] Assignment submissions — students submit/resubmit work (`POST /assignments/:id/submissions`), with a computed `late` flag
+- [x] Assignment grading — owner instructor / admin grades a submission (`PATCH /assignments/:id/submissions/:studentId/grade`)
 
 ### Planned 🔮
 
 - [ ] **MongoDB Transactions** for cascade enrollment operations
 - [ ] **Activity Logs** (`activityLog.model.js`) — audit trail for user actions
-- [ ] **Assignment submissions & grading** (`assignment.model.js`) — students submitting work, instructor grading (listing/viewing assignments is done — see Implemented ✅ above)
 - [ ] **Admin Analytics Dashboard** (`dashboardStats.model.js`)
 - [ ] **Jest + Supertest** integration test suite
 - [ ] **Request Correlation IDs** for distributed tracing

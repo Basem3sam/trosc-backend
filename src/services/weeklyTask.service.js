@@ -124,6 +124,64 @@ exports.getTrackWeeklyTasks = async (trackId, requestingUser) => {
 };
 
 /**
+ * Update a weekly task's week number, title, and/or items. Ownership
+ * (instructor === requester, or admin) is enforced by the checkOwnership
+ * middleware before this runs.
+ *
+ * Items passed WITH their existing _id are edited in place, preserving
+ * any students' completion records for that item. Items passed WITHOUT
+ * an _id are treated as brand new (get a fresh _id, start with zero
+ * completions). Any item that existed before but is missing from the new
+ * `items` array is dropped, and its now-orphaned completion records are
+ * cleaned up along with it.
+ *
+ * @param {string} taskId
+ * @param {Object} data - { week?, title?, items? }
+ * @returns {Promise<WeeklyTask>}
+ */
+exports.updateWeeklyTask = async (taskId, data) => {
+  const task = await WeeklyTask.findById(taskId);
+  if (!task) {
+    throw new AppError('No weekly task found with that ID', 404);
+  }
+
+  if (data.week !== undefined && data.week !== task.week) {
+    const clash = await WeeklyTask.findOne({
+      course: task.course,
+      week: data.week,
+      _id: { $ne: taskId },
+    });
+    if (clash) {
+      throw new AppError(
+        `Week ${data.week} already has a weekly task for this course`,
+        400,
+      );
+    }
+    task.week = data.week;
+  }
+
+  if (data.title !== undefined) {
+    task.title = data.title;
+  }
+
+  if (data.items !== undefined) {
+    // Mongoose keeps a subdocument's _id if one is provided in the plain
+    // object being assigned, and generates a fresh one otherwise.
+    task.items = data.items;
+
+    const survivingItemIds = new Set(
+      task.items.map((item) => item._id.toString()),
+    );
+    task.completions = task.completions.filter((c) =>
+      survivingItemIds.has(c.item.toString()),
+    );
+  }
+
+  await task.save();
+  return task;
+};
+
+/**
  * Delete a weekly task (and all of its completion records with it).
  * Ownership (instructor === requester, or admin) is enforced by the
  * checkOwnership middleware before this runs.

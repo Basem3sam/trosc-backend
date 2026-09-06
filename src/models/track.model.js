@@ -322,6 +322,13 @@ trackSchema.pre(/^find/, function (next) {
   next();
 });
 
+trackSchema.pre('save', function (next) {
+  if (this.courses.length === 0 && this.sessions.length === 0) {
+    return next(new Error('A track must have at least one course or session'));
+  }
+  next();
+});
+
 const Track = mongoose.model('Track', trackSchema);
 
 module.exports = Track;

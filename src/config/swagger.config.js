@@ -49,6 +49,15 @@ const options = {
       { name: 'Events', description: 'Club events, workshops & RSVP' },
       { name: 'Announcements', description: 'Pinned posts & targeted news' },
       {
+        name: 'Reviews',
+        description: 'Track feedback & ratings from enrolled students',
+      },
+      { name: 'Contact', description: 'Public contact form submission' },
+      {
+        name: 'Weekly Tasks',
+        description: 'Per-item completion tracking and task deletion',
+      },
+      {
         name: 'Feed',
         description: 'Dashboard announcements + upcoming events',
       },

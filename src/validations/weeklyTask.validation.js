@@ -48,3 +48,24 @@ exports.createWeeklyTaskSchema = Joi.object({
     'any.required': 'Items are required',
   }),
 });
+
+// Items can optionally carry their existing _id to edit that item in
+// place (preserving its completion history). Items without an _id are
+// treated as new — students' prior completions won't carry over to them.
+const updateItemSchema = itemSchema.keys({
+  _id: objectId.optional(),
+});
+
+exports.updateWeeklyTaskSchema = Joi.object({
+  week: Joi.number().integer().min(1).messages({
+    'number.base': 'Week must be a positive integer',
+  }),
+  title: Joi.string().trim(),
+  items: Joi.array().items(updateItemSchema).min(1).messages({
+    'array.min': 'At least one item is required',
+  }),
+})
+  .min(1)
+  .messages({
+    'object.min': 'Provide at least one field to update (week, title, or items)',
+  });
