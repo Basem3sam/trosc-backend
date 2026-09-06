@@ -749,6 +749,53 @@
 
 /**
  * @swagger
+ * /tracks/{id}/assignments:
+ *   get:
+ *     operationId: getTrackAssignments
+ *     summary: Get all assignments across every course in a track
+ *     description: >
+ *       Returns every assignment belonging to any course in the track, plus any
+ *       assignment on a standalone session mounted directly on the track, sorted
+ *       by deadline. Each assignment includes `mySubmission` — the requesting
+ *       user's own submission, or null if they haven't submitted. Accessible to
+ *       admins, any instructor, or a student enrolled in the track.
+ *     tags: [Tracks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439021"
+ *     responses:
+ *       200:
+ *         description: List of assignments
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 results: { type: integer, example: 3 }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     assignments:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Assignment'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Only enrolled students can view this track's assignments
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
  * /tracks/{id}/reviews:
  *   post:
  *     operationId: createTrackReview
@@ -846,6 +893,7 @@
 const express = require('express');
 const AppError = require('../utils/AppError');
 const reviewRouter = require('./review.route');
+const assignmentRouter = require('./assignment.route');
 const trackController = require('../controllers/track.controller');
 const {
   protect,
@@ -1105,5 +1153,6 @@ router.post(
 
 // 
 router.use('/:id/reviews', reviewRouter('track'));
+router.use('/:id/assignments', assignmentRouter);
 
 module.exports = router;

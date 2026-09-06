@@ -106,6 +106,7 @@ List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `
 | `DELETE` | `/v1/tracks/:trackId/sessions/:sessionId` | Admin / Instructor | Remove session from track |
 | `POST` | `/v1/tracks/:id/reviews` | Protected (enrolled student) | Submit a rating + review for a track (one per student) |
 | `GET` | `/v1/tracks/:id/reviews` | Public | List reviews for a track (paginated) |
+| `GET` | `/v1/tracks/:id/assignments` | Protected (enrolled student / any instructor / admin) | All assignments across every course + standalone session in the track, with `mySubmission` attached |
 
 ### Courses
 
@@ -127,6 +128,7 @@ List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `
 | `DELETE` | `/v1/courses/:courseId/sessions/:sessionId` | Admin / Instructor | Remove session from course |
 | `POST` | `/v1/courses/:id/reviews` | Protected (enrolled student) | Submit a rating + review for a course (one per student) |
 | `GET` | `/v1/courses/:id/reviews` | Public | List reviews for a course (paginated) |
+| `GET` | `/v1/courses/:id/assignments` | Protected (enrolled student / any instructor / admin) | Assignments for this course, with `mySubmission` attached |
 
 ### Sessions
 
@@ -145,6 +147,7 @@ List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `
 | `DELETE` | `/v1/sessions/:id/students/:studentId` | Admin / Instructor | Remove student from session |
 | `POST` | `/v1/sessions/:id/reviews` | Protected (enrolled student) | Submit a rating + review for a session (one per student) |
 | `GET` | `/v1/sessions/:id/reviews` | Public | List reviews for a session (paginated) |
+| `GET` | `/v1/sessions/:id/assignments` | Protected (enrolled student / any instructor / admin) | Assignments for this standalone session, with `mySubmission` attached |
 
 ### Events
 

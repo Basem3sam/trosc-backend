@@ -511,6 +511,51 @@
 
 /**
  * @swagger
+ * /courses/{id}/assignments:
+ *   get:
+ *     operationId: getCourseAssignments
+ *     summary: Get all assignments for a course
+ *     description: >
+ *       Each assignment includes `mySubmission` — the requesting user's own
+ *       submission, or null if they haven't submitted. Accessible to admins,
+ *       any instructor, or a student enrolled in the course.
+ *     tags: [Courses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439041"
+ *     responses:
+ *       200:
+ *         description: List of assignments
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 results: { type: integer, example: 2 }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     assignments:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Assignment'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Only enrolled students can view this course's assignments
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
  * /courses/{id}/reviews:
  *   post:
  *     operationId: createCourseReview
@@ -608,6 +653,7 @@
 const express = require('express');
 const AppError = require('../utils/AppError');
 const reviewRouter = require('./review.route');
+const resourceAssignmentRouter = require('./resourceAssignment.route');
 const courseController = require('../controllers/course.controller');
 const {
   protect,
@@ -756,5 +802,6 @@ router.route('/:id/students/:studentId').delete(
 );
 
 router.use('/:id/reviews', reviewRouter('course'));
+router.use('/:id/assignments', resourceAssignmentRouter('course'));
 
 module.exports = router;

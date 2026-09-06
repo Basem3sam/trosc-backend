@@ -353,6 +353,51 @@
 
 /**
  * @swagger
+ * /sessions/{id}/assignments:
+ *   get:
+ *     operationId: getSessionAssignments
+ *     summary: Get all assignments for a standalone session
+ *     description: >
+ *       Each assignment includes `mySubmission` — the requesting user's own
+ *       submission, or null if they haven't submitted. Accessible to admins,
+ *       any instructor, or a student enrolled in the session.
+ *     tags: [Sessions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439031"
+ *     responses:
+ *       200:
+ *         description: List of assignments
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 results: { type: integer, example: 1 }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     assignments:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Assignment'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Only enrolled students can view this session's assignments
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
  * /sessions/{id}/reviews:
  *   post:
  *     operationId: createSessionReview
@@ -449,6 +494,7 @@
 
 const express = require('express');
 const reviewRouter = require('./review.route');
+const resourceAssignmentRouter = require('./resourceAssignment.route');
 const sessionController = require('../controllers/session.controller');
 const {
   protect,
@@ -555,5 +601,6 @@ router.route('/:id/students/:studentId').delete(
 );
 
 router.use('/:id/reviews', reviewRouter('session'));
+router.use('/:id/assignments', resourceAssignmentRouter('session'));
 
 module.exports = router;
