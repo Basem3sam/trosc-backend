@@ -335,10 +335,12 @@ const userSchema = new mongoose.Schema(
         validator: function (v) {
           if (!v || v === 'https://placehold.co/800x400?text=Trosc+User')
             return true;
+          if (v.startsWith('data:image/') && v.includes(';base64,'))
+            return true;
           if (validator.isURL(v, { require_protocol: true })) return true;
           return /^(?!.*[\/\\])[a-zA-Z0-9_\-]+\.(jpg|jpeg|png|webp)$/i.test(v);
         },
-        message: 'Photo must be a valid URL or image filename',
+        message: 'Photo must be a valid URL, base64 image, or image filename',
       },
     },
     bio: {
