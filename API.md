@@ -37,6 +37,50 @@ All successful list responses follow this envelope:
 
 ---
 
+## Error Response Structure
+
+All error responses follow this format:
+
+```json
+{
+  "status": "fail", // or "error" for 5xx
+  "message": "Error description"
+}
+```
+
+Common HTTP status codes:
+
+| Code | Meaning                              |
+| ---- | ------------------------------------ |
+| 200  | Success                              |
+| 201  | Created                              |
+| 204  | No Content (successful delete)       |
+| 400  | Bad Request (validation error)       |
+| 401  | Unauthorized (missing/invalid token) |
+| 403  | Forbidden (insufficient permissions) |
+| 404  | Not Found                            |
+| 409  | Conflict (duplicate resource)        |
+| 429  | Too Many Requests (rate limited)     |
+| 500  | Internal Server Error                |
+
+---
+
+## Rate Limiting
+
+All endpoints are rate-limited. The global limit is **300 requests per 15 minutes** per IP. Authentication endpoints (`/v1/users/login`, `/v1/users/signup`, `/v1/users/forgotPassword`, `/v1/users/resetPassword`) have a stricter limit of **5 attempts per 15 minutes**.
+
+Rate limit headers are included in responses:
+
+```
+X-RateLimit-Limit: 300
+X-RateLimit-Remaining: 295
+X-RateLimit-Reset: 1700000000
+```
+
+When the limit is exceeded, the API returns `429 Too Many Requests`.
+
+---
+
 ## Query Parameters
 
 List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `GET /announcements`, `GET /users`, `GET /contact`) support:
@@ -49,6 +93,12 @@ List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `
 | `fields`      | string  | Comma-separated fields to include/exclude                             |
 | `search`      | string  | Full-text search on title/description where applicable                |
 | `[field][op]` | mixed   | MongoDB-style operators: `?duration[gte]=10`, `?date[gte]=2025-01-01` |
+
+### Example: Pagination + Filtering
+
+```
+GET /v1/tracks?level=intermediate&published=true&page=2&limit=5
+```
 
 ---
 

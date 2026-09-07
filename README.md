@@ -73,7 +73,8 @@
 | **Security**   | Helmet, express-rate-limit, mongo-sanitize, hpp | —        |
 | **Email**      | Nodemailer + html-to-text                       | —        |
 | **Docs**       | Swagger (swagger-jsdoc + swagger-ui-express)    | 3.0      |
-| **Logging**    | Winston                                         | —        |
+| **Logging**    | Winston + DailyRotateFile                       | —        |
+| **Testing**    | Jest + Supertest + mongodb-memory-server        | —        |
 
 > **Design Principle:** No file uploads. All media (images, videos, PDFs) are referenced via URLs from trusted hosts (YouTube, Google Drive, Cloudinary, Imgur, GitHub, Dropbox). This keeps hosting 100% free.
 
@@ -115,7 +116,7 @@ src/
 │   ├── weeklyTask.service.js
 │   ├── contact.service.js
 │   ├── enrollment.service.js    # Enrollment rules & prerequisites
-│   └── cascade.service.js       # Keeps User enrollments in sync across collections
+│   └── cascade.service.js       # Keeps User enrollments in sync across collections (with MongoDB transactions)
 │
 ├── models/                # Mongoose schemas + Swagger component definitions
 │   ├── user.model.js
@@ -166,7 +167,7 @@ src/
 │   ├── catchAsync.js          # Async handler wrapper
 │   ├── Email.js               # HTML email templates with plaintext fallback
 │   ├── generateToken.js
-│   ├── logger.js              # Winston configuration
+│   ├── logger.js              # Winston configuration with log rotation
 │   ├── trustedHosts.js        # single source of truth for the attachment/resource host allowlist
 │   ├── validateAttachments.js
 │   ├── attachmentValidation.js
@@ -182,7 +183,7 @@ src/
 ### Design Patterns Used
 
 - **Service Layer**: Controllers are thin; all business logic lives in services.
-- **Cascade Service**: Centralized synchronization of `User.enrolledTracks`, `enrolledCourses`, and `enrolledSessions` to prevent data drift.
+- **Cascade Service**: Centralized synchronization of `User.enrolledTracks`, `enrolledCourses`, and `enrolledSessions` to prevent data drift — now with **MongoDB transactions** for atomicity.
 - **Ownership Middleware**: Generic, reusable authorization factory that checks `instructor`, `createdBy`, or `user` fields before allowing mutations — used consistently across tracks, courses, sessions, announcements, events, weekly tasks, assignments, and reviews.
 - **Resource-Type Factories**: `review.route.js` and `resourceAssignment.route.js` each export a single factory function mounted three times (`track` / `course` / `session`), so create/list/delete logic for reviews and assignments is written once and shared, not duplicated per resource type.
 - **Factory Functions**: `catchAsync`, `checkOwnership`, and `APIFeatures` reduce boilerplate.
@@ -238,7 +239,7 @@ When a student **leaves** (or is removed), all of the above are reversed atomica
 
 Deleting a **course** or **track** also cascades to remove its assignments, reviews, and weekly tasks, so nothing is left pointing at a deleted parent.
 
-> ⚠️ **Note:** MongoDB transactions are recommended for production deployments to ensure cascade operations remain consistent under race conditions.
+> ✅ **Note:** MongoDB transactions are fully implemented in `cascade.service.js` for all critical enrollment sync operations, ensuring consistency even under race conditions.
 
 ---
 
@@ -309,6 +310,7 @@ open http://localhost:5000/api-docs
 | `RATE_LIMIT_WINDOW_MS`      | ❌       | `900000`                          | Rate limit window (15 min in ms)               |
 | `AUTH_RATE_LIMIT_MAX`       | ❌       | `5`                               | Max auth attempts per window                   |
 | `AUTH_RATE_LIMIT_WINDOW_MS` | ❌       | `900000`                          | Auth rate limit window                         |
+| `MONGODB_POOL_SIZE`         | ❌       | `10`                              | Connection pool size                           |
 | `EMAIL_HOST`                | ✅\*     | —                                 | SMTP host (dev: Mailtrap)                      |
 | `EMAIL_PORT`                | ✅\*     | `2525`                            | SMTP port                                      |
 | `EMAIL_USER`                | ✅\*     | —                                 | SMTP username                                  |
@@ -337,6 +339,7 @@ BASE_URL=http://localhost:5000
 
 RATE_LIMIT_MAX=300
 RATE_LIMIT_WINDOW_MS=900000
+MONGODB_POOL_SIZE=10
 
 EMAIL_HOST=smtp.mailtrap.io
 EMAIL_PORT=2525
@@ -429,6 +432,28 @@ All successful list responses follow this structure:
 }
 ```
 
+### Error Response Structure
+
+```json
+{
+  "status": "fail",
+  "message": "Invalid input: title is required"
+}
+```
+
+Common HTTP status codes:
+
+- `200` – Success
+- `201` – Created
+- `204` – No Content (successful deletion)
+- `400` – Bad Request (validation error)
+- `401` – Unauthorized (missing or invalid token)
+- `403` – Forbidden (insufficient permissions)
+- `404` – Not Found
+- `409` – Conflict (duplicate resource)
+- `429` – Too Many Requests (rate limited)
+- `500` – Internal Server Error
+
 ---
 
 ## 🔐 Authentication Flow
@@ -471,9 +496,11 @@ All successful list responses follow this structure:
 
 Instead of S3/Cloudinary storage costs, all media is referenced by URL. The system validates URLs against a single, shared whitelist of trusted hosts (`src/utils/trustedHosts.js` — YouTube, Drive, Dropbox, GitHub, Cloudinary, Imgur, Discord CDN), used consistently by both the Mongoose-level and Joi-level attachment validators. This makes the backend stateless and free to host.
 
-### 2. Cascade Enrollment Service
+### 2. Cascade Enrollment Service with Transactions
 
 Instead of scattering enrollment logic across controllers, a dedicated `cascade.service.js` handles the many-to-many synchronization between `User` and `Track`/`Course`/`Session`. This prevents bugs where a user is in a track but not its courses. Deleting a course or track similarly cascades to clean up its assignments, reviews, and weekly tasks rather than leaving them orphaned.
+
+**All critical cascade operations use MongoDB transactions** for atomicity, ensuring the system never ends up in an inconsistent state.
 
 ### 3. Generic Ownership Middleware
 
@@ -522,11 +549,19 @@ Validation schemas (Joi) are defined in `validations/` and referenced in route J
 
 ## 🛠️ Scripts & Utilities
 
-| Command                     | Description                                       |
-| --------------------------- | ------------------------------------------------- |
-| `npm start`                 | Development mode with nodemon                     |
-| `npm start:prod`            | Production mode                                   |
-| `node testEmail.js <email>` | Diagnose SMTP configuration and send a test email |
+| Command                               | Description                                                     |
+| ------------------------------------- | --------------------------------------------------------------- |
+| `npm start`                           | Development mode with nodemon                                   |
+| `npm start:prod`                      | Production mode                                                 |
+| `npm run swagger:export`              | Generate `swagger.json` from JSDoc comments                     |
+| `npm test`                            | Run Jest test suite                                             |
+| `npm run test:watch`                  | Run tests in watch mode                                         |
+| `npm run test:coverage`               | Run tests with coverage report                                  |
+| `npm run lint`                        | Run ESLint                                                      |
+| `npm run lint:fix`                    | Fix ESLint issues automatically                                 |
+| `node testEmail.js <email>`           | Diagnose SMTP configuration and send a test email               |
+| `node scripts/createAdmin.js <email>` | Promote a user to admin                                         |
+| `node combine.js`                     | Combine all source files into one text file for LLM consumption |
 
 ### Email Diagnostic Tool
 
@@ -535,6 +570,14 @@ node testEmail.js your-email@example.com
 ```
 
 This script verifies your `.env` variables, tests the SMTP connection, and sends a styled HTML test email.
+
+### Admin Promotion
+
+```bash
+node scripts/createAdmin.js user@example.com
+```
+
+Promotes an existing user to admin role.
 
 ---
 
@@ -568,6 +611,7 @@ This script verifies your `.env` variables, tests the SMTP connection, and sends
 - [ ] `EMAIL_SERVICE` is configured (SendGrid, AWS SES, etc.)
 - [ ] `JWT_COOKIE_EXPIRES_IN` matches your security policy
 - [ ] Rate limits are appropriate for your traffic
+- [ ] Database indexes are synced (Mongoose `syncIndexes()` runs on startup)
 
 ---
 
@@ -591,7 +635,7 @@ open http://localhost:5000/api-docs
 ```bash
 npm test              # run the full suite once
 npm run test:watch    # re-run automatically as you edit
-npm run test:coverage # run once + generate a coverage report
+npm run test:coverage # run once + generate a coverage report (coverage/lcov-report/index.html)
 ```
 
 Tests run against a real, throwaway in-memory MongoDB instance (`mongodb-memory-server`) — never your real dev or production database. See **[TESTING.md](./TESTING.md)** for a full walkthrough of how the setup works and how to write your next test.
@@ -636,17 +680,18 @@ Coverage so far is intentionally small (two example route files) — the pattern
 - [x] Weekly tasks — per-course buckets of items (reading/quiz/video/etc.) with per-student completion tracking, aggregated at the track level; full CRUD (create/update/delete) plus per-item completion toggling
 - [x] Assignment submissions — students submit/resubmit work (`POST /assignments/:id/submissions`), with a computed `late` flag
 - [x] Assignment grading — owner instructor / admin grades a submission (`PATCH /assignments/:id/submissions/:studentId/grade`)
+- [x] MongoDB Transactions for cascade enrollment operations (`cascade.service.js`)
+- [x] Jest + Supertest test setup — in-memory MongoDB, test-user helper, two example route test files (see TESTING.md; growing coverage is ongoing)
 
 ### Planned 🔮
 
-- [ ] **MongoDB Transactions** for cascade enrollment operations
 - [ ] **Activity Logs** (`activityLog.model.js`) — audit trail for user actions
 - [ ] **Admin Analytics Dashboard** (`dashboardStats.model.js`)
 - [ ] **Email verification flow** — the `emailVerified` flag exists and resets on email change, but there's no self-service send/verify-token endpoint yet; currently only an admin can flip it
 - [ ] **Announcement audience filtering** — `audience`/`targetTrack`/`targetCourse` are stored but not yet used to filter what `GET /v1/announcements` returns
-- [x] Jest + Supertest test setup — in-memory MongoDB, test-user helper, two example route test files (see TESTING.md; growing coverage is ongoing)
 - [ ] **Request Correlation IDs** for distributed tracing
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
+- [ ] **Full test coverage** — expand beyond the two example route files
 
 ---
 

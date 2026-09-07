@@ -4,11 +4,11 @@ A practical guide to the concepts behind the test setup in this repo, written fo
 
 ## The two tools, in plain terms
 
-**Jest** is the *test runner and assertion library*. It's what gives you `describe`, `it`, and `expect`, runs your test files, and tells you what passed/failed. You never `require('jest')` in your code — Jest injects those functions globally when it runs your files.
+**Jest** is the _test runner and assertion library_. It's what gives you `describe`, `it`, and `expect`, runs your test files, and tells you what passed/failed. You never `require('jest')` in your code — Jest injects those functions globally when it runs your files.
 
 **Supertest** is a library that lets you send fake HTTP requests directly at your Express `app` object — no real server, no real port, no actual network call. It's what gives you `request(app).post('/v1/contact').send({...})`. Under the hood it spins up your Express app on a random ephemeral port for the duration of that one request, then tears it down — you never have to call `app.listen()` yourself in tests.
 
-Together: Jest runs the test and checks results, Supertest is *how you make the request* that produces those results.
+Together: Jest runs the test and checks results, Supertest is _how you make the request_ that produces those results.
 
 ## Why `server.js` and `src/app.js` being separate matters
 
@@ -91,10 +91,10 @@ It calls `User.create()` directly (so no signup endpoint, no rate limiter, no em
 
 In `weeklyTask.test.js`, the track/course/enrollment setup uses `Track.create()` / `Course.create()` directly rather than hitting `POST /v1/tracks` and `POST /v1/tracks/:id/courses`. This is a deliberate and common pattern:
 
-- **Speed** — no need to run through every layer of validation/middleware just to get data into place for a test that isn't *about* track/course creation.
+- **Speed** — no need to run through every layer of validation/middleware just to get data into place for a test that isn't _about_ track/course creation.
 - **Focus** — if this test fails, you know it's about weekly tasks, not accidentally exposing a bug in course creation.
 
-The trade-off: this test doesn't verify that track/course creation *itself* works — that belongs in its own test file, testing that flow through the real endpoints.
+The trade-off: this test doesn't verify that track/course creation _itself_ works — that belongs in its own test file, testing that flow through the real endpoints.
 
 ## Running the tests
 
@@ -104,7 +104,45 @@ npm run test:watch    # re-run automatically as you edit files
 npm run test:coverage # run once + generate a coverage report
 ```
 
-`npm test` runs with `--runInBand`, meaning test files run one after another rather than in parallel. This project's tests share one in-memory MongoDB instance, so running them one at a time avoids test files stepping on each other's data mid-run. (Individual tests *within* one file still run fast — this only serializes across files.)
+`npm test` runs with `--runInBand`, meaning test files run one after another rather than in parallel. This project's tests share one in-memory MongoDB instance, so running them one at a time avoids test files stepping on each other's data mid-run. (Individual tests _within_ one file still run fast — this only serializes across files.)
+
+### Running a specific test file
+
+```bash
+npm test -- tests/contact.test.js
+```
+
+Or if you want to watch only that file:
+
+```bash
+npm run test:watch -- tests/contact.test.js
+```
+
+### Test coverage
+
+Coverage reports are generated in `coverage/lcov-report/index.html`. Open it in your browser to see which lines are covered. You can set a minimum coverage threshold by adding `--coverageThreshold` to the Jest config.
+
+## Debugging tests
+
+### Using Node inspector
+
+```bash
+node --inspect-brk node_modules/.bin/jest --runInBand tests/your-test.test.js
+```
+
+Then open `chrome://inspect` in Chrome and attach the debugger.
+
+### Using `console.log`
+
+Jest captures `console.log` output and shows it only for failed tests. You can also use `--verbose` to see all logs.
+
+### Using the debugger statement
+
+Add `debugger;` in your test or code, then run:
+
+```bash
+npm test -- --inspect-brk
+```
 
 ## What's deliberately NOT covered yet
 
@@ -115,3 +153,11 @@ npm run test:coverage # run once + generate a coverage report
 ## A good next test to write yourself
 
 Try `GET /v1/tracks/:id/reviews` (public, no auth, no fixtures needed beyond a track) — it's structurally almost identical to `contact.test.js`. That's a good way to build confidence before tackling something with auth and roles.
+
+## Writing your own tests: checklist
+
+1. **Identify the endpoint** — is it public or protected? If protected, use `createTestUser` to get a token.
+2. **Set up fixtures** — if the test needs data (e.g., a track, a course), create it directly with the model.
+3. **Make the request** — use `request(app).method('/path')` and chain `.set()` for auth, `.send()` for body.
+4. **Assert the response** — status code, body structure, and optionally verify database state.
+5. **Clean up** — the database is cleared after each test automatically, so you don't need to manually delete data.
