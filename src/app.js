@@ -44,7 +44,7 @@ if (isProduction) {
     const start = Date.now();
 
     res.on('finish', () => {
-      logger.info({
+      logger.info('Request completed', {
         method: req.method,
         url: req.originalUrl,
         status: res.statusCode,

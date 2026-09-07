@@ -1972,6 +1972,54 @@
           }
         }
       },
+      "ContactUpdate": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "read",
+              "archived"
+            ],
+            "example": "read"
+          }
+        }
+      },
+      "ContactsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "results": {
+            "type": "integer",
+            "example": 5
+          },
+          "total": {
+            "type": "integer",
+            "example": 20
+          },
+          "pagination": {
+            "type": "object"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "contacts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Contact"
+                }
+              }
+            }
+          }
+        }
+      },
       "Submission": {
         "type": "object",
         "properties": {
@@ -2062,6 +2110,63 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "AssignmentCreate": {
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "deadline"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Build a REST API"
+          },
+          "description": {
+            "type": "string",
+            "example": "Create a full CRUD API with Node.js"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-01-15T23:59:00.000Z"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Trusted-host URLs (Drive, GitHub, Cloudinary, etc.), max 10"
+          }
+        }
+      },
+      "AssignmentUpdate": {
+        "type": "object",
+        "description": "At least one field must be provided.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Build a REST API (v2)"
+          },
+          "description": {
+            "type": "string",
+            "example": "Updated requirements — add auth middleware"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-01-22T23:59:00.000Z"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
           }
         }
       },
@@ -2377,11 +2482,15 @@
     },
     {
       "name": "Contact",
-      "description": "Public contact form submission"
+      "description": "Public contact form submission, plus admin listing and triage"
     },
     {
       "name": "Weekly Tasks",
       "description": "Per-item completion tracking and task deletion"
+    },
+    {
+      "name": "Assignments",
+      "description": "Course and session assignments: creation, editing, submissions, and grading"
     },
     {
       "name": "Feed",
@@ -4704,7 +4813,7 @@
         "summary": "Get all assignments across every course in a track",
         "description": "Returns every assignment belonging to any course in the track, plus any assignment on a standalone session mounted directly on the track, sorted by deadline. Each assignment includes `mySubmission` — the requesting user's own submission, or null if they haven't submitted. Accessible to admins, any instructor, or a student enrolled in the track.\n",
         "tags": [
-          "Tracks"
+          "Assignments"
         ],
         "security": [
           {
@@ -5410,6 +5519,49 @@
         }
       }
     },
+    "/sessions/student/{studentId}": {
+      "get": {
+        "operationId": "getSessionsByStudent",
+        "summary": "Get sessions by student enrollment",
+        "description": "Returns sessions a student is enrolled in. Admin can view any student; students can only view themselves.",
+        "tags": [
+          "Sessions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/sessions/{id}/enroll-me": {
       "post": {
         "operationId": "enrollMeInSession",
@@ -5504,12 +5656,84 @@
       }
     },
     "/sessions/{id}/assignments": {
+      "post": {
+        "operationId": "createSessionAssignment",
+        "summary": "Create an assignment for a standalone session",
+        "description": "Owner instructor or admin only.",
+        "tags": [
+          "Assignments"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439031"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Assignment created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "assignment": {
+                          "$ref": "#/components/schemas/Assignment"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
       "get": {
         "operationId": "getSessionAssignments",
         "summary": "Get all assignments for a standalone session",
         "description": "Each assignment includes `mySubmission` — the requesting user's own submission, or null if they haven't submitted. Accessible to admins, any instructor, or a student enrolled in the session.\n",
         "tags": [
-          "Sessions"
+          "Assignments"
         ],
         "security": [
           {
@@ -5726,6 +5950,55 @@
                 }
               }
             }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/sessions/{id}/reviews/{reviewId}": {
+      "delete": {
+        "operationId": "deleteSessionReview",
+        "summary": "Delete a session review",
+        "description": "The review's own author, or an admin, may delete it.",
+        "tags": [
+          "Reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439031"
+            }
+          },
+          {
+            "name": "reviewId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a8888"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -7220,12 +7493,84 @@
       }
     },
     "/courses/{id}/assignments": {
+      "post": {
+        "operationId": "createCourseAssignment",
+        "summary": "Create an assignment for a course",
+        "description": "Owner instructor or admin only.",
+        "tags": [
+          "Assignments"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Assignment created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "assignment": {
+                          "$ref": "#/components/schemas/Assignment"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
       "get": {
         "operationId": "getCourseAssignments",
         "summary": "Get all assignments for a course",
         "description": "Each assignment includes `mySubmission` — the requesting user's own submission, or null if they haven't submitted. Accessible to admins, any instructor, or a student enrolled in the course.\n",
         "tags": [
-          "Courses"
+          "Assignments"
         ],
         "security": [
           {
@@ -7449,6 +7794,55 @@
         }
       }
     },
+    "/courses/{id}/reviews/{reviewId}": {
+      "delete": {
+        "operationId": "deleteCourseReview",
+        "summary": "Delete a course review",
+        "description": "The review's own author, or an admin, may delete it.",
+        "tags": [
+          "Reviews"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "507f1f77bcf86cd799439041"
+            }
+          },
+          {
+            "name": "reviewId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a8888"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/contact": {
       "post": {
         "security": [],
@@ -7500,6 +7894,200 @@
             "$ref": "#/components/responses/ValidationError"
           }
         }
+      },
+      "get": {
+        "operationId": "getAllContacts",
+        "summary": "List all contact form submissions",
+        "description": "Admin only. Supports the standard pagination/filter query params.",
+        "tags": [
+          "Contact"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "read",
+                "archived"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of contact submissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/contact/{id}": {
+      "get": {
+        "operationId": "getContact",
+        "summary": "Get a single contact submission",
+        "description": "Admin only.",
+        "tags": [
+          "Contact"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a6666"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact submission found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "contact": {
+                          "$ref": "#/components/schemas/Contact"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateContact",
+        "summary": "Update a contact submission's status",
+        "description": "Admin only. Used to triage submissions (new → read → archived).",
+        "tags": [
+          "Contact"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a6666"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact submission updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "contact": {
+                          "$ref": "#/components/schemas/Contact"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/assignments/{id}/submissions": {
@@ -7508,7 +8096,7 @@
         "summary": "Submit (or resubmit) your work for an assignment",
         "description": "The requesting student must be enrolled in the assignment's course or session. Submitting again overwrites the previous file and clears any existing grade — a new file means the old grade no longer applies. The response's top-level `late` flag reflects whether this submission landed after the deadline; it isn't stored.\n",
         "tags": [
-          "Courses"
+          "Assignments"
         ],
         "security": [
           {
@@ -7595,7 +8183,7 @@
         "summary": "Grade a student's submission for an assignment",
         "description": "Owner instructor (the assignment's own instructor) or admin only.",
         "tags": [
-          "Courses"
+          "Assignments"
         ],
         "security": [
           {
@@ -7679,6 +8267,118 @@
           },
           "404": {
             "description": "Assignment not found, or this student hasn't submitted yet"
+          }
+        }
+      }
+    },
+    "/assignments/{id}": {
+      "patch": {
+        "operationId": "updateAssignment",
+        "summary": "Update an assignment's title, description, deadline, and/or attachments",
+        "description": "Owner instructor (the assignment's own instructor) or admin only.",
+        "tags": [
+          "Assignments"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a7777"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assignment updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "assignment": {
+                          "$ref": "#/components/schemas/Assignment"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAssignment",
+        "summary": "Delete an assignment",
+        "description": "Owner instructor or admin only. Also deletes all of its submissions.",
+        "tags": [
+          "Assignments"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "6713b5ac12ef4567890a7777"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
