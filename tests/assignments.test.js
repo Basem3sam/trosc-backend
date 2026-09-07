@@ -1,14 +1,20 @@
 const request = require('supertest');
 const app = require('../src/app');
 const Assignment = require('../src/models/assignment.model');
+const Track = require('../src/models/track.model');
 const { buildTrackAndCourseFixture } = require('./helpers/fixtures');
 const { createTestUser } = require('./helpers/testUser');
 
 describe('Assignments', () => {
   describe('GET /v1/courses/:id/assignments', () => {
     it("lets an enrolled student see the course's assignments with mySubmission", async () => {
-      const { course, instructor, student, studentToken } =
+      const { track, course, instructor, student, studentToken } =
         await buildTrackAndCourseFixture();
+
+      // Ensure the student is also in the track (for consistency)
+      await Track.findByIdAndUpdate(track._id, {
+        $addToSet: { students: student._id },
+      });
 
       await Assignment.create({
         title: 'Build a REST API',
@@ -25,13 +31,14 @@ describe('Assignments', () => {
       expect(res.status).toBe(200);
       expect(res.body.results).toBe(1);
       expect(res.body.data.assignments[0].mySubmission).toBeNull();
-      // submissions from other students should never be exposed here
       expect(res.body.data.assignments[0].submissions).toBeUndefined();
     });
 
     it('rejects a student who is not enrolled in the course', async () => {
       const { course, instructor } = await buildTrackAndCourseFixture();
-      const { token: outsiderToken } = await createTestUser({ role: 'student' });
+      const { token: outsiderToken } = await createTestUser({
+        role: 'student',
+      });
 
       await Assignment.create({
         title: 'Build a REST API',
@@ -51,8 +58,13 @@ describe('Assignments', () => {
 
   describe('GET /v1/tracks/:id/assignments', () => {
     it('aggregates assignments from every course in the track', async () => {
-      const { track, course, instructor, studentToken } =
+      const { track, course, instructor, student, studentToken } =
         await buildTrackAndCourseFixture();
+
+      // ✅ Enroll student in the track (required for track-level access)
+      await Track.findByIdAndUpdate(track._id, {
+        $addToSet: { students: student._id },
+      });
 
       await Assignment.create({
         title: 'Week 1 homework',
@@ -134,7 +146,9 @@ describe('Assignments', () => {
         .send({ file: 'https://drive.google.com/file/d/first' });
 
       await request(app)
-        .patch(`/v1/assignments/${assignment._id}/submissions/${student._id}/grade`)
+        .patch(
+          `/v1/assignments/${assignment._id}/submissions/${student._id}/grade`,
+        )
         .set('Authorization', `Bearer ${instructorToken}`)
         .send({ grade: 90 });
 
