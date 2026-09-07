@@ -2,8 +2,11 @@ const request = require('supertest');
 const app = require('../src/app');
 const Assignment = require('../src/models/assignment.model');
 const Track = require('../src/models/track.model');
-const { buildTrackAndCourseFixture } = require('./helpers/fixtures');
 const { createTestUser } = require('./helpers/testUser');
+const {
+  buildTrackAndCourseFixture,
+  buildStandaloneSessionFixture,
+} = require('./helpers/fixtures');
 
 describe('Assignments', () => {
   describe('GET /v1/courses/:id/assignments', () => {
@@ -245,6 +248,224 @@ describe('Assignments', () => {
         .send({ grade: 85 });
 
       expect(res.status).toBe(403);
+    });
+  });
+  describe('POST /v1/courses/:id/assignments', () => {
+    it('lets the owning instructor create an assignment', async () => {
+      const { course, instructorToken } = await buildTrackAndCourseFixture();
+
+      const res = await request(app)
+        .post(`/v1/courses/${course._id}/assignments`)
+        .set('Authorization', `Bearer ${instructorToken}`)
+        .send({
+          title: 'Build a REST API',
+          description: 'Create a full CRUD API with Node.js',
+          deadline: new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.assignment.title).toBe('Build a REST API');
+      expect(res.body.data.assignment.course).toBe(String(course._id));
+    });
+
+    it('rejects an instructor who does not own the course', async () => {
+      const { course, otherInstructorToken } =
+        await buildTrackAndCourseFixture();
+
+      const res = await request(app)
+        .post(`/v1/courses/${course._id}/assignments`)
+        .set('Authorization', `Bearer ${otherInstructorToken}`)
+        .send({
+          title: 'Build a REST API',
+          description: 'Create a full CRUD API with Node.js',
+          deadline: new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+        });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('rejects a student', async () => {
+      const { course, studentToken } = await buildTrackAndCourseFixture();
+
+      const res = await request(app)
+        .post(`/v1/courses/${course._id}/assignments`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({
+          title: 'Build a REST API',
+          description: 'Create a full CRUD API with Node.js',
+          deadline: new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+        });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('rejects an untrusted attachment host', async () => {
+      const { course, instructorToken } = await buildTrackAndCourseFixture();
+
+      const res = await request(app)
+        .post(`/v1/courses/${course._id}/assignments`)
+        .set('Authorization', `Bearer ${instructorToken}`)
+        .send({
+          title: 'Build a REST API',
+          description: 'Create a full CRUD API with Node.js',
+          deadline: new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+          attachments: ['https://some-random-site.com/spec.pdf'],
+        });
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /v1/sessions/:id/assignments', () => {
+    it('lets the owning instructor create an assignment for a standalone session', async () => {
+      const { session, instructorToken } =
+        await buildStandaloneSessionFixture();
+
+      const res = await request(app)
+        .post(`/v1/sessions/${session._id}/assignments`)
+        .set('Authorization', `Bearer ${instructorToken}`)
+        .send({
+          title: 'Practice Exercise',
+          description: 'Complete the practice set',
+          deadline: new Date(
+            Date.now() + 3 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.assignment.session).toBe(String(session._id));
+    });
+  });
+
+  describe('PATCH /v1/assignments/:id', () => {
+    it('lets the owning instructor update the assignment', async () => {
+      const { course, instructor, instructorToken } =
+        await buildTrackAndCourseFixture();
+
+      const assignment = await Assignment.create({
+        title: 'Build a REST API',
+        description: 'Create a full CRUD API with Node.js',
+        instructor: instructor._id,
+        course: course._id,
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const res = await request(app)
+        .patch(`/v1/assignments/${assignment._id}`)
+        .set('Authorization', `Bearer ${instructorToken}`)
+        .send({ title: 'Build a REST API (v2)' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.assignment.title).toBe('Build a REST API (v2)');
+    });
+
+    it('rejects an instructor who does not own the assignment', async () => {
+      const { course, instructor, otherInstructorToken } =
+        await buildTrackAndCourseFixture();
+
+      const assignment = await Assignment.create({
+        title: 'Build a REST API',
+        description: 'Create a full CRUD API with Node.js',
+        instructor: instructor._id,
+        course: course._id,
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const res = await request(app)
+        .patch(`/v1/assignments/${assignment._id}`)
+        .set('Authorization', `Bearer ${otherInstructorToken}`)
+        .send({ title: 'Hijacked title' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('rejects an empty update body', async () => {
+      const { course, instructor, instructorToken } =
+        await buildTrackAndCourseFixture();
+
+      const assignment = await Assignment.create({
+        title: 'Build a REST API',
+        description: 'Create a full CRUD API with Node.js',
+        instructor: instructor._id,
+        course: course._id,
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const res = await request(app)
+        .patch(`/v1/assignments/${assignment._id}`)
+        .set('Authorization', `Bearer ${instructorToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('DELETE /v1/assignments/:id', () => {
+    it('lets the owning instructor delete the assignment', async () => {
+      const { course, instructor, instructorToken } =
+        await buildTrackAndCourseFixture();
+
+      const assignment = await Assignment.create({
+        title: 'Build a REST API',
+        description: 'Create a full CRUD API with Node.js',
+        instructor: instructor._id,
+        course: course._id,
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const res = await request(app)
+        .delete(`/v1/assignments/${assignment._id}`)
+        .set('Authorization', `Bearer ${instructorToken}`);
+
+      expect(res.status).toBe(204);
+      expect(await Assignment.findById(assignment._id)).toBeNull();
+    });
+
+    it('rejects an instructor who does not own the assignment', async () => {
+      const { course, instructor, otherInstructorToken } =
+        await buildTrackAndCourseFixture();
+
+      const assignment = await Assignment.create({
+        title: 'Build a REST API',
+        description: 'Create a full CRUD API with Node.js',
+        instructor: instructor._id,
+        course: course._id,
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const res = await request(app)
+        .delete(`/v1/assignments/${assignment._id}`)
+        .set('Authorization', `Bearer ${otherInstructorToken}`);
+
+      expect(res.status).toBe(403);
+      expect(await Assignment.findById(assignment._id)).not.toBeNull();
+    });
+
+    it('lets an admin delete any assignment', async () => {
+      const { course, instructor } = await buildTrackAndCourseFixture();
+      const { token: adminToken } = await createTestUser({ role: 'admin' });
+
+      const assignment = await Assignment.create({
+        title: 'Build a REST API',
+        description: 'Create a full CRUD API with Node.js',
+        instructor: instructor._id,
+        course: course._id,
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const res = await request(app)
+        .delete(`/v1/assignments/${assignment._id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(204);
     });
   });
 });

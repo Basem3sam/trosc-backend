@@ -46,6 +46,7 @@ tests/
                                clearing a grade, and grading
   updateMe.test.js           — the base64 photo regression + enrolledTrack
                                presence
+  contactAdmin.test.js       — admin contact triage: list, view, update status
 ```
 
 ### Why an in-memory MongoDB instead of your real dev database?
@@ -162,9 +163,6 @@ npm test -- --inspect-brk
 - **Email-sending code paths** — signup's welcome email, the contact form's admin notification, password reset — none of these are exercised in a way that actually sends mail (the contact test works specifically because `ADMIN_EMAIL` isn't set in `.env.test`, so that code path is skipped). If you write tests that need to touch those paths, you'll want to mock `src/utils/Email.js` rather than let it try to hit a real SMTP server — ask me when you get there.
 - **File-upload/attachment validation** — untested so far, other than the assignment-submission trusted-host check in `assignments.test.js`.
 - **Auth itself** — signup, login, password reset/change flows have no tests yet. Everything else here bypasses signup on purpose (via `createTestUser`), which means a real bug in `/signup` or `/login` wouldn't be caught by anything in this suite.
-- **Assignment CRUD** — `PATCH`/`DELETE /v1/assignments/:id` (create is exercised only implicitly via the `Assignment.create()` fixtures in `assignments.test.js`, not through `POST /v1/{courses,sessions}/:id/assignments`).
-- **Review deletion** — `DELETE` on a review isn't tested; only creation and listing are.
-- **Contact admin endpoints** — `GET /v1/contact`, `GET /v1/contact/:id`, `PATCH /v1/contact/:id` (list/view/triage) have no tests; only the public `POST` does.
 - **The `course`/`session` mutual-exclusivity validator on `Assignment`** — the model enforces exactly one of `course`/`session` must be set, but nothing tests that rejection directly.
 
 ## What's covered so far
@@ -173,9 +171,10 @@ npm test -- --inspect-brk
 |---|---|
 | `contact.test.js` | Public contact form: success + every validation rejection |
 | `weeklyTask.test.js` | Course-scoped weekly task creation (ownership, role, duplicate-week rejection) + per-student completion isolation |
-| `reviews.test.js` | Course review creation (enrollment/duplicate/rating-range rejection), public listing, session-level review creation |
-| `assignments.test.js` | Course + track assignment listing (`mySubmission`, enrollment gating, no submission-leakage), submission (including untrusted-host rejection), resubmission clearing a grade, grading (ownership-gated, 404-before-submission) |
+| `reviews.test.js` | Course review creation (enrollment/duplicate/rating-range rejection), public listing, session-level review creation plus review deletion (author, admin bypass, ownership rejection, 404) |
+| `assignments.test.js` | Course + track assignment listing (`mySubmission`, enrollment gating, no submission-leakage), submission (including untrusted-host rejection), resubmission clearing a grade, grading (ownership-gated, 404-before-submission) plus assignment create (course + session, ownership/role gated, untrusted-host rejection), update (ownership-gated, rejects empty body), and delete (ownership-gated, admin bypass) |
 | `updateMe.test.js` | The base64 photo regression (report item #4) + a normal-URL sanity check + garbage-input rejection + `enrolledTrack` presence (report item #8) |
+| `contactAdmin.test.js` | Admin list/view/update-status for contact submissions; auth and role gating on all three |
 
 ## A good next test to write yourself
 

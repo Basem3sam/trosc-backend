@@ -23,7 +23,9 @@ describe('Reviews', () => {
 
     it('rejects a student who is not enrolled', async () => {
       const { course } = await buildTrackAndCourseFixture();
-      const { token: outsiderToken } = await createTestUser({ role: 'student' });
+      const { token: outsiderToken } = await createTestUser({
+        role: 'student',
+      });
 
       const res = await request(app)
         .post(`/v1/courses/${course._id}/reviews`)
@@ -90,6 +92,79 @@ describe('Reviews', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.data.review.session).toBe(String(session._id));
+    });
+  });
+
+  describe('DELETE /v1/courses/:id/reviews/:reviewId', () => {
+    it('lets the review author delete their own review', async () => {
+      const { course, studentToken } = await buildTrackAndCourseFixture();
+
+      const createRes = await request(app)
+        .post(`/v1/courses/${course._id}/reviews`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ rating: 4, content: 'Pretty good.' });
+
+      const reviewId = createRes.body.data.review._id;
+
+      const res = await request(app)
+        .delete(`/v1/courses/${course._id}/reviews/${reviewId}`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(204);
+
+      const listRes = await request(app).get(
+        `/v1/courses/${course._id}/reviews`,
+      );
+      expect(listRes.body.results).toBe(0);
+    });
+
+    it("lets an admin delete someone else's review", async () => {
+      const { course, studentToken } = await buildTrackAndCourseFixture();
+      const { token: adminToken } = await createTestUser({ role: 'admin' });
+
+      const createRes = await request(app)
+        .post(`/v1/courses/${course._id}/reviews`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ rating: 4, content: 'Pretty good.' });
+
+      const reviewId = createRes.body.data.review._id;
+
+      const res = await request(app)
+        .delete(`/v1/courses/${course._id}/reviews/${reviewId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(204);
+    });
+
+    it("rejects deleting someone else's review", async () => {
+      const { course, studentToken } = await buildTrackAndCourseFixture();
+      const { token: outsiderToken } = await createTestUser({
+        role: 'student',
+      });
+
+      const createRes = await request(app)
+        .post(`/v1/courses/${course._id}/reviews`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({ rating: 4, content: 'Pretty good.' });
+
+      const reviewId = createRes.body.data.review._id;
+
+      const res = await request(app)
+        .delete(`/v1/courses/${course._id}/reviews/${reviewId}`)
+        .set('Authorization', `Bearer ${outsiderToken}`);
+
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 404 for a non-existent review', async () => {
+      const { course, studentToken } = await buildTrackAndCourseFixture();
+      const fakeId = '507f1f77bcf86cd799439099';
+
+      const res = await request(app)
+        .delete(`/v1/courses/${course._id}/reviews/${fakeId}`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(404);
     });
   });
 });
