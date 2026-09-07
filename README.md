@@ -561,7 +561,6 @@ Validation schemas (Joi) are defined in `validations/` and referenced in route J
 | `npm run lint:fix`                    | Fix ESLint issues automatically                                 |
 | `node testEmail.js <email>`           | Diagnose SMTP configuration and send a test email               |
 | `node scripts/createAdmin.js <email>` | Promote a user to admin                                         |
-| `node combine.js`                     | Combine all source files into one text file for LLM consumption |
 
 ### Email Diagnostic Tool
 
