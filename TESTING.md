@@ -34,9 +34,18 @@ tests/
   helpers/
     testUser.js             — creates a user directly in the DB + mints
                                a real JWT, skipping signup/email entirely
-  contact.test.js            — example: public endpoint, no auth
-  weeklyTask.test.js         — example: auth, roles, ownership, a full
-                               create → complete → verify flow
+    fixtures.js             — shared track/course/session fixture builders,
+                               used by reviews.test.js and assignments.test.js
+  contact.test.js            — public contact form: submission + validation
+  weeklyTask.test.js         — course-scoped weekly tasks: ownership, roles,
+                               duplicate-week rejection, completion tracking
+  reviews.test.js            — track/course/session review creation +
+                               public listing
+  assignments.test.js        — assignment listing, submission (including
+                               untrusted-host rejection), resubmission
+                               clearing a grade, and grading
+  updateMe.test.js           — the base64 photo regression + enrolledTrack
+                               presence
 ```
 
 ### Why an in-memory MongoDB instead of your real dev database?
@@ -89,12 +98,16 @@ It calls `User.create()` directly (so no signup endpoint, no rate limiter, no em
 
 ## Why fixtures are built with `Model.create()`, not through the API
 
-In `weeklyTask.test.js`, the track/course/enrollment setup uses `Track.create()` / `Course.create()` directly rather than hitting `POST /v1/tracks` and `POST /v1/tracks/:id/courses`. This is a deliberate and common pattern:
+`reviews.test.js`, `assignments.test.js`, and `weeklyTask.test.js` all build track/course/session setup directly via `Track.create()` / `Course.create()` / `Session.create()` rather than hitting the real creation endpoints. This is a deliberate and common pattern:
 
 - **Speed** — no need to run through every layer of validation/middleware just to get data into place for a test that isn't _about_ track/course creation.
-- **Focus** — if this test fails, you know it's about weekly tasks, not accidentally exposing a bug in course creation.
+- **Focus** — if this test fails, you know it's about reviews/assignments/weekly-tasks, not accidentally exposing a bug in course creation.
 
-The trade-off: this test doesn't verify that track/course creation _itself_ works — that belongs in its own test file, testing that flow through the real endpoints.
+The trade-off: none of these tests verify that track/course/session creation _itself_ works — that belongs in its own test file, testing that flow through the real endpoints.
+
+### `tests/helpers/fixtures.js`
+
+`reviews.test.js` and `assignments.test.js` share one fixture builder (`buildTrackAndCourseFixture`, `buildStandaloneSessionFixture`) instead of each defining their own — both needed the exact same shape (a track, a course inside it, an owning instructor, an unrelated instructor for ownership-rejection tests, and an enrolled student). `weeklyTask.test.js` still has its own local copy of a similar fixture, written before this shared helper existed; it works fine as-is, so it wasn't worth touching a passing file just for consistency's sake. If you add another test file needing the same shape, use the shared one rather than copy-pasting again.
 
 ## Running the tests
 
@@ -147,12 +160,26 @@ npm test -- --inspect-brk
 ## What's deliberately NOT covered yet
 
 - **Email-sending code paths** — signup's welcome email, the contact form's admin notification, password reset — none of these are exercised in a way that actually sends mail (the contact test works specifically because `ADMIN_EMAIL` isn't set in `.env.test`, so that code path is skipped). If you write tests that need to touch those paths, you'll want to mock `src/utils/Email.js` rather than let it try to hit a real SMTP server — ask me when you get there.
-- **File-upload/attachment validation** — untested so far.
-- Every other route in the project — `contact.test.js` and `weeklyTask.test.js` are two examples to learn the pattern from, not a full suite. The natural next step is picking one route file at a time and writing tests for it the same way.
+- **File-upload/attachment validation** — untested so far, other than the assignment-submission trusted-host check in `assignments.test.js`.
+- **Auth itself** — signup, login, password reset/change flows have no tests yet. Everything else here bypasses signup on purpose (via `createTestUser`), which means a real bug in `/signup` or `/login` wouldn't be caught by anything in this suite.
+- **Assignment CRUD** — `PATCH`/`DELETE /v1/assignments/:id` (create is exercised only implicitly via the `Assignment.create()` fixtures in `assignments.test.js`, not through `POST /v1/{courses,sessions}/:id/assignments`).
+- **Review deletion** — `DELETE` on a review isn't tested; only creation and listing are.
+- **Contact admin endpoints** — `GET /v1/contact`, `GET /v1/contact/:id`, `PATCH /v1/contact/:id` (list/view/triage) have no tests; only the public `POST` does.
+- **The `course`/`session` mutual-exclusivity validator on `Assignment`** — the model enforces exactly one of `course`/`session` must be set, but nothing tests that rejection directly.
+
+## What's covered so far
+
+| File | Covers |
+|---|---|
+| `contact.test.js` | Public contact form: success + every validation rejection |
+| `weeklyTask.test.js` | Course-scoped weekly task creation (ownership, role, duplicate-week rejection) + per-student completion isolation |
+| `reviews.test.js` | Course review creation (enrollment/duplicate/rating-range rejection), public listing, session-level review creation |
+| `assignments.test.js` | Course + track assignment listing (`mySubmission`, enrollment gating, no submission-leakage), submission (including untrusted-host rejection), resubmission clearing a grade, grading (ownership-gated, 404-before-submission) |
+| `updateMe.test.js` | The base64 photo regression (report item #4) + a normal-URL sanity check + garbage-input rejection + `enrolledTrack` presence (report item #8) |
 
 ## A good next test to write yourself
 
-Try `GET /v1/tracks/:id/reviews` (public, no auth, no fixtures needed beyond a track) — it's structurally almost identical to `contact.test.js`. That's a good way to build confidence before tackling something with auth and roles.
+Session-level assignment CRUD, review deletion, and the contact admin endpoints are the biggest real gaps right now (see above) — any of those is a good next target. If you want something smaller to warm up on first, `PATCH /v1/assignments/:id` (update) is a good middle-difficulty step: auth + ownership like `weeklyTask.test.js`, but a simpler shape than the submission/grading flow in `assignments.test.js`.
 
 ## Writing your own tests: checklist
 

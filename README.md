@@ -645,12 +645,16 @@ tests/
 ├── globalTeardown.js    # stops it once per run
 ├── setupAfterEnv.js     # per-file: connects Mongoose, clears data between tests
 ├── helpers/
-│   └── testUser.js      # creates a user + valid JWT without hitting /signup
-├── contact.test.js      # example: public endpoint
-└── weeklyTask.test.js   # example: auth, roles, ownership, full create→complete flow
+│   ├── testUser.js      # creates a user + valid JWT without hitting /signup
+│   └── fixtures.js      # shared track/course/session fixture builders
+├── contact.test.js      # public contact form (submission only — see below)
+├── weeklyTask.test.js   # course-scoped weekly tasks: ownership, roles, completion tracking
+├── reviews.test.js      # track/course/session review creation + public listing
+├── assignments.test.js  # assignment listing, submission, resubmission, grading
+└── updateMe.test.js     # base64 photo regression + enrolledTrack presence
 ```
 
-Coverage so far is intentionally small (two example route files) — the pattern is established, and the natural next step is writing tests for one more route file at a time. Assignment CRUD, review deletion, and the new contact admin endpoints don't have tests yet — see [TESTING.md](./TESTING.md) for suggested next tests.
+Coverage now spans contact submission, reviews (creation + listing), assignments (listing, submission, resubmission, grading), weekly tasks, and the profile-update endpoint. **Not yet covered:** assignment CRUD (create/update/delete), review deletion, the new contact admin endpoints (list/view/triage), and signup/login itself — see [TESTING.md](./TESTING.md) for the full breakdown and suggested next tests.
 
 ---
 
@@ -681,7 +685,7 @@ Coverage so far is intentionally small (two example route files) — the pattern
 - [x] Assignment grading — owner instructor / admin grades a submission (`PATCH /assignments/:id/submissions/:studentId/grade`)
 - [x] MongoDB Transactions for cascade enrollment operations (`cascade.service.js`)
 + [x] Request Correlation IDs — full implementation with `AsyncLocalStorage`, automatic injection into every log, and `X-Request-ID` round-trip to clients
-- [x] Jest + Supertest test setup — in-memory MongoDB, test-user helper, two example route test files (see TESTING.md; growing coverage is ongoing)
+- [x] Jest + Supertest test setup — in-memory MongoDB, shared fixture builders, six test files covering contact/reviews/assignments/weekly-tasks/profile-update (see TESTING.md; growing coverage is ongoing)
 
 ### Planned 🔮
 
@@ -690,7 +694,7 @@ Coverage so far is intentionally small (two example route files) — the pattern
 - [ ] **Email verification flow** — the `emailVerified` flag exists and resets on email change, but there's no self-service send/verify-token endpoint yet; currently only an admin can flip it
 - [ ] **Announcement audience filtering** — `audience`/`targetTrack`/`targetCourse` are stored but not yet used to filter what `GET /v1/announcements` returns
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
-- [ ] **Full test coverage** — expand beyond the two example route files
+- [ ] **Full test coverage** — assignment CRUD, review deletion, contact admin endpoints, and signup/login still need tests
 
 ---
 
