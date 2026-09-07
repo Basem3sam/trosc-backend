@@ -127,7 +127,7 @@ src/
 │   ├── announcement.model.js
 │   ├── review.model.js
 │   ├── assignment.model.js
-│   ├── weeklyTask.model.js
+│   ├── weeklytask.model.js
 │   └── contact.model.js
 │
 ├── routes/                # Route definitions + Swagger JSDoc annotations
