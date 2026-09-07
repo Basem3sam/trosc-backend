@@ -10,7 +10,7 @@
  *       clears any existing grade — a new file means the old grade no
  *       longer applies. The response's top-level `late` flag reflects
  *       whether this submission landed after the deadline; it isn't stored.
- *     tags: [Courses]
+ *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -61,7 +61,7 @@
  *     operationId: gradeSubmission
  *     summary: Grade a student's submission for an assignment
  *     description: Owner instructor (the assignment's own instructor) or admin only.
- *     tags: [Courses]
+ *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -108,6 +108,73 @@
  *         $ref: '#/components/responses/Forbidden'
  *       404:
  *         description: Assignment not found, or this student hasn't submitted yet
+ */
+
+/**
+ * @swagger
+ * /assignments/{id}:
+ *   patch:
+ *     operationId: updateAssignment
+ *     summary: Update an assignment's title, description, deadline, and/or attachments
+ *     description: Owner instructor (the assignment's own instructor) or admin only.
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "6713b5ac12ef4567890a7777" }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AssignmentUpdate'
+ *     responses:
+ *       200:
+ *         description: Assignment updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     assignment:
+ *                       $ref: '#/components/schemas/Assignment'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *
+ *   delete:
+ *     operationId: deleteAssignment
+ *     summary: Delete an assignment
+ *     description: Owner instructor or admin only. Also deletes all of its submissions.
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "6713b5ac12ef4567890a7777" }
+ *     responses:
+ *       204:
+ *         description: Deleted successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
  */
 
 const express = require('express');

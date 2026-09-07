@@ -803,7 +803,7 @@
  *       by deadline. Each assignment includes `mySubmission` — the requesting
  *       user's own submission, or null if they haven't submitted. Accessible to
  *       admins, any instructor, or a student enrolled in the track.
- *     tags: [Tracks]
+ *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -932,6 +932,33 @@
  *                         $ref: '#/components/schemas/Review'
  *       404:
  *         $ref: '#/components/responses/NotFound'
+ */
+
+/*
+ * @swagger
+ * /tracks/{id}/reviews/{reviewId}:
+ *  delete:
+ *    operationId: deleteTrackReview
+ *    summary: Delete a track review
+ *    description: The review's own author, or an admin, may delete it.
+ *    tags: [Reviews]
+ *    security:
+ *      - bearerAuth: []
+ *    parameters:
+ *      - name: id
+ *        in: path
+ *        required: true
+ *        schema: {type: string, example: "507f1f77bcf86cd799439021"}
+ *      - name: reviewId
+ *        in: path
+ *        required: true
+ *        schema: {type: string, example: "507f1f77bcf86cd799439031"}
+ *    responses:
+ *      204: { description: Deleted successfully }
+ *      401: { $ref: '#/components/responses/Unauthorized' }
+ *      403: { $ref: '#/components/responses/Forbidden' }
+ *      404: { $ref: '#/components/responses/NotFound' }
+ * 
  */
 
 const express = require('express');

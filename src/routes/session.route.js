@@ -305,6 +305,29 @@
  *               $ref: '#/components/schemas/SessionsResponse'
  *       404: { description: Track not found }
  *
+ * /sessions/student/{studentId}:
+ *   get:
+ *     operationId: getSessionsByStudent
+ *     summary: Get sessions by student enrollment
+ *     description: Returns sessions a student is enrolled in. Admin can view any student; students can only view themselves.
+ *     tags: [Sessions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: studentId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: List of sessions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SessionsResponse'
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *
  * /sessions/{id}/enroll-me:
  *   post:
  *     operationId: enrollMeInSession
@@ -354,6 +377,53 @@
 /**
  * @swagger
  * /sessions/{id}/assignments:
+ *   post:
+ *     operationId: createSessionAssignment
+ *     summary: Create an assignment for a standalone session
+ *     description: Owner instructor or admin only.
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439031"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AssignmentCreate'
+ *     responses:
+ *       201:
+ *         description: Assignment created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     assignment:
+ *                       $ref: '#/components/schemas/Assignment'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * /sessions/{id}/assignments:
  *   get:
  *     operationId: getSessionAssignments
  *     summary: Get all assignments for a standalone session
@@ -361,7 +431,7 @@
  *       Each assignment includes `mySubmission` — the requesting user's own
  *       submission, or null if they haven't submitted. Accessible to admins,
  *       any instructor, or a student enrolled in the session.
- *     tags: [Sessions]
+ *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -490,6 +560,32 @@
  *                         $ref: '#/components/schemas/Review'
  *       404:
  *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * /sessions/{id}/reviews/{reviewId}:
+ *   delete:
+ *     operationId: deleteSessionReview
+ *     summary: Delete a session review
+ *     description: The review's own author, or an admin, may delete it.
+ *     tags: [Reviews]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "507f1f77bcf86cd799439031" }
+ *       - name: reviewId
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "6713b5ac12ef4567890a8888" }
+ *     responses:
+ *       204: { description: Deleted successfully }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */
 
 const express = require('express');

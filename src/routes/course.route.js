@@ -610,6 +610,53 @@
 /**
  * @swagger
  * /courses/{id}/assignments:
+ *   post:
+ *     operationId: createCourseAssignment
+ *     summary: Create an assignment for a course
+ *     description: Owner instructor or admin only.
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439041"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AssignmentCreate'
+ *     responses:
+ *       201:
+ *         description: Assignment created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     assignment:
+ *                       $ref: '#/components/schemas/Assignment'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * /courses/{id}/assignments:
  *   get:
  *     operationId: getCourseAssignments
  *     summary: Get all assignments for a course
@@ -617,7 +664,7 @@
  *       Each assignment includes `mySubmission` — the requesting user's own
  *       submission, or null if they haven't submitted. Accessible to admins,
  *       any instructor, or a student enrolled in the course.
- *     tags: [Courses]
+ *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -746,6 +793,32 @@
  *                         $ref: '#/components/schemas/Review'
  *       404:
  *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * /courses/{id}/reviews/{reviewId}:
+ *   delete:
+ *     operationId: deleteCourseReview
+ *     summary: Delete a course review
+ *     description: The review's own author, or an admin, may delete it.
+ *     tags: [Reviews]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "507f1f77bcf86cd799439041" }
+ *       - name: reviewId
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "6713b5ac12ef4567890a8888" }
+ *     responses:
+ *       204: { description: Deleted successfully }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */
 
 const express = require('express');

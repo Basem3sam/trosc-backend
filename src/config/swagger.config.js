@@ -52,10 +52,19 @@ const options = {
         name: 'Reviews',
         description: 'Track feedback & ratings from enrolled students',
       },
-      { name: 'Contact', description: 'Public contact form submission' },
+      {
+        name: 'Contact',
+        description:
+          'Public contact form submission, plus admin listing and triage',
+      },
       {
         name: 'Weekly Tasks',
         description: 'Per-item completion tracking and task deletion',
+      },
+      {
+        name: 'Assignments',
+        description:
+          'Course and session assignments: creation, editing, submissions, and grading',
       },
       {
         name: 'Feed',

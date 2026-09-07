@@ -38,6 +38,35 @@
  *           format: date-time
  */
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     ContactUpdate:
+ *       type: object
+ *       required:
+ *         - status
+ *       properties:
+ *         status:
+ *           type: string
+ *           enum: [new, read, archived]
+ *           example: read
+ *     ContactsResponse:
+ *       type: object
+ *       properties:
+ *         status: { type: string, example: success }
+ *         results: { type: integer, example: 5 }
+ *         total: { type: integer, example: 20 }
+ *         pagination: { type: object }
+ *         data:
+ *           type: object
+ *           properties:
+ *             contacts:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Contact'
+ */
+
 const mongoose = require('mongoose');
 const validator = require('validator');
 

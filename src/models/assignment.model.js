@@ -1,5 +1,3 @@
-const mongoose = require('mongoose');
-
 /**
  * @swagger
  * components:
@@ -76,6 +74,55 @@ const mongoose = require('mongoose');
  *           format: date-time
  */
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     AssignmentCreate:
+ *       type: object
+ *       required:
+ *         - title
+ *         - description
+ *         - deadline
+ *       properties:
+ *         title:
+ *           type: string
+ *           example: "Build a REST API"
+ *         description:
+ *           type: string
+ *           example: "Create a full CRUD API with Node.js"
+ *         deadline:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-15T23:59:00.000Z"
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
+ *             format: uri
+ *           description: Trusted-host URLs (Drive, GitHub, Cloudinary, etc.), max 10
+ *     AssignmentUpdate:
+ *       type: object
+ *       description: At least one field must be provided.
+ *       properties:
+ *         title:
+ *           type: string
+ *           example: "Build a REST API (v2)"
+ *         description:
+ *           type: string
+ *           example: "Updated requirements — add auth middleware"
+ *         deadline:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-22T23:59:00.000Z"
+ *         attachments:
+ *           type: array
+ *           items:
+ *             type: string
+ *             format: uri
+ */
+
+const mongoose = require('mongoose');
 const validateAttachments = require('../utils/validateAttachments');
 
 const submissionSchema = new mongoose.Schema({

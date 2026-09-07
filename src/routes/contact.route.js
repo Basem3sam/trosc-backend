@@ -40,6 +40,105 @@
  *         $ref: '#/components/responses/ValidationError'
  */
 
+/**
+ * @swagger
+ * /contact:
+ *   get:
+ *     operationId: getAllContacts
+ *     summary: List all contact form submissions
+ *     description: Admin only. Supports the standard pagination/filter query params.
+ *     tags: [Contact]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *       - name: limit
+ *         in: query
+ *         schema: { type: integer, default: 10 }
+ *       - name: status
+ *         in: query
+ *         schema: { type: string, enum: [new, read, archived] }
+ *     responses:
+ *       200:
+ *         description: List of contact submissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ContactsResponse'
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *
+ * /contact/{id}:
+ *   get:
+ *     operationId: getContact
+ *     summary: Get a single contact submission
+ *     description: Admin only.
+ *     tags: [Contact]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "6713b5ac12ef4567890a6666" }
+ *     responses:
+ *       200:
+ *         description: Contact submission found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     contact:
+ *                       $ref: '#/components/schemas/Contact'
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ *   patch:
+ *     operationId: updateContact
+ *     summary: Update a contact submission's status
+ *     description: Admin only. Used to triage submissions (new → read → archived).
+ *     tags: [Contact]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "6713b5ac12ef4567890a6666" }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ContactUpdate'
+ *     responses:
+ *       200:
+ *         description: Contact submission updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     contact:
+ *                       $ref: '#/components/schemas/Contact'
+ *       400: { $ref: '#/components/responses/ValidationError' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+
 const express = require('express');
 const contactController = require('../controllers/contact.controller');
 const validate = require('../middlewares/validate.middleware');
