@@ -681,6 +681,7 @@ Coverage so far is intentionally small (two example route files) — the pattern
 - [x] Assignment submissions — students submit/resubmit work (`POST /assignments/:id/submissions`), with a computed `late` flag
 - [x] Assignment grading — owner instructor / admin grades a submission (`PATCH /assignments/:id/submissions/:studentId/grade`)
 - [x] MongoDB Transactions for cascade enrollment operations (`cascade.service.js`)
++ [x] Request Correlation IDs — full implementation with `AsyncLocalStorage`, automatic injection into every log, and `X-Request-ID` round-trip to clients
 - [x] Jest + Supertest test setup — in-memory MongoDB, test-user helper, two example route test files (see TESTING.md; growing coverage is ongoing)
 
 ### Planned 🔮
@@ -689,7 +690,6 @@ Coverage so far is intentionally small (two example route files) — the pattern
 - [ ] **Admin Analytics Dashboard** (`dashboardStats.model.js`)
 - [ ] **Email verification flow** — the `emailVerified` flag exists and resets on email change, but there's no self-service send/verify-token endpoint yet; currently only an admin can flip it
 - [ ] **Announcement audience filtering** — `audience`/`targetTrack`/`targetCourse` are stored but not yet used to filter what `GET /v1/announcements` returns
-- [ ] **Request Correlation IDs** for distributed tracing
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
 - [ ] **Full test coverage** — expand beyond the two example route files
 

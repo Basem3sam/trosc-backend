@@ -3,7 +3,7 @@ const User = require('../models/user.model');
 const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
 const signToken = require('../utils/generateToken');
-const logger = require('../utils/logger');
+const { logger } = require('../utils/logger');
 
 // Create and send token (with cookie)
 const createSendToken = (user) => {

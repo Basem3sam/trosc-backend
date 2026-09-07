@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const logger = require('../utils/logger');
+const { logger } = require('../utils/logger');
 
 // ✅ Register ONCE at module load. mongoose.connection is a singleton,
 // so these fire for every connection (including reconnects).

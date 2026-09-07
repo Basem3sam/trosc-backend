@@ -22,7 +22,8 @@ const feedRouter = require('./routes/feed.route');
 const contactRouter = require('./routes/contact.route');
 const weeklyTaskProgressRouter = require('./routes/weeklyTaskProgress.route');
 const assignmentSubmissionRouter = require('./routes/assignmentSubmission.route');
-const logger = require('./utils/logger');
+const { logger, asyncLocalStorage } = require('./utils/logger');
+const crypto = require('crypto');
 
 const { authLimiter } = require('./middlewares/rateLimit.middleware');
 
@@ -67,6 +68,18 @@ if (isProduction) {
 
 // Parse cookies
 app.use(cookieParser());
+
+// Set up Async Local Storage for request context
+app.use((req, res, next) => {
+  const requestId = req.headers['x-request-id'] || crypto.randomUUID();
+  req.requestId = requestId;
+  res.setHeader('X-Request-ID', requestId);
+
+  // Run the rest of the request in the ALS context
+  asyncLocalStorage.run({ requestId }, () => {
+    next();
+  });
+});
 
 // Set security HTTP headers
 app.use(helmet());

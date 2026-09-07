@@ -1,6 +1,6 @@
 const { convert } = require('html-to-text');
 const createTransporter = require('../config/mailer.config');
-const logger = require('../utils/logger');
+const { logger } = require('../utils/logger');
 
 class Email {
   constructor(user, url) {

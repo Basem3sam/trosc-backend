@@ -1,5 +1,5 @@
 const AppError = require('../utils/AppError');
-const logger = require('../utils/logger');
+const { logger } = require('../utils/logger');
 
 const handleCastErrorDB = (err) => {
   const message = `Invalid ${err.path}: ${err.value}.`;

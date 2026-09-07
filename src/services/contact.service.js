@@ -2,7 +2,7 @@ const Contact = require('../models/contact.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
-const logger = require('../utils/logger');
+const { logger } = require('../utils/logger');
 
 /**
  * Store a contact form submission and (best-effort) notify the admin by email.

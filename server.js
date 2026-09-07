@@ -1,5 +1,5 @@
 const dotenv = require('dotenv');
-const logger = require('./src/utils/logger');
+const { logger } = require('./src/utils/logger');
 
 // for catching synchronous errors
 process.on('uncaughtException', (err) => {
