@@ -5,16 +5,16 @@ const { createTestUser } = require('./helpers/testUser');
 describe('Announcements CRUD', () => {
   let adminToken, instructorToken, studentToken, announcementId;
 
-  beforeAll(async () => {
+  // ✅ Use beforeEach to get fresh users and a default announcement per test
+  beforeEach(async () => {
     const admin = await createTestUser({ role: 'admin' });
     adminToken = admin.token;
     const instructor = await createTestUser({ role: 'instructor' });
     instructorToken = instructor.token;
     const student = await createTestUser({ role: 'student' });
     studentToken = student.token;
-  });
 
-  it('instructor can create an announcement', async () => {
+    // Create a base announcement (so we have something to GET/update/delete)
     const res = await request(app)
       .post('/v1/announcements')
       .set('Authorization', `Bearer ${instructorToken}`)
@@ -23,8 +23,21 @@ describe('Announcements CRUD', () => {
         message: 'This is a test announcement.',
         isPinned: true,
       });
+    if (res.status === 201) {
+      announcementId = res.body.data.announcement._id;
+    }
+  });
+
+  it('instructor can create an announcement', async () => {
+    const res = await request(app)
+      .post('/v1/announcements')
+      .set('Authorization', `Bearer ${instructorToken}`)
+      .send({
+        title: 'Another Announcement',
+        message: 'This is another test.',
+        isPinned: false,
+      });
     expect(res.status).toBe(201);
-    announcementId = res.body.data.announcement._id;
   });
 
   it('admin can create an announcement', async () => {
