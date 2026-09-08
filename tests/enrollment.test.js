@@ -46,7 +46,10 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
     });
   });
 
-  describe('Track Self-Enrollment (endpoint tests)', () => {
+  // ============================================================
+  // 1. ENDPOINT TESTS – self‑enroll and leave endpoints
+  // ============================================================
+  describe('Track Self-Enrollment (endpoint)', () => {
     it('student can request enrollment (pending approval)', async () => {
       const res = await request(app)
         .post(`/v1/tracks/${trackId}/enroll-me`)
@@ -69,6 +72,9 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
     });
   });
 
+  // ============================================================
+  // 2. APPROVE / REJECT – direct DB setup (no endpoint calls)
+  // ============================================================
   describe('Approve / Reject (direct DB setup)', () => {
     beforeEach(async () => {
       await Track.findByIdAndUpdate(trackId, {
@@ -103,6 +109,9 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
     });
   });
 
+  // ============================================================
+  // 3. LEAVE REQUESTS – direct DB setup
+  // ============================================================
   describe('Track Leave Requests (direct DB setup)', () => {
     beforeEach(async () => {
       await Track.findByIdAndUpdate(trackId, {
@@ -130,7 +139,9 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
         .set('Authorization', `Bearer ${instructorToken}`);
       expect(res.status).toBe(200);
       const track = await Track.findById(trackId);
-      expect(track.students).not.toContainEqual(studentId);
+      expect(track.students.map((id) => id.toString())).not.toContain(
+        studentId,
+      );
       expect(track.pendingLeaves).toHaveLength(0);
     });
 
@@ -143,11 +154,14 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
         .set('Authorization', `Bearer ${instructorToken}`);
       expect(res.status).toBe(200);
       const track = await Track.findById(trackId);
-      expect(track.students).toContainEqual(studentId);
+      expect(track.students.map((id) => id.toString())).toContain(studentId);
       expect(track.pendingLeaves).toHaveLength(0);
     });
   });
 
+  // ============================================================
+  // 4. COURSE SELF-ENROLLMENT (Access Rules)
+  // ============================================================
   describe('Course Self-Enrollment (Access Rules)', () => {
     it('student can enroll in a public course', async () => {
       const instructor = await createTestUser({ role: 'instructor' });
@@ -167,14 +181,32 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
     });
 
     it('student can enroll in a track-only course if in the track', async () => {
-      await Track.findByIdAndUpdate(trackId, {
-        $addToSet: { students: studentId },
+      // Enroll and approve (auto-enrolls into existing courses)
+      await request(app)
+        .post(`/v1/tracks/${trackId}/enroll-me`)
+        .set('Authorization', `Bearer ${studentToken}`);
+      await request(app)
+        .post(`/v1/tracks/${trackId}/students/${studentId}/approve`)
+        .set('Authorization', `Bearer ${instructorToken}`);
+
+      // Add a NEW course to the track after approval – cascade won't touch it
+      const instructor = await createTestUser({ role: 'instructor' });
+      const lateCourse = await Course.create({
+        title: 'Course Added After Approval',
+        description: 'Added to the track after the student already joined',
+        instructor: instructor.user._id,
+        track: trackId,
+        published: true,
       });
+      await Track.findByIdAndUpdate(trackId, {
+        $addToSet: { courses: lateCourse._id },
+      });
+
       const res = await request(app)
-        .post(`/v1/courses/${courseId}/enroll-me`)
+        .post(`/v1/courses/${lateCourse._id}/enroll-me`)
         .set('Authorization', `Bearer ${studentToken}`);
       expect(res.status).toBe(200);
-      const course = await Course.findById(courseId);
+      const course = await Course.findById(lateCourse._id);
       expect(course.students.map((id) => id.toString())).toContain(studentId);
     });
 
@@ -194,16 +226,35 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
     });
   });
 
+  // ============================================================
+  // 5. SESSION SELF-ENROLLMENT
+  // ============================================================
   describe('Session Self-Enrollment', () => {
     it('student can enroll in a session if in the track/course', async () => {
-      await Track.findByIdAndUpdate(trackId, {
-        $addToSet: { students: studentId },
+      // Same approach: add a session AFTER approval to test the gate
+      await request(app)
+        .post(`/v1/tracks/${trackId}/enroll-me`)
+        .set('Authorization', `Bearer ${studentToken}`);
+      await request(app)
+        .post(`/v1/tracks/${trackId}/students/${studentId}/approve`)
+        .set('Authorization', `Bearer ${instructorToken}`);
+
+      const instructor = await createTestUser({ role: 'instructor' });
+      const lateSession = await Session.create({
+        title: 'Session Added After Approval',
+        instructor: instructor.user._id,
+        tracks: [trackId],
+        published: true,
       });
+      await Track.findByIdAndUpdate(trackId, {
+        $addToSet: { sessions: lateSession._id },
+      });
+
       const res = await request(app)
-        .post(`/v1/sessions/${sessionId}/enroll-me`)
+        .post(`/v1/sessions/${lateSession._id}/enroll-me`)
         .set('Authorization', `Bearer ${studentToken}`);
       expect(res.status).toBe(200);
-      const session = await Session.findById(sessionId);
+      const session = await Session.findById(lateSession._id);
       expect(session.students.map((id) => id.toString())).toContain(studentId);
     });
 
