@@ -694,7 +694,7 @@ Coverage now spans contact submission, reviews (creation + listing), assignments
 - [ ] **Email verification flow** — the `emailVerified` flag exists and resets on email change, but there's no self-service send/verify-token endpoint yet; currently only an admin can flip it
 - [ ] **Announcement audience filtering** — `audience`/`targetTrack`/`targetCourse` are stored but not yet used to filter what `GET /v1/announcements` returns
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
-- [ ] **Full test coverage** — assignment CRUD, review deletion, contact admin endpoints, and signup/login still need tests
+- [ ] **Full test coverage** — still need tests
 
 ---
 

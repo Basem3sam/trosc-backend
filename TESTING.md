@@ -32,21 +32,26 @@ tests/
   setupAfterEnv.js          — runs before/after each test FILE: connects
                                Mongoose, wipes collections between tests
   helpers/
-    testUser.js             — creates a user directly in the DB + mints
-                               a real JWT, skipping signup/email entirely
-    fixtures.js             — shared track/course/session fixture builders,
+    testUser.js             — creates a user + valid JWT without hitting
+                               /signup or /login, skipping the rate limiter
+                               and email entirely
+    fixtures.js              — shared track/course/session fixture builders,
                                used by reviews.test.js and assignments.test.js
-  contact.test.js            — public contact form: submission + validation
-  weeklyTask.test.js         — course-scoped weekly tasks: ownership, roles,
+  auth.test.js                — the real /signup and /login endpoints:
+                               happy paths, role-injection rejection,
+                               password hashing, duplicate email, user
+                               enumeration protection, deactivated accounts
+  contact.test.js             — public contact form: submission + validation
+  weeklyTask.test.js          — course-scoped weekly tasks: ownership, roles,
                                duplicate-week rejection, completion tracking
-  reviews.test.js            — track/course/session review creation +
+  reviews.test.js             — track/course/session review creation +
                                public listing
-  assignments.test.js        — assignment listing, submission (including
+  assignments.test.js         — assignment listing, submission (including
                                untrusted-host rejection), resubmission
                                clearing a grade, and grading
-  updateMe.test.js           — the base64 photo regression + enrolledTrack
+  updateMe.test.js            — the base64 photo regression + enrolledTrack
                                presence
-  contactAdmin.test.js       — admin contact triage: list, view, update status
+  contactAdmin.test.js        — admin contact triage: list, view, update status
 ```
 
 ### Why an in-memory MongoDB instead of your real dev database?
@@ -58,6 +63,8 @@ tests/
 3. **Repeatability** — every test run starts from a genuinely empty database, so a test can never accidentally pass (or fail) because of leftover data from a previous run or another developer's local database.
 
 The first time you run tests, it'll download the MongoDB binary — that needs an internet connection and takes a few seconds. After that it's cached locally and startup is fast.
+
+> **Note:** this instance is a standalone `MongoMemoryServer`, not a replica set. MongoDB transactions (used in `cascade.service.js` for enrollment sync) require a replica set to run at all, so any test that exercises `syncUserEnrollments`/`unsyncUserEnrollments` directly would fail against the current setup. None of the existing test files call those cascade paths yet — worth keeping in mind if you write one that does; you'd need `MongoMemoryReplSet` instead.
 
 ## Anatomy of one test
 
@@ -82,7 +89,7 @@ Common Jest matchers you'll use constantly: `.toBe(x)` (exact equality), `.toEqu
 
 ## Testing an authenticated route
 
-Real signup goes through email verification, rate limiting, and password hashing — all real behavior you don't want to fight with in every single test. `tests/helpers/testUser.js` shortcuts this:
+Real signup goes through email verification, rate limiting, and password hashing — all real behavior you don't want to fight with in every single test that isn't actually *about* auth. `tests/helpers/testUser.js` shortcuts this:
 
 ```js
 const { createTestUser } = require('./helpers/testUser');
@@ -96,6 +103,8 @@ const res = await request(app)
 ```
 
 It calls `User.create()` directly (so no signup endpoint, no rate limiter, no email sent) and signs a real JWT with your actual `generateToken` util — so the token is indistinguishable from one a real login would produce. `.set('Authorization', ...)` attaches it exactly like a real client would.
+
+`auth.test.js` is the one file that deliberately does the opposite — it hits `/v1/users/signup` and `/v1/users/login` directly through Supertest, because that endpoint behavior is exactly what it's testing.
 
 ## Why fixtures are built with `Model.create()`, not through the API
 
@@ -160,15 +169,17 @@ npm test -- --inspect-brk
 
 ## What's deliberately NOT covered yet
 
-- **Email-sending code paths** — signup's welcome email, the contact form's admin notification, password reset — none of these are exercised in a way that actually sends mail (the contact test works specifically because `ADMIN_EMAIL` isn't set in `.env.test`, so that code path is skipped). If you write tests that need to touch those paths, you'll want to mock `src/utils/Email.js` rather than let it try to hit a real SMTP server — ask me when you get there.
+- **The rest of the password/account-recovery flow** — `forgotPassword`, `resetPassword`, and `updatePassword` have no tests yet. `auth.test.js` covers signup and login only.
+- **Email-sending code paths** — signup's welcome email, the contact form's admin notification, password reset — none of these are exercised in a way that actually sends mail (the contact test works specifically because `ADMIN_EMAIL` isn't set in `.env.test`, so that code path is skipped; `auth.test.js`'s signup tests rely on the same try/catch-and-log fallback in `auth.service.js` so a missing SMTP config doesn't fail the request). If you write tests that need to touch those paths, you'll want to mock `src/utils/Email.js` rather than let it try to hit a real SMTP server — ask me when you get there.
 - **File-upload/attachment validation** — untested so far, other than the assignment-submission trusted-host check in `assignments.test.js`.
-- **Auth itself** — signup, login, password reset/change flows have no tests yet. Everything else here bypasses signup on purpose (via `createTestUser`), which means a real bug in `/signup` or `/login` wouldn't be caught by anything in this suite.
 - **The `course`/`session` mutual-exclusivity validator on `Assignment`** — the model enforces exactly one of `course`/`session` must be set, but nothing tests that rejection directly.
+- **MongoDB transaction paths in `cascade.service.js`** — see the in-memory-MongoDB note above; these need a replica-set test instance before they can be tested at all.
 
 ## What's covered so far
 
 | File | Covers |
 |---|---|
+| `auth.test.js` | Signup (happy path, password hashing, role-injection rejection, duplicate email, validation errors) and login (happy path, `lastLogin` update, wrong password, unknown email, identical error message for both to confirm no user enumeration, deactivated account, missing fields) |
 | `contact.test.js` | Public contact form: success + every validation rejection |
 | `weeklyTask.test.js` | Course-scoped weekly task creation (ownership, role, duplicate-week rejection) + per-student completion isolation |
 | `reviews.test.js` | Course review creation (enrollment/duplicate/rating-range rejection), public listing, session-level review creation plus review deletion (author, admin bypass, ownership rejection, 404) |
@@ -178,7 +189,7 @@ npm test -- --inspect-brk
 
 ## A good next test to write yourself
 
-Session-level assignment CRUD, review deletion, and the contact admin endpoints are the biggest real gaps right now (see above) — any of those is a good next target. If you want something smaller to warm up on first, `PATCH /v1/assignments/:id` (update) is a good middle-difficulty step: auth + ownership like `weeklyTask.test.js`, but a simpler shape than the submission/grading flow in `assignments.test.js`.
+The biggest real gaps left are the rest of the password-recovery flow (`forgotPassword` / `resetPassword` / `updatePassword`) and the MongoDB transaction paths in `cascade.service.js` (which needs a replica-set test instance first — see the note above). `updatePassword` is the easier of the two to start with: it's a protected route like the ones in `weeklyTask.test.js`, but the logic itself (verify current password, hash new one, re-issue a token) is self-contained and easy to reason about.
 
 ## Writing your own tests: checklist
 
