@@ -226,3 +226,38 @@ describe('POST /v1/users/login', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('POST /v1/users/logout', () => {
+  let credentials;
+
+  beforeEach(async () => {
+    credentials = {
+      email: 'logout-user@example.com',
+      password: 'Password123!',
+    };
+    await request(app)
+      .post('/v1/users/signup')
+      .send({
+        name: 'Logout User',
+        ...credentials,
+        passwordConfirm: credentials.password,
+      });
+  });
+
+  it('logs out and clears the cookie', async () => {
+    const loginRes = await request(app)
+      .post('/v1/users/login')
+      .send(credentials);
+    expect(loginRes.status).toBe(200);
+    const token = loginRes.body.token;
+
+    const logoutRes = await request(app)
+      .post('/v1/users/logout')
+      .set('Authorization', `Bearer ${token}`);
+    expect(logoutRes.status).toBe(200);
+    const cookie = logoutRes.headers['set-cookie']?.find((c) =>
+      c.startsWith('jwt='),
+    );
+    expect(cookie).toMatch(/Expires=/i); // cookie expires quickly
+  });
+});

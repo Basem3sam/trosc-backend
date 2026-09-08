@@ -27,6 +27,7 @@ exports.signupSchema = Joi.object({
     linkedin: Joi.string().uri().allow(''),
     github: Joi.string().uri().allow(''),
   }).optional(),
+  role: Joi.string().optional(),
 });
 
 exports.loginSchema = Joi.object({
