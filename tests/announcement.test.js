@@ -5,7 +5,6 @@ const { createTestUser } = require('./helpers/testUser');
 describe('Announcements CRUD', () => {
   let adminToken, instructorToken, studentToken, announcementId;
 
-  // ✅ Use beforeEach to get fresh users and a default announcement per test
   beforeEach(async () => {
     const admin = await createTestUser({ role: 'admin' });
     adminToken = admin.token;
@@ -14,7 +13,7 @@ describe('Announcements CRUD', () => {
     const student = await createTestUser({ role: 'student' });
     studentToken = student.token;
 
-    // Create a base announcement (so we have something to GET/update/delete)
+    // Create a base announcement for GET/update/delete tests
     const res = await request(app)
       .post('/v1/announcements')
       .set('Authorization', `Bearer ${instructorToken}`)
