@@ -100,7 +100,8 @@ src/
 │   ├── assignmentSubmission.controller.js
 │   ├── weeklyTask.controller.js
 │   ├── contact.controller.js
-│   └── feed.controller.js
+│   ├── feed.controller.js
+│   └── error.controller.js      # Global error handler (dev vs prod responses, Mongo/JWT error mapping)
 │
 ├── services/              # Business logic & database operations
 │   ├── auth.service.js
@@ -128,7 +129,9 @@ src/
 │   ├── review.model.js
 │   ├── assignment.model.js
 │   ├── weeklytask.model.js
-│   └── contact.model.js
+│   ├── contact.model.js
+│   ├── activitylog.model.js     # Reserved for a future activity-log feature (not wired up yet)
+│   └── dashboardstats.model.js  # Reserved for a future admin-analytics feature (not wired up yet)
 │
 ├── routes/                # Route definitions + Swagger JSDoc annotations
 │   ├── user.route.js
@@ -139,8 +142,11 @@ src/
 │   ├── announcement.route.js
 │   ├── review.route.js              # generic factory, mounted per resource type
 │   ├── resourceAssignment.route.js  # generic factory, mounted per resource type
+│   ├── assignment.route.js          # track-level aggregated assignment listing
 │   ├── assignmentSubmission.route.js
 │   ├── weeklyTask.route.js
+│   ├── weeklyTaskProgress.route.js  # top-level /v1/weekly-tasks mount (per-item completion toggling)
+│   ├── trackWeeklyTask.route.js     # track-level aggregated weekly-task listing
 │   ├── contact.route.js
 │   └── feed.route.js
 │
@@ -150,14 +156,17 @@ src/
 │   ├── course.validation.js
 │   ├── session.validation.js
 │   ├── event.validation.js
+│   ├── announcement.validation.js
 │   ├── review.validation.js
 │   ├── assignment.validation.js
+│   ├── assignmentSubmission.validation.js
 │   ├── weeklyTask.validation.js
 │   └── contact.validation.js
 │
 ├── middlewares/           # Reusable Express middleware
 │   ├── auth.middleware.js       # protect, restrictTo, checkOwnership
 │   ├── ownership.middleware.js
+│   ├── rateLimit.middleware.js  # authLimiter — applied to login/signup/reset + enrollment/RSVP/contact endpoints
 │   ├── validate.middleware.js
 │   └── selfApproval.js
 │
@@ -166,9 +175,11 @@ src/
 │   ├── AppError.js            # Operational error class
 │   ├── catchAsync.js          # Async handler wrapper
 │   ├── Email.js               # HTML email templates with plaintext fallback
+│   ├── escapeHtml.js          # Escapes user input before interpolating into HTML email bodies
 │   ├── generateToken.js
 │   ├── logger.js              # Winston configuration with log rotation
-│   ├── trustedHosts.js        # single source of truth for the attachment/resource host allowlist
+│   ├── trustedHosts.js        # single source of truth for the attachment/resource host allowlist (the data)
+│   ├── isTrustedHost.js       # single source of truth for matching a URL's host against that allowlist (the logic)
 │   ├── validateAttachments.js
 │   ├── attachmentValidation.js
 │   └── photoValidation.js
@@ -549,18 +560,18 @@ Validation schemas (Joi) are defined in `validations/` and referenced in route J
 
 ## 🛠️ Scripts & Utilities
 
-| Command                               | Description                                                     |
-| ------------------------------------- | --------------------------------------------------------------- |
-| `npm start`                           | Development mode with nodemon                                   |
-| `npm start:prod`                      | Production mode                                                 |
-| `npm run swagger:export`              | Generate `swagger.json` from JSDoc comments                     |
-| `npm test`                            | Run Jest test suite                                             |
-| `npm run test:watch`                  | Run tests in watch mode                                         |
-| `npm run test:coverage`               | Run tests with coverage report                                  |
-| `npm run lint`                        | Run ESLint                                                      |
-| `npm run lint:fix`                    | Fix ESLint issues automatically                                 |
-| `node testEmail.js <email>`           | Diagnose SMTP configuration and send a test email               |
-| `node scripts/createAdmin.js <email>` | Promote a user to admin                                         |
+| Command                               | Description                                       |
+| ------------------------------------- | ------------------------------------------------- |
+| `npm start`                           | Development mode with nodemon                     |
+| `npm start:prod`                      | Production mode                                   |
+| `npm run swagger:export`              | Generate `swagger.json` from JSDoc comments       |
+| `npm test`                            | Run Jest test suite                               |
+| `npm run test:watch`                  | Run tests in watch mode                           |
+| `npm run test:coverage`               | Run tests with coverage report                    |
+| `npm run lint`                        | Run ESLint                                        |
+| `npm run lint:fix`                    | Fix ESLint issues automatically                   |
+| `node testEmail.js <email>`           | Diagnose SMTP configuration and send a test email |
+| `node scripts/createAdmin.js <email>` | Promote a user to admin                           |
 
 ### Email Diagnostic Tool
 
@@ -684,7 +695,9 @@ Coverage now spans contact submission, reviews (creation + listing), assignments
 - [x] Assignment submissions — students submit/resubmit work (`POST /assignments/:id/submissions`), with a computed `late` flag
 - [x] Assignment grading — owner instructor / admin grades a submission (`PATCH /assignments/:id/submissions/:studentId/grade`)
 - [x] MongoDB Transactions for cascade enrollment operations (`cascade.service.js`)
-+ [x] Request Correlation IDs — full implementation with `AsyncLocalStorage`, automatic injection into every log, and `X-Request-ID` round-trip to clients
+
+* [x] Request Correlation IDs — full implementation with `AsyncLocalStorage`, automatic injection into every log, and `X-Request-ID` round-trip to clients
+
 - [x] Jest + Supertest test setup — in-memory MongoDB, shared fixture builders, six test files covering contact/reviews/assignments/weekly-tasks/profile-update (see TESTING.md; growing coverage is ongoing)
 
 ### Planned 🔮
