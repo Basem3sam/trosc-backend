@@ -44,7 +44,7 @@ exports.getAllSessions = async (query) => {
   };
 };
 
-exports.getSessionById = async (sessionId, userId = null) => {
+exports.getSessionById = async (sessionId, requestingUser = null) => {
   const session = await Session.findById(sessionId)
     .populate('instructor', 'name email role')
     .populate('students', 'name email role')
@@ -71,13 +71,16 @@ exports.getSessionById = async (sessionId, userId = null) => {
     }
   }
 
-  // GATE: strip url if not enrolled
-  if (!userId) {
-    delete sessionObj.url;
-    delete sessionObj.embedUrl;
-    delete sessionObj.resources; // also hide attached PDFs/slides
-  } else {
-    // Check enrollment: direct, via track, or via course
+  const userId = requestingUser?.id;
+  const isAdmin = requestingUser?.role === 'admin';
+  const isOwner = !!userId && sessionObj.instructor?._id?.toString() === userId;
+
+  // GATE: strip url/embedUrl/resources unless the requester is the
+  // session's own instructor, an admin, or enrolled — directly, via a
+  // parent track, or via a parent course.
+  let canSeeContent = isAdmin || isOwner;
+
+  if (!canSeeContent && userId) {
     const isDirectStudent = sessionObj.students?.some(
       (s) => s._id?.toString() === userId || s.toString() === userId,
     );
@@ -86,11 +89,21 @@ exports.getSessionById = async (sessionId, userId = null) => {
       t.students?.some((s) => s.toString() === userId),
     );
 
-    if (!isDirectStudent && !isTrackStudent) {
-      delete sessionObj.url;
-      delete sessionObj.embedUrl;
-      delete sessionObj.resources;
+    let isCourseStudent = false;
+    if (!isDirectStudent && !isTrackStudent && sessionObj.course) {
+      const course = await Course.findById(sessionObj.course).select(
+        'students',
+      );
+      isCourseStudent = !!course?.students.some((s) => s.toString() === userId);
     }
+
+    canSeeContent = isDirectStudent || isTrackStudent || isCourseStudent;
+  }
+
+  if (!canSeeContent) {
+    delete sessionObj.url;
+    delete sessionObj.embedUrl;
+    delete sessionObj.resources;
   }
 
   return sessionObj;

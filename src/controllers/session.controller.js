@@ -43,7 +43,7 @@ exports.getAllSessions = catchAsync(async (req, res, next) => {
 exports.getSession = catchAsync(async (req, res, next) => {
   const session = await sessionService.getSessionById(
     req.params.id,
-    req.user?.id,
+    req.user,
   );
 
   res.status(200).json({
