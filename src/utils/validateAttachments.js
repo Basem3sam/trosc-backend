@@ -1,7 +1,7 @@
 // src/utils/validateAttachments.js
 
 // List of trusted file hosting services
-const isTrustedHost = require('./isTrustedHosts');
+const isTrustedHost = require('./isTrustedHost');
 
 /**
  * Validates an array of attachment URLs.
