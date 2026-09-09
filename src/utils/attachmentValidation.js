@@ -1,7 +1,7 @@
 const Joi = require('joi');
 
 // Free hosting services Trosc uses
-const isTrustedHOSTS = require('./isTrustedHost');
+const isTrustedHost = require('./isTrustedHost');
 
 const attachmentValidation = Joi.array()
   .items(
