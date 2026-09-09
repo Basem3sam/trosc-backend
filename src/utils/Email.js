@@ -2,13 +2,23 @@ const { convert } = require('html-to-text');
 const createTransporter = require('../config/mailer.config');
 const { logger } = require('../utils/logger');
 
+// Singleton transporter
+let transporter = null;
+
+function getTransporter() {
+  if (!transporter) {
+    transporter = createTransporter();
+  }
+  return transporter;
+}
+
 class Email {
   constructor(user, url) {
     this.to = user.email;
     this.firstName = user.name.split(' ')[0];
     this.url = url;
     this.from = process.env.EMAIL_FROM || 'Trosc Club <noreply@trosc.club>';
-    this.transporter = createTransporter();
+    this.transporter = getTransporter(); // reuse the singleton
   }
 
   // Send actual email with error handling
@@ -20,11 +30,10 @@ class Email {
         subject,
         html: htmlContent,
         text: convert(htmlContent, {
-          wordwrap: 130, // Better text formatting
+          wordwrap: 130,
         }),
-        // Add headers for better email deliverability
         headers: {
-          'X-Priority': '3', // Normal priority
+          'X-Priority': '3',
           'X-Mailer': 'Trosc Mailer 1.0',
         },
       };
