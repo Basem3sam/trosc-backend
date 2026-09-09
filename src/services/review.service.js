@@ -79,7 +79,9 @@ exports.getReviews = async (resourceType, resourceId, query) => {
   const baseQuery = Review.find({ [field]: resourceId }).sort({
     createdAt: -1,
   });
-  const features = new APIFeatures(baseQuery, query, Review).limitFields();
+  const features = new APIFeatures(baseQuery, query, Review)
+    .filter({ [field]: resourceId })
+    .limitFields();
 
   await features.paginate();
   const reviews = await features.query.populate('user', 'name photo');

@@ -1,7 +1,7 @@
 const Joi = require('joi');
 
 // Free hosting services Trosc uses
-const ALLOWED_HOSTS = require('./trustedHosts');
+const isTrustedHOSTS = require('./isTrustedHosts');
 
 const attachmentValidation = Joi.array()
   .items(
@@ -12,9 +12,7 @@ const attachmentValidation = Joi.array()
 
         try {
           const url = new URL(value);
-          const isAllowedHost = ALLOWED_HOSTS.some((host) =>
-            url.hostname.endsWith(host),
-          );
+          const isAllowedHost = isTrustedHost(url.hostname);
 
           if (!isAllowedHost || url.protocol !== 'https:') {
             return helpers.error('any.invalid');

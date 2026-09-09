@@ -285,7 +285,7 @@
 
 const mongoose = require('mongoose');
 const validator = require('validator');
-const ALLOWED_HOSTS = require('../utils/trustedHosts');
+const isTrustedHost = require('../utils/isTrustedHost');
 
 const resourceSchema = new mongoose.Schema({
   title: {
@@ -300,11 +300,8 @@ const resourceSchema = new mongoose.Schema({
         if (!v) return true;
         try {
           const parsed = new URL(v);
-          const isAllowed = ALLOWED_HOSTS.some((host) => parsed.hostname.endsWith(host));
-          return (
-            isAllowed &&
-            parsed.protocol === 'https:'
-          );
+          const isAllowed = isTrustedHost(parsed.hostname);
+          return isAllowed && parsed.protocol === 'https:';
         } catch {
           return false;
         }

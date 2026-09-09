@@ -1,7 +1,7 @@
 // src/utils/validateAttachments.js
 
 // List of trusted file hosting services
-const ALLOWED_HOSTS = require('./trustedHosts');
+const isTrustedHost = require('./isTrustedHosts');
 
 /**
  * Validates an array of attachment URLs.
@@ -18,9 +18,7 @@ function validateAttachments(arr) {
 
     try {
       const parsed = new URL(url);
-      const isAllowedHost = ALLOWED_HOSTS.some((host) =>
-        parsed.hostname.endsWith(host),
-      );
+      const isAllowedHost = isTrustedHost(parsed.hostname);
       return isAllowedHost && parsed.protocol === 'https:';
     } catch {
       return false;

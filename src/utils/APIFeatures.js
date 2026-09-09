@@ -30,16 +30,7 @@ class APIFeatures {
     const addDollarSign = (obj) => {
       const newObj = {};
       Object.keys(obj).forEach((key) => {
-        const newKey = [
-          'gte',
-          'gt',
-          'lte',
-          'lt',
-          'in',
-          'ne',
-          'regex',
-          'options',
-        ].includes(key)
+        const newKey = ['gte', 'gt', 'lte', 'lt', 'in', 'ne'].includes(key)
           ? `$${key}`
           : key;
         newObj[newKey] =

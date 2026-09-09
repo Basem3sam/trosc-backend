@@ -20,7 +20,7 @@ exports.assignmentStudentIdSchema = Joi.object({
 
 // Same trusted-host allowlist as src/utils/attachmentValidation.js, applied
 // to a single URL instead of an array (a submission has exactly one file).
-const ALLOWED_HOSTS = require('../utils/trustedHosts');
+const isTrustedHost = require('../utils/isTrustedHost');
 
 const fileUrlSchema = Joi.string()
   .uri()
@@ -28,9 +28,7 @@ const fileUrlSchema = Joi.string()
   .custom((value, helpers) => {
     try {
       const url = new URL(value);
-      const isAllowedHost = ALLOWED_HOSTS.some((host) =>
-        url.hostname.endsWith(host),
-      );
+      const isAllowedHost = isTrustedHost(url.hostname);
 
       if (!isAllowedHost || url.protocol !== 'https:') {
         return helpers.error('any.invalid');
