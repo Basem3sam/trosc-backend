@@ -2,6 +2,7 @@ const Contact = require('../models/contact.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
+const escapeHtml = require('../utils/escapeHtml');
 const { logger } = require('../utils/logger');
 
 /**
@@ -24,12 +25,12 @@ exports.submitContactForm = async (data) => {
         `New Contact Form Submission — ${data.username}`,
         `
           <h2>New contact form submission</h2>
-          <p><strong>Name:</strong> ${data.username}</p>
-          <p><strong>Track:</strong> ${data.track}</p>
-          <p><strong>Email:</strong> ${data.email}</p>
-          <p><strong>Phone:</strong> ${data.phone}</p>
+          <p><strong>Name:</strong> ${escapeHtml(data.username)}</p>
+          <p><strong>Track:</strong> ${escapeHtml(data.track)}</p>
+          <p><strong>Email:</strong> ${escapeHtml(data.email)}</p>
+          <p><strong>Phone:</strong> ${escapeHtml(data.phone)}</p>
           <p><strong>Message:</strong></p>
-          <p>${data.message}</p>
+          <p>${escapeHtml(data.message)}</p>
         `,
       );
     } catch (error) {

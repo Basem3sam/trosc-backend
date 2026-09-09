@@ -19,9 +19,10 @@ exports.createContactSchema = Joi.object({
       'string.empty': 'Phone number is required',
       'string.pattern.base': 'Please provide a valid phone number',
     }),
-  message: Joi.string().required().trim().min(10).messages({
+  message: Joi.string().required().trim().min(10).max(2000).messages({
     'string.empty': 'Message is required',
     'string.min': 'Message must be at least 10 characters',
+    'string.max': 'Message cannot exceed 2000 characters',
   }),
 });
 

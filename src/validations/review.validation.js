@@ -16,8 +16,9 @@ exports.createReviewSchema = Joi.object({
     'number.max': 'Rating must be at most 5',
     'any.required': 'Rating is required',
   }),
-  content: Joi.string().required().trim().min(1).messages({
+  content: Joi.string().required().trim().min(1).max(1000).messages({
     'string.empty': 'Review content is required',
+    'string.max': 'Review content cannot exceed 1000 characters',
   }),
 });
 

@@ -85,6 +85,7 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       required: [true, 'A review must have content'],
       trim: true,
+      maxlength: [1000, 'Review content cannot exceed 1000 characters'],
     },
   },
   { timestamps: true },
