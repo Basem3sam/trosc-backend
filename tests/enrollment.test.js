@@ -272,4 +272,71 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('Course Self-Enrollment (Prerequisites)', () => {
+    let instructor, student, studentToken, studentId, track, courseA, courseB;
+
+    beforeEach(async () => {
+      instructor = await createTestUser({ role: 'instructor' });
+      student = await createTestUser({ role: 'student' });
+      studentToken = student.token;
+      studentId = student.user._id.toString();
+
+      track = await Track.create({
+        title: 'Prerequisite Track',
+        description: 'For testing prerequisites',
+        instructor: instructor.user._id,
+        published: true,
+      });
+
+      courseA = await Course.create({
+        title: 'Intro Course (Prereq)',
+        description: 'Must take this first',
+        instructor: instructor.user._id,
+        track: track._id,
+        published: true,
+        access: 'public',
+      });
+
+      courseB = await Course.create({
+        title: 'Advanced Course',
+        description: 'Requires Intro Course',
+        instructor: instructor.user._id,
+        track: track._id,
+        published: true,
+        access: 'public',
+        prerequisites: [courseA._id],
+      });
+
+      // Add courses to track
+      await Track.findByIdAndUpdate(track._id, {
+        $addToSet: { courses: [courseA._id, courseB._id] },
+      });
+    });
+
+    it('prevents enrollment if prerequisites are not met', async () => {
+      const res = await request(app)
+        .post(`/v1/courses/${courseB._id}/enroll-me`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toMatch(/prerequisites/);
+    });
+
+    it('allows enrollment after completing prerequisites', async () => {
+      // Enroll in courseA first
+      await request(app)
+        .post(`/v1/courses/${courseA._id}/enroll-me`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      // Now enroll in courseB (prereq met)
+      const res = await request(app)
+        .post(`/v1/courses/${courseB._id}/enroll-me`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(200);
+      const course = await Course.findById(courseB._id);
+      expect(course.students.map((id) => id.toString())).toContain(studentId);
+    });
+  });
 });
