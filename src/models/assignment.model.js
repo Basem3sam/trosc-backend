@@ -123,6 +123,7 @@
  */
 
 const mongoose = require('mongoose');
+const AppError = require('../utils/AppError');
 const validateAttachments = require('../utils/validateAttachments');
 
 const submissionSchema = new mongoose.Schema({
@@ -199,6 +200,20 @@ assignmentSchema.pre('validate', function (next) {
 assignmentSchema.index({ course: 1 });
 assignmentSchema.index({ session: 1 });
 assignmentSchema.index({ instructor: 1 });
+
+assignmentSchema.pre('validate', function (next) {
+  const hasCourse = !!this.course;
+  const hasSession = !!this.session;
+  if (hasCourse === hasSession) {
+    return next(
+      new AppError(
+        'An assignment must belong to exactly one of course or session (not both, not neither)',
+        400,
+      ),
+    );
+  }
+  next();
+});
 
 const Assignment = mongoose.model('Assignment', assignmentSchema);
 module.exports = Assignment;
