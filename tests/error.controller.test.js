@@ -70,18 +70,6 @@ function createAppWithErrorRoute(errorToThrow, statusCode = 500) {
     }
   });
 
-  // A route that triggers a TokenExpiredError
-  app.get('/jwt-expired', (req, res, next) => {
-    try {
-      const token = jwt.sign({ id: 'test' }, 'secret', { expiresIn: '1ms' });
-      setTimeout(() => {
-        jwt.verify(token, 'secret');
-      }, 10);
-    } catch (err) {
-      next(err);
-    }
-  });
-
   // A route that throws a generic Error (non-operational)
   app.get('/generic-error', (req, res, next) => {
     throw new Error('Something went wrong');
@@ -195,6 +183,8 @@ describe('Error Controller', () => {
       const res = await request(app).get('/jwt-expired');
       // This test is timing‑sensitive; we can mock the error instead.
       // We'll create a route that directly throws a TokenExpiredError.
+      // Directly trigger a TokenExpiredError via a dedicated route instead
+      // of racing a real 1ms-expiring JWT.
       const app2 = express();
       app2.get('/token-expired', (req, res, next) => {
         const err = new jwt.TokenExpiredError('jwt expired', new Date());
