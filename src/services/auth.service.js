@@ -147,9 +147,11 @@ exports.updatePassword = async (
   }
 
   // 1) Get user from collection
-  const user = await User.findById(userId).select('+password');
+  const user = await User.findById(userId).select('+password +active');
 
   if (!user) throw new AppError('User not found', 404);
+
+  if (!user.active) throw new AppError('Account deactivated', 401);
 
   // 2) Check if POSTed current password is correct
   if (!(await user.correctPassword(passwordCurrent, user.password))) {

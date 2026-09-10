@@ -3,6 +3,8 @@ const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
+const Email = require('../utils/Email');
+const { logger } = require('../utils/logger');
 const cascade = require('./cascade.service');
 
 exports.enrollStudentInTrack = async (trackId, studentId) => {
@@ -179,7 +181,6 @@ exports.getPendingLeaves = async (trackId) => {
   return track.pendingLeaves;
 };
 
-
 // ============================
 // COURSE ENROLLMENT
 // ============================
@@ -229,9 +230,18 @@ exports.enrollInCourse = async (userId, courseId) => {
 
   course.students.push(userId);
   await course.save();
-  await User.findByIdAndUpdate(userId, {
+  const user = await User.findByIdAndUpdate(userId, {
     $addToSet: { enrolledCourses: courseId },
   });
+
+  // Fire-and-forget confirmation email; don't fail enrollment if SMTP breaks
+  try {
+    const courseUrl = `${process.env.FRONTEND_URL}/courses/${courseId}`;
+    await new Email(user, courseUrl).sendEnrollmentConfirmation(course.title);
+  } catch (err) {
+    logger.error('Enrollment confirmation email failed:', err.message);
+  }
+
   return course;
 };
 
