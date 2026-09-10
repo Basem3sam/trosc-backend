@@ -761,7 +761,7 @@ tests/
 ├── error.controller.test.js, errorHandling.test.js, app.test.js, APIFeatures.test.js
 ```
 
-41 test files span auth, password recovery, every CRUD resource (tracks/courses/sessions/events/announcements), enrollment + the MongoDB transaction paths in `cascade.service.js`, reviews, assignments (incl. grading), weekly tasks, contact (public + admin), the global error handler, and `src/app.js`'s own production-vs-development configuration. See **[TESTING.md](./TESTING.md)** for the full file-by-file coverage table and the (short) list of what's still deliberately untested — mainly that email-sending is mocked everywhere rather than asserted on, and a couple of narrow model-validator edge cases.
+37 test files span auth, password recovery, every CRUD resource (tracks/courses/sessions/events/announcements), enrollment + the MongoDB transaction paths in `cascade.service.js`, reviews, assignments (incl. grading), weekly tasks, contact (public + admin), the global error handler, and `src/app.js`'s own production-vs-development configuration. See **[TESTING.md](./TESTING.md)** for the full file-by-file coverage table and the (short) list of what's still deliberately untested — mainly that email-sending is mocked everywhere rather than asserted on, and a couple of narrow model-validator edge cases.
 
 ---
 
@@ -794,7 +794,7 @@ tests/
 
 * [x] Request Correlation IDs — full implementation with `AsyncLocalStorage`, automatic injection into every log, and `X-Request-ID` round-trip to clients
 
-- [x] Jest + Supertest test setup — in-memory MongoDB **replica set** (enabling real transaction tests), shared fixture builders, a global Email mock, and 41 test files covering auth, password recovery, every CRUD resource, enrollment + cascade transactions, reviews, assignments, weekly tasks, contact, the global error handler, and `app.js` config (see [TESTING.md](./TESTING.md) for the full breakdown)
+- [x] Jest + Supertest test setup — in-memory MongoDB **replica set** (enabling real transaction tests), shared fixture builders, a global Email mock, and 37 test files covering auth, password recovery, every CRUD resource, enrollment + cascade transactions, reviews, assignments, weekly tasks, contact, the global error handler, and `app.js` config (see [TESTING.md](./TESTING.md) for the full breakdown)
 
 ### Planned 🔮
 
