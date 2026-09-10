@@ -1,6 +1,7 @@
 const { convert } = require('html-to-text');
 const createTransporter = require('../config/mailer.config');
 const { logger } = require('../utils/logger');
+const escapeHtml = require('./escapeHtml');
 
 // Singleton transporter
 let transporter = null;
@@ -15,7 +16,9 @@ function getTransporter() {
 class Email {
   constructor(user, url) {
     this.to = user.email;
-    this.firstName = user.name.split(' ')[0];
+    // user.name is user-supplied and gets interpolated straight into HTML
+    // email templates below — escape it once here so every template is safe.
+    this.firstName = escapeHtml(user.name.split(' ')[0]);
     this.url = url;
     this.from = process.env.EMAIL_FROM || 'Trosc Club <noreply@trosc.club>';
     this.transporter = getTransporter(); // reuse the singleton
@@ -162,11 +165,12 @@ class Email {
 
   async sendEnrollmentConfirmation(courseName) {
     const subject = `✅ Enrollment Confirmed - ${courseName}`;
+    const safeCourseName = escapeHtml(courseName);
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2>🎉 You're Enrolled!</h2>
         <p>Hello ${this.firstName},</p>
-        <p>You have been successfully enrolled in <strong>${courseName}</strong>.</p>
+        <p>You have been successfully enrolled in <strong>${safeCourseName}</strong>.</p>
         <p>We're excited to have you in this session and can't wait to see your progress!</p>
         <a href="${this.url}" style="background: #4CAF50; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px;">Access Course</a>
         <p>Best regards,<br>Trosc Team</p>
@@ -178,11 +182,13 @@ class Email {
 
   async sendSessionReminder(sessionTitle, startTime) {
     const subject = `🔔 Reminder: ${sessionTitle} Starting Soon`;
+    const safeSessionTitle = escapeHtml(sessionTitle);
+    const safeStartTime = escapeHtml(startTime);
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2>Session Reminder</h2>
         <p>Hello ${this.firstName},</p>
-        <p>This is a friendly reminder that your session <strong>${sessionTitle}</strong> is scheduled to start at ${startTime}.</p>
+        <p>This is a friendly reminder that your session <strong>${safeSessionTitle}</strong> is scheduled to start at ${safeStartTime}.</p>
         <a href="${this.url}" style="background: #2196F3; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px;">Join Session</a>
         <p>See you there!<br>Trosc Team</p>
       </div>

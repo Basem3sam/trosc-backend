@@ -13,7 +13,7 @@
     "swagger:export": "node scripts/exportSwagger.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "lint:check": "eslint . --check",
+    "lint:check": "eslint . --max-warnings=0",
     "test": "cross-env NODE_ENV=test jest --runInBand --detectOpenHandles",
     "test:watch": "cross-env NODE_ENV=test jest --watch --runInBand",
     "test:coverage": "cross-env NODE_ENV=test jest --runInBand --coverage"
