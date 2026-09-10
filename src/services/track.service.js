@@ -239,6 +239,18 @@ exports.addCourseToTrack = async (trackId, courseId) => {
     throw new AppError('Course already in this track', 400);
   }
 
+  // If the course already belongs to a different track, detach it from
+  // that track's `courses` array first. Otherwise the old track keeps a
+  // stale reference: `course.track` would point here, but the old track's
+  // `courses` array would still list it too — and anything that trusts
+  // that array (e.g. deleteTrack orphaning its courses) would wrongly act
+  // on a course it no longer owns.
+  if (course.track && course.track.toString() !== trackId) {
+    await Track.findByIdAndUpdate(course.track, {
+      $pull: { courses: courseId },
+    });
+  }
+
   // Update both sides
   track.courses.push(courseId);
   course.track = trackId;

@@ -19,27 +19,29 @@ exports.syncUserEnrollments = async (userId, trackId) => {
     const courseIds = trackCourses.map((c) => c._id);
     const sessionIds = trackSessions.map((s) => s._id);
 
-    await Promise.all([
-      Course.updateMany(
-        { _id: { $in: courseIds }, students: { $ne: userId } },
-        { $push: { students: userId } },
-      ).session(session),
-      Session.updateMany(
-        { _id: { $in: sessionIds }, students: { $ne: userId } },
-        { $push: { students: userId } },
-      ).session(session),
-      User.findByIdAndUpdate(
-        userId,
-        {
-          $set: { enrolledTrack: trackId },
-          $addToSet: {
-            enrolledCourses: { $each: courseIds },
-            enrolledSessions: { $each: sessionIds },
-          },
+    // These must run sequentially, not via Promise.all: a single
+    // ClientSession can only have one operation in flight at a time, so
+    // firing concurrent writes against the same session risks intermittent
+    // "operation in progress" errors under load.
+    await Course.updateMany(
+      { _id: { $in: courseIds }, students: { $ne: userId } },
+      { $push: { students: userId } },
+    ).session(session);
+    await Session.updateMany(
+      { _id: { $in: sessionIds }, students: { $ne: userId } },
+      { $push: { students: userId } },
+    ).session(session);
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: { enrolledTrack: trackId },
+        $addToSet: {
+          enrolledCourses: { $each: courseIds },
+          enrolledSessions: { $each: sessionIds },
         },
-        { session },
-      ),
-    ]);
+      },
+      { session },
+    );
 
     await session.commitTransaction();
   } catch (error) {
@@ -64,27 +66,27 @@ exports.unsyncUserEnrollments = async (userId, trackId) => {
     const courseIds = trackCourses.map((c) => c._id);
     const sessionIds = trackSessions.map((s) => s._id);
 
-    await Promise.all([
-      Course.updateMany(
-        { _id: { $in: courseIds } },
-        { $pull: { students: userId } },
-      ).session(session),
-      Session.updateMany(
-        { _id: { $in: sessionIds } },
-        { $pull: { students: userId } },
-      ).session(session),
-      User.findByIdAndUpdate(
-        userId,
-        {
-          $unset: { enrolledTrack: 1 },
-          $pull: {
-            enrolledCourses: { $in: courseIds },
-            enrolledSessions: { $in: sessionIds },
-          },
+    // Sequential for the same reason as syncUserEnrollments above: one
+    // ClientSession, one operation in flight at a time.
+    await Course.updateMany(
+      { _id: { $in: courseIds } },
+      { $pull: { students: userId } },
+    ).session(session);
+    await Session.updateMany(
+      { _id: { $in: sessionIds } },
+      { $pull: { students: userId } },
+    ).session(session);
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $unset: { enrolledTrack: 1 },
+        $pull: {
+          enrolledCourses: { $in: courseIds },
+          enrolledSessions: { $in: sessionIds },
         },
-        { session },
-      ),
-    ]);
+      },
+      { session },
+    );
 
     await session.commitTransaction();
   } catch (error) {
