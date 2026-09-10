@@ -109,7 +109,7 @@ exports.updateMe = async (userId, data) => {
   }
 
   const current = await User.findById(userId).select('email');
-  if (current.email !== data.email) {
+  if (data.email && current.email !== data.email) {
     filteredData.emailVerified = false;
   }
 
