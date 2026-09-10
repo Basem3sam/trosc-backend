@@ -75,6 +75,7 @@
 | **Docs**       | Swagger (swagger-jsdoc + swagger-ui-express)    | 3.0      |
 | **Logging**    | Winston + DailyRotateFile                       | —        |
 | **Testing**    | Jest + Supertest + mongodb-memory-server        | —        |
+| **Tooling**    | ESLint (airbnb-base) + Prettier                 | —        |
 
 > **Design Principle:** No file uploads. All media (images, videos, PDFs) are referenced via URLs from trusted hosts (YouTube, Google Drive, Cloudinary, Imgur, GitHub, Dropbox). This keeps hosting 100% free.
 
