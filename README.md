@@ -6,7 +6,11 @@
   <img src="https://img.shields.io/badge/MongoDB-Atlas-green?logo=mongodb&logoColor=white" alt="MongoDB">
   <img src="https://img.shields.io/badge/Swagger-3.0-orange?logo=swagger&logoColor=white" alt="Swagger">
   <img src="https://img.shields.io/badge/JWT-Auth-000000?logo=jsonwebtokens&logoColor=white" alt="JWT">
+  <img src="https://img.shields.io/badge/Tests-Jest%20%2B%20Supertest-C21325?logo=jest&logoColor=white" alt="Tests">
   <img src="https://img.shields.io/badge/License-ISC-blue.svg" alt="License">
+</p>
+<p align="center">
+  <img src="https://github.com/basem3sam/trosc-backend/actions/workflows/test.yml/badge.svg" alt="Test Status">
 </p>
 
 <p align="center">
@@ -208,7 +212,84 @@ src/
 <summary>📐 Data Flow Diagram (Level 1) (click to expand)</summary>
 <br>
 
-![DFD Level 1](./design/DFD.svg)
+```mermaid
+flowchart TD
+    subgraph ext [External Entities]
+        direction LR
+        Student([Student / User])
+        Instructor([Instructor])
+        Admin([Admin])
+    end
+
+    subgraph auth [Authentication]
+        P1[1.0 Authenticate User]
+    end
+
+    subgraph content [Content Management]
+        direction TB
+        P2[2.0 Manage Tracks, Courses, Sessions]
+        P3[3.0 Manage Events]
+        P4[4.0 Manage Announcements]
+    end
+
+    subgraph enroll [Enrollment & Approval]
+        P5[5.0 Process Enrollment & RSVP]
+    end
+
+    subgraph feed [Dashboard & Discovery]
+        P6[6.0 Build Dashboard Feed]
+    end
+
+    subgraph stores [Data Stores]
+        direction TB
+        DS1[(User Store)]
+        DS2[(Content Store<br/>Tracks, Courses, Sessions)]
+        DS3[(Event Store)]
+        DS4[(Announcement Store)]
+    end
+
+    %% Authentication flows
+    Student -->|signup / login credentials| P1
+    Instructor -->|login credentials| P1
+    Admin -->|login credentials| P1
+    P1 -->|JWT token + user profile| Student
+    P1 -->|JWT token + user profile| Instructor
+    P1 -->|JWT token + user profile| Admin
+    P1 <-->|read / write user record, lastLogin| DS1
+
+    %% Content CRUD (Instructor + Admin)
+    Instructor -->|create / update / delete content| P2
+    Admin -->|create / update / delete / bulk| P2
+    P2 <-->|read / write tracks, courses, sessions| DS2
+    P2 <-->|read / write instructor ref| DS1
+
+    Instructor -->|create / update event| P3
+    Admin -->|create / update event| P3
+    Student -->|RSVP / cancel RSVP| P3
+    P3 <-->|read / write events| DS3
+    P3 <-->|read creator ref| DS1
+
+    Instructor -->|create / update announcement| P4
+    Admin -->|create / update announcement| P4
+    P4 <-->|read / write announcements| DS4
+    P4 <-->|read creator ref| DS1
+
+    %% Enrollment & Approval
+    Student -->|self-enroll / request leave| P5
+    Instructor -->|manual add / approve / reject| P5
+    Admin -->|manual add / bulk manage| P5
+    P5 -->|update enrolledTracks / Courses / Sessions| DS1
+    P5 -->|update students / pending / pendingLeaves| DS2
+
+    %% Public browsing & Feed
+    Student -->|browse / view / search| P2
+    P2 -->|public content + instructor info| Student
+    Student -->|request dashboard| P6
+    P6 -->|pinned + upcoming + creator info| Student
+    DS1 -->|user / creator data| P6
+    DS3 -->|upcoming events| P6
+    DS4 -->|pinned announcements| P6
+```
 
 </details>
 
@@ -216,11 +297,13 @@ src/
 <summary>📊 Entity Relationship Diagram (click to expand)</summary>
 <br>
 
-![ERD](./design/ERD.svg)
+> Rendered from [`design/trosc-ERD.mmd`](./design/trosc-ERD.mmd) — open that file directly (or paste it into [mermaid.live](https://mermaid.live)) for the full entity/field breakdown; it's long enough that inlining it here would hurt readability.
 
 </details>
 
 > 📂 Source files: [`design/trosc-DFD-level1.mmd`](./design/trosc-DFD-level1.mmd) · [`design/trosc-ERD.mmd`](./design/trosc-ERD.mmd)
+>
+> ⚠️ **Note:** both diagrams predate the reviews, assignments, weekly-tasks, and contact-form features and only model the original auth/content/events/announcements/feed slice of the API. They're useful for the high-level shape of the system but shouldn't be treated as exhaustive — see the [Database Overview](#-database-overview) table below for the current, complete collection list.
 
 ---
 
@@ -649,24 +732,36 @@ npm run test:watch    # re-run automatically as you edit
 npm run test:coverage # run once + generate a coverage report (coverage/lcov-report/index.html)
 ```
 
-Tests run against a real, throwaway in-memory MongoDB instance (`mongodb-memory-server`) — never your real dev or production database. See **[TESTING.md](./TESTING.md)** for a full walkthrough of how the setup works and how to write your next test.
+Tests run against a real, throwaway in-memory MongoDB **replica set** (`mongodb-memory-server`'s `MongoMemoryReplSet`) — never your real dev or production database. A replica set (rather than a plain standalone instance) is required so that the MongoDB transactions in `cascade.service.js` can actually run during tests. See **[TESTING.md](./TESTING.md)** for a full walkthrough of how the setup works and how to write your next test.
 
 ```
 tests/
-├── globalSetup.js       # starts the in-memory MongoDB once per run
-├── globalTeardown.js    # stops it once per run
-├── setupAfterEnv.js     # per-file: connects Mongoose, clears data between tests
+├── globalSetup.js        # starts the in-memory MongoDB replica set once per run
+├── globalTeardown.js     # stops it once per run
+├── setupAfterEnv.js      # per-file: connects Mongoose, mocks Email, clears data between tests
+├── __mocks__/Email.js    # no-op Email mock, applied globally via setupAfterEnv.js
 ├── helpers/
-│   ├── testUser.js      # creates a user + valid JWT without hitting /signup
-│   └── fixtures.js      # shared track/course/session fixture builders
-├── contact.test.js      # public contact form (submission only — see below)
-├── weeklyTask.test.js   # course-scoped weekly tasks: ownership, roles, completion tracking
-├── reviews.test.js      # track/course/session review creation + public listing
-├── assignments.test.js  # assignment listing, submission, resubmission, grading
-└── updateMe.test.js     # base64 photo regression + enrolledTrack presence
+│   ├── testUser.js       # creates a user + valid JWT without hitting /signup
+│   └── fixtures.js       # shared track/course/session fixture builders
+├── config/                     # mailer.config.js unit tests
+├── controllers/                # endpoints not covered by the top-level *.test.js files
+│   (course/session/track/weeklyTask "missing endpoints" suites)
+├── services/                   # service-layer unit tests (course/session/track/
+│   enrollment/weeklyTask), incl. cascade/transaction edge cases
+├── utils/                      # pure-function/class tests (Email, logger, escapeHtml,
+│   attachment validation)
+├── auth.test.js, passwordReset.test.js         # signup/login/logout, forgot/reset/update password
+├── adminUsers.test.js, bulkUser.test.js         # admin user management
+├── trackCourseCRUD.test.js, trackEndpoints.test.js  # track/course CRUD + analytics/pending/leaves
+├── enrollment.test.js, cascade.test.js, sessionGating.test.js
+├── announcement.test.js, events.test.js, feed.test.js
+├── contact.test.js, contactAdmin.test.js
+├── reviews.test.js, assignments.test.js, weeklyTask.test.js
+├── updateMe.test.js
+├── error.controller.test.js, errorHandling.test.js, app.test.js, APIFeatures.test.js
 ```
 
-Coverage now spans contact submission, reviews (creation + listing), assignments (listing, submission, resubmission, grading), weekly tasks, and the profile-update endpoint. **Not yet covered:** assignment CRUD (create/update/delete), review deletion, the new contact admin endpoints (list/view/triage), and signup/login itself — see [TESTING.md](./TESTING.md) for the full breakdown and suggested next tests.
+41 test files span auth, password recovery, every CRUD resource (tracks/courses/sessions/events/announcements), enrollment + the MongoDB transaction paths in `cascade.service.js`, reviews, assignments (incl. grading), weekly tasks, contact (public + admin), the global error handler, and `src/app.js`'s own production-vs-development configuration. See **[TESTING.md](./TESTING.md)** for the full file-by-file coverage table and the (short) list of what's still deliberately untested — mainly that email-sending is mocked everywhere rather than asserted on, and a couple of narrow model-validator edge cases.
 
 ---
 
@@ -699,7 +794,7 @@ Coverage now spans contact submission, reviews (creation + listing), assignments
 
 * [x] Request Correlation IDs — full implementation with `AsyncLocalStorage`, automatic injection into every log, and `X-Request-ID` round-trip to clients
 
-- [x] Jest + Supertest test setup — in-memory MongoDB, shared fixture builders, six test files covering contact/reviews/assignments/weekly-tasks/profile-update (see TESTING.md; growing coverage is ongoing)
+- [x] Jest + Supertest test setup — in-memory MongoDB **replica set** (enabling real transaction tests), shared fixture builders, a global Email mock, and 41 test files covering auth, password recovery, every CRUD resource, enrollment + cascade transactions, reviews, assignments, weekly tasks, contact, the global error handler, and `app.js` config (see [TESTING.md](./TESTING.md) for the full breakdown)
 
 ### Planned 🔮
 
