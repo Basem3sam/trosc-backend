@@ -67,6 +67,11 @@ const options = {
           'Course and session assignments: creation, editing, submissions, and grading',
       },
       {
+        name: 'Activity Logs',
+        description:
+          'Audit trail of user actions (admin) and personal activity timeline (self)',
+      },
+      {
         name: 'Feed',
         description: 'Dashboard announcements + upcoming events',
       },

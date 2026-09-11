@@ -4,6 +4,7 @@ const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
 const signToken = require('../utils/generateToken');
 const { logger } = require('../utils/logger');
+const { logActivity } = require('./activityLog.service');
 
 // Create and send token (with cookie)
 const createSendToken = (user) => {
@@ -50,6 +51,8 @@ exports.signUp = async (data, url) => {
     logger.error('Welcome email failed:', err.message);
   }
 
+  await logActivity({ userId: newUser._id, action: 'signed_up' });
+
   const token = createSendToken(newUser);
   return { token, user: newUser };
 };
@@ -78,6 +81,8 @@ exports.login = async (email, password) => {
   user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
 
+  await logActivity({ userId: user._id, action: 'login' });
+
   // If everything ok, send token to client
   const token = createSendToken(user);
   return { token, user };
@@ -96,6 +101,8 @@ exports.forgotPassword = async (email) => {
   // 2) Generate the random token
   const resetToken = user.createPasswordResetToken();
   await user.save({ validateBeforeSave: false });
+
+  await logActivity({ userId: user._id, action: 'requested_password_reset' });
 
   const resetURL = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
@@ -132,6 +139,8 @@ exports.resetPassword = async (token, password, passwordConfirm) => {
   user.passwordResetExpires = undefined;
   await user.save();
 
+  await logActivity({ userId: user._id, action: 'reset_password' });
+
   // 3) Log user in, send JWT
   const jwtToken = createSendToken(user);
   return { token: jwtToken, user }; // Changed from jwtToken to token for consistency
@@ -164,6 +173,8 @@ exports.updatePassword = async (
   user.password = password;
   user.passwordConfirm = passwordConfirm;
   await user.save();
+
+  await logActivity({ userId: user._id, action: 'updated_password' });
 
   // 4) Log user in, send JWT
   const token = createSendToken(user);

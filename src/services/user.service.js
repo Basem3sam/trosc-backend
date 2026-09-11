@@ -1,6 +1,7 @@
 const APIFeatures = require('../utils/APIFeatures');
 const User = require('../models/user.model');
 const AppError = require('../utils/AppError');
+const { logActivity } = require('./activityLog.service');
 
 const filterObj = (obj, ...allowedFields) => {
   const newObj = {};
@@ -120,11 +121,14 @@ exports.updateMe = async (userId, data) => {
 
   if (!updatedUser) throw new AppError('User not found', 404);
 
+  await logActivity({ userId, action: 'updated_profile' });
+
   return updatedUser;
 };
 
 exports.deleteMe = async (userId) => {
   await User.findByIdAndUpdate(userId, { active: false });
+  await logActivity({ userId, action: 'deactivated_account' });
   return null;
 };
 
@@ -148,4 +152,10 @@ exports.bulkUserAction = async (userIds, action, requestingUserId) => {
   } else if (action === 'delete') {
     await User.deleteMany({ _id: { $in: userIds } });
   }
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'bulk_user_action',
+    metadata: { targetUserIds: userIds, bulkAction: action },
+  });
 };

@@ -27,18 +27,31 @@ class APIFeatures {
 
     excludedFields.forEach((el) => delete queryObj[el]);
 
+    // True ONLY for plain `{}` objects — deliberately excludes Date,
+    // ObjectId, Buffer, and any other class instance. The previous
+    // `typeof x === 'object'` check was too broad: when a caller passed an
+    // ObjectId (e.g. a mongoose.Types.ObjectId from a service layer) as a
+    // default filter value, addDollarSign would recursively walk the
+    // ObjectId's own enumerable properties (`buffer`, `_bsontype`, `id`,
+    // …), produce a plain object with the same shape, and drop the
+    // ObjectId prototype — which then blew up downstream as a CastError
+    // when Mongoose tried to cast that plain object back to an ObjectId
+    // on the query path.
+    const isPlainObject = (v) => {
+      if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
+      const proto = Object.getPrototypeOf(v);
+      return proto === Object.prototype || proto === null;
+    };
+
     const addDollarSign = (obj) => {
       const newObj = {};
       Object.keys(obj).forEach((key) => {
         const newKey = ['gte', 'gt', 'lte', 'lt', 'in', 'ne'].includes(key)
           ? `$${key}`
           : key;
-        newObj[newKey] =
-          typeof obj[key] === 'object' &&
-          obj[key] !== null &&
-          !Array.isArray(obj[key])
-            ? addDollarSign(obj[key])
-            : obj[key];
+        newObj[newKey] = isPlainObject(obj[key])
+          ? addDollarSign(obj[key])
+          : obj[key];
       });
       return newObj;
     };

@@ -6,6 +6,7 @@ const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
 const { logger } = require('../utils/logger');
 const cascade = require('./cascade.service');
+const { logActivity } = require('./activityLog.service');
 
 exports.enrollStudentInTrack = async (trackId, studentId) => {
   const track = await Track.findById(trackId);
@@ -77,6 +78,14 @@ exports.enrollMeInTrack = async (trackId, userId) => {
 
   track.pendingStudents.push(userId);
   await track.save();
+
+  await logActivity({
+    userId,
+    action: 'requested_track_enrollment',
+    targetModel: 'Track',
+    targetId: trackId,
+  });
+
   return track;
 };
 
@@ -105,6 +114,13 @@ exports.approveStudentInTrack = async (trackId, studentId) => {
   await track.save();
 
   await cascade.syncUserEnrollments(studentId, trackId);
+
+  await logActivity({
+    userId: studentId,
+    action: 'approved_track_enrollment',
+    targetModel: 'Track',
+    targetId: trackId,
+  });
 
   return track;
 };
@@ -242,6 +258,13 @@ exports.enrollInCourse = async (userId, courseId) => {
     logger.error('Enrollment confirmation email failed:', err.message);
   }
 
+  await logActivity({
+    userId,
+    action: 'enrolled_in_course',
+    targetModel: 'Course',
+    targetId: courseId,
+  });
+
   return course;
 };
 
@@ -257,6 +280,14 @@ exports.leaveCourse = async (userId, courseId) => {
   await User.findByIdAndUpdate(userId, {
     $pull: { enrolledCourses: courseId },
   });
+
+  await logActivity({
+    userId,
+    action: 'left_course',
+    targetModel: 'Course',
+    targetId: courseId,
+  });
+
   return course;
 };
 
@@ -305,6 +336,14 @@ exports.enrollInSession = async (userId, sessionId) => {
   await User.findByIdAndUpdate(userId, {
     $addToSet: { enrolledSessions: sessionId },
   });
+
+  await logActivity({
+    userId,
+    action: 'enrolled_in_session',
+    targetModel: 'Session',
+    targetId: sessionId,
+  });
+
   return session;
 };
 
@@ -320,5 +359,13 @@ exports.leaveSession = async (userId, sessionId) => {
   await User.findByIdAndUpdate(userId, {
     $pull: { enrolledSessions: sessionId },
   });
+
+  await logActivity({
+    userId,
+    action: 'left_session',
+    targetModel: 'Session',
+    targetId: sessionId,
+  });
+
   return session;
 };
