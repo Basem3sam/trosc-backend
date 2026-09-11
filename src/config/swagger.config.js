@@ -72,6 +72,11 @@ const options = {
           'Audit trail of user actions (admin) and personal activity timeline (self)',
       },
       {
+        name: 'Dashboard Stats',
+        description:
+          'Admin analytics — live platform stats and historical snapshots for trend charts',
+      },
+      {
         name: 'Feed',
         description: 'Dashboard announcements + upcoming events',
       },
