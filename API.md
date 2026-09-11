@@ -83,7 +83,7 @@ When the limit is exceeded, the API returns `429 Too Many Requests`.
 
 ## Query Parameters
 
-List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `GET /announcements`, `GET /users`, `GET /contact`) support:
+List endpoints (`GET /tracks`, `GET /courses`, `GET /sessions`, `GET /events`, `GET /announcements`, `GET /users`, `GET /contact`, `GET /activity-logs`, `GET /dashboard-stats`) support:
 
 | Parameter     | Type    | Description                                                           |
 | ------------- | ------- | --------------------------------------------------------------------- |
@@ -263,6 +263,37 @@ Creation lives under `/v1/courses/:id/assignments` and `/v1/sessions/:id/assignm
 | `DELETE` | `/v1/assignments/:id`                              | Admin / owner instructor     | Delete an assignment (and its submissions with it)                      |
 | `POST`   | `/v1/assignments/:id/submissions`                  | Protected (enrolled student) | Submit or resubmit your work (resubmitting clears any existing grade)   |
 | `PATCH`  | `/v1/assignments/:id/submissions/:studentId/grade` | Admin / owner instructor     | Grade a student's submission (0–100)                                    |
+
+### Activity Logs
+
+Audit trail of user actions. There is deliberately **no `POST` endpoint** — entries are written server-side only, as a side effect of other actions (signup, login, enrollment, profile updates, admin bulk actions), never accepted directly from a client. Everything below requires authentication; only `/me` is available to a non-admin.
+
+| Method   | Endpoint                            | Access    | Description                                                                                             |
+| -------- | ----------------------------------- | --------- | ------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/v1/activity-logs/me`              | Protected | The caller's own activity timeline, newest first                                                        |
+| `GET`    | `/v1/activity-logs`                 | Admin     | List all activity logs (filter/sort/paginate; e.g. `?action=login`, `?createdAt[gte]=2025-01-01`)       |
+| `GET`    | `/v1/activity-logs/summary`         | Admin     | Aggregated stats: total count, breakdown by action, top 5 most active users (`?from`, `?to`, `?action`) |
+| `GET`    | `/v1/activity-logs/user/:userId`    | Admin     | A specific user's activity timeline                                                                     |
+| `GET`    | `/v1/activity-logs/:id`             | Admin     | Get a single activity log entry                                                                         |
+| `DELETE` | `/v1/activity-logs/:id`             | Admin     | Delete a single activity log entry (rare — audit trails are normally append-only)                       |
+| `DELETE` | `/v1/activity-logs?olderThanDays=N` | Admin     | Bulk-delete logs older than N days (retention cleanup; `N` must be ≥ 30)                                |
+
+### Dashboard Stats
+
+Admin-only platform analytics. `live` is computed on the fly and never persisted; everything else reads from or writes to stored, point-in-time snapshots (one per `period` + `date`, upserted rather than duplicated on re-generation).
+
+| Method   | Endpoint                              | Access | Description                                                                                      |
+| -------- | ------------------------------------- | ------ | ------------------------------------------------------------------------------------------------ |
+| `GET`    | `/v1/dashboard-stats/live`            | Admin  | Current stats, computed on demand (not persisted); `newUsers` covers the last 24 hours           |
+| `POST`   | `/v1/dashboard-stats/snapshot`        | Admin  | Generate/refresh a snapshot on demand (body: `{ period, date? }`) — upserts in place             |
+| `GET`    | `/v1/dashboard-stats/latest`          | Admin  | Most recently generated stored snapshot for a period (`?period=daily`)                           |
+| `GET`    | `/v1/dashboard-stats/trends`          | Admin  | Last N snapshots for a period, oldest first — ready for a trend chart (`?period=daily&limit=30`) |
+| `GET`    | `/v1/dashboard-stats`                 | Admin  | List stored snapshots (filter/sort/paginate; e.g. `?period=weekly`)                              |
+| `GET`    | `/v1/dashboard-stats/:id`             | Admin  | Get a single snapshot                                                                            |
+| `DELETE` | `/v1/dashboard-stats/:id`             | Admin  | Delete a single snapshot                                                                         |
+| `DELETE` | `/v1/dashboard-stats?olderThanDays=N` | Admin  | Bulk-delete snapshots older than N days (retention cleanup; `N` must be ≥ 30)                    |
+
+> `avgCompletionRate` in a snapshot = average, across all assignments, of (submissions ÷ that assignment's course/session roster size) as a percentage. Roster size is always the _current_ roster (MongoDB doesn't retain historical rosters), so this is most accurate for the latest snapshot and only approximate for older ones.
 
 ### Feed & Health
 
