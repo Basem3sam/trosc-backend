@@ -12,7 +12,7 @@ const photoValidation = Joi.string()
       /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/i;
 
     // Allow simple filenames (profile.jpg, user-photo.png, etc.)
-    const filenameRegex = /^[a-zA-Z0-9_\-\.]+\.(jpg|jpeg|png|webp|gif|svg)$/i;
+    const filenameRegex = /^[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|webp|gif|svg)$/i;
 
     // Allow data URIs (base64 images)
     const dataUriRegex =

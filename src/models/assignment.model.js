@@ -183,20 +183,6 @@ const assignmentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-assignmentSchema.pre('validate', function (next) {
-  const hasCourse = !!this.course;
-  const hasSession = !!this.session;
-
-  if (hasCourse === hasSession) {
-    return next(
-      new Error(
-        'An assignment must belong to exactly one of course or session (not both, not neither)',
-      ),
-    );
-  }
-  next();
-});
-
 assignmentSchema.index({ course: 1 });
 assignmentSchema.index({ session: 1 });
 assignmentSchema.index({ instructor: 1 });

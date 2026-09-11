@@ -1,4 +1,3 @@
-// tests/utils/logger.test.js
 const { AsyncLocalStorage } = require('async_hooks');
 
 // Mock winston and winston-daily-rotate-file
@@ -86,7 +85,8 @@ describe('Logger', () => {
   });
 
   it('uses the correct formats', () => {
-    const { logger } = require('../../src/utils/logger');
+    require('../../src/utils/logger');
+
     expect(winston.format.combine).toHaveBeenCalled();
     expect(winston.format.timestamp).toHaveBeenCalled();
     expect(winston.format.errors).toHaveBeenCalledWith({ stack: true });
@@ -94,7 +94,8 @@ describe('Logger', () => {
   });
 
   it('adds the console transport in all environments', () => {
-    const { logger } = require('../../src/utils/logger');
+    require('../../src/utils/logger');
+
     expect(winston.transports.Console).toHaveBeenCalled();
   });
 
@@ -103,20 +104,20 @@ describe('Logger', () => {
 
     jest.resetModules();
 
-    const DailyRotateFile = require('winston-daily-rotate-file');
+    const DailyRotateFileMock = require('winston-daily-rotate-file');
 
     require('../../src/utils/logger');
 
-    expect(DailyRotateFile).toHaveBeenCalledTimes(2);
+    expect(DailyRotateFileMock).toHaveBeenCalledTimes(2);
 
-    expect(DailyRotateFile).toHaveBeenCalledWith(
+    expect(DailyRotateFileMock).toHaveBeenCalledWith(
       expect.objectContaining({
         filename: 'logs/error-%DATE%.log',
         level: 'error',
       }),
     );
 
-    expect(DailyRotateFile).toHaveBeenCalledWith(
+    expect(DailyRotateFileMock).toHaveBeenCalledWith(
       expect.objectContaining({
         filename: 'logs/combined-%DATE%.log',
       }),
@@ -126,7 +127,7 @@ describe('Logger', () => {
   it('does not add file transports in non-production', () => {
     process.env.NODE_ENV = 'development';
     jest.resetModules();
-    const { logger } = require('../../src/utils/logger');
+    require('../../src/utils/logger');
     expect(DailyRotateFile).not.toHaveBeenCalled();
   });
 
@@ -138,47 +139,49 @@ describe('Logger', () => {
   });
 
   describe('requestId injection format', () => {
-    it('injects requestId from asyncLocalStorage store', () => {
-      // We need to test the format function directly
-      const { asyncLocalStorage } = require('../../src/utils/logger');
-      const mockInfo = { message: 'test' };
-      const store = { requestId: 'test-request-id' };
+    // The logger module calls `winston.format(fn)` directly once for the
+    // top-level logger and once for the console transport. Both calls use
+    // the same requestIdFormat factory, so we grab the first callback and
+    // exercise it directly against a mock `info` object.
+    function loadRequestIdFormatFn() {
+      require('../../src/utils/logger');
+      const [firstCall] = winston.format.mock.calls;
+      if (!firstCall) {
+        throw new Error(
+          'winston.format() was never called — logger.js did not register requestIdFormat',
+        );
+      }
+      return firstCall[0];
+    }
 
-      // Run the format function inside the ALS context
-      asyncLocalStorage.run(store, () => {
-        // Re-require to get the fresh format function
-        const { logger } = require('../../src/utils/logger');
-        // The format is applied internally; we can't easily test it without
-        // actually logging something. We'll test by checking that the
-        // requestIdFormat function was used.
-        // We'll instead verify that winston.format.combine was called with
-        // a function that modifies the info object.
-        const combineCalls = winston.format.combine.mock.calls;
-        expect(combineCalls.length).toBeGreaterThan(0);
-        // The first argument to combine should be the requestIdFormat function
-        const formats = combineCalls[0];
-        // We can't easily test the function itself, but we can test that
-        // the logger was created with the expected format.
+    it('injects requestId from asyncLocalStorage store', () => {
+      const { asyncLocalStorage } = require('../../src/utils/logger');
+      const requestIdFormatFn = loadRequestIdFormatFn();
+
+      const info = { message: 'test' };
+
+      asyncLocalStorage.run({ requestId: 'test-request-id' }, () => {
+        const result = requestIdFormatFn(info);
+        expect(result.requestId).toBe('test-request-id');
       });
     });
 
-    it('uses "no-request-id" when requestId is not set', () => {
-      // Similar to above, we test that the format exists and is called
-      const { asyncLocalStorage } = require('../../src/utils/logger');
-      const mockInfo = { message: 'test' };
+    it('falls back to "no-request-id" when no store is set', () => {
+      const requestIdFormatFn = loadRequestIdFormatFn();
 
-      // Run without setting a store
-      asyncLocalStorage.run(undefined, () => {
-        const { logger } = require('../../src/utils/logger');
-        // We can't directly test the format, but we can verify it's included
-        expect(winston.format.combine).toHaveBeenCalled();
-      });
+      const info = { message: 'test' };
+
+      // Deliberately not wrapped in asyncLocalStorage.run — getStore()
+      // returns undefined, so the fallback branch must fire.
+      const result = requestIdFormatFn(info);
+
+      expect(result.requestId).toBe('no-request-id');
     });
   });
 
-  // Additional test: verify that the logger's info method works
-  it('logs messages using the logger', () => {
+  it('exposes info/error/warn/debug methods on the logger', () => {
     const { logger } = require('../../src/utils/logger');
+
     expect(logger.info).toBeDefined();
     expect(logger.error).toBeDefined();
     expect(logger.warn).toBeDefined();
