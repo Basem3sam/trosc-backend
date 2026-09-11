@@ -2337,37 +2337,118 @@
           },
           "user": {
             "type": "string",
-            "description": "ObjectId reference to the user who did the action",
+            "description": "ObjectId reference to the user who performed the action",
             "example": "67123abc12ef4567890a1234"
           },
           "action": {
             "type": "string",
-            "description": "Type of action performed",
+            "description": "Type of action performed (see ACTIVITY_ACTIONS)",
             "example": "enrolled_in_course"
           },
           "targetModel": {
             "type": "string",
-            "description": "The model affected (e.g., Course, Track)",
+            "description": "The model affected (e.g., Course, Track), if any",
             "example": "Course"
           },
           "targetId": {
             "type": "string",
-            "description": "The ID of the affected model instance",
+            "description": "The ID of the affected document, if any",
             "example": "67123abc12ef4567890a5678"
           },
           "metadata": {
             "type": "object",
-            "description": "Additional context data (e.g., IP, browser, etc.)",
+            "description": "Free-form additional context (IP, user agent, old/new values, etc.)",
             "example": {
               "ip": "192.168.1.1",
-              "browser": "Chrome",
-              "duration": "2h"
+              "userAgent": "Mozilla/5.0"
             }
           },
           "createdAt": {
             "type": "string",
             "format": "date-time",
             "example": "2025-10-18T14:30:00.000Z"
+          }
+        }
+      },
+      "ActivityLogsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "results": {
+            "type": "integer",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "example": 143
+          },
+          "pagination": {
+            "type": "object"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "activityLogs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ActivityLog"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ActivitySummaryResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "totalActivities": {
+                "type": "integer",
+                "example": 512
+              },
+              "byAction": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "example": "enrolled_in_course"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "example": 87
+                    }
+                  }
+                }
+              },
+              "mostActiveUsers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "userId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2491,6 +2572,10 @@
     {
       "name": "Assignments",
       "description": "Course and session assignments: creation, editing, submissions, and grading"
+    },
+    {
+      "name": "Activity Logs",
+      "description": "Audit trail of user actions (admin) and personal activity timeline (self)"
     },
     {
       "name": "Feed",
@@ -8625,6 +8710,396 @@
         "summary": "Delete announcement",
         "tags": [
           "Announcements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/activity-logs/me": {
+      "get": {
+        "operationId": "getMyActivityLogs",
+        "summary": "Get my own activity timeline",
+        "description": "Returns the authenticated user's own activity history, newest first",
+        "tags": [
+          "Activity Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity logs retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/activity-logs/summary": {
+      "get": {
+        "operationId": "getActivitySummary",
+        "summary": "Get aggregated activity stats (admin only)",
+        "description": "Total activity count, a breakdown by action, and the most active users, optionally scoped to a date range",
+        "tags": [
+          "Activity Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "ISO 8601 date, inclusive lower bound",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "ISO 8601 date, inclusive upper bound",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Restrict the breakdown to a single action",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Summary retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivitySummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/activity-logs/user/{userId}": {
+      "get": {
+        "operationId": "getUserActivityLogs",
+        "summary": "Get a specific user's activity timeline (admin only)",
+        "tags": [
+          "Activity Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity logs retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/activity-logs": {
+      "get": {
+        "operationId": "getAllActivityLogs",
+        "summary": "List all activity logs (admin only)",
+        "description": "Supports the standard list query params (page, limit, sort, fields) plus field filters like ?action=login or ?createdAt[gte]=2025-01-01",
+        "tags": [
+          "Activity Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity logs retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "pruneActivityLogs",
+        "summary": "Bulk-delete activity logs older than N days (admin only)",
+        "description": "Retention/cleanup endpoint. Requires olderThanDays (minimum 30) to prevent accidentally wiping the whole audit trail.",
+        "tags": [
+          "Activity Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "olderThanDays",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 3650
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Old logs deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Deleted 42 activity log(s) older than 2025-07-01T00:00:00.000Z"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "deletedCount": {
+                          "type": "integer",
+                          "example": 42
+                        },
+                        "cutoff": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/activity-logs/{id}": {
+      "get": {
+        "operationId": "getActivityLog",
+        "summary": "Get a single activity log entry by ID (admin only)",
+        "tags": [
+          "Activity Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity log found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "activityLog": {
+                          "$ref": "#/components/schemas/ActivityLog"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteActivityLog",
+        "summary": "Delete a single activity log entry (admin only)",
+        "description": "Rare in practice — audit trails are normally append-only. Kept for cases like a targeted erasure request.",
+        "tags": [
+          "Activity Logs"
         ],
         "security": [
           {
