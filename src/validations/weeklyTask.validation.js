@@ -67,5 +67,6 @@ exports.updateWeeklyTaskSchema = Joi.object({
 })
   .min(1)
   .messages({
-    'object.min': 'Provide at least one field to update (week, title, or items)',
+    'object.min':
+      'Provide at least one field to update (week, title, or items)',
   });

@@ -4,7 +4,10 @@ const Event = require('../src/models/event.model');
 const { createTestUser } = require('./helpers/testUser');
 
 describe('Events CRUD & RSVP', () => {
-  let adminToken, instructorToken, studentToken, studentId;
+  let adminToken;
+  let instructorToken;
+  let studentToken;
+  let studentId;
 
   beforeEach(async () => {
     const admin = await createTestUser({ role: 'admin' });

@@ -2,11 +2,11 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 // ── Color helpers ──────────────────────────────────────────
-const green = (msg) => console.log('\x1b[32m✅ ' + msg + '\x1b[0m');
-const red = (msg) => console.log('\x1b[31m❌ ' + msg + '\x1b[0m');
-const yellow = (msg) => console.log('\x1b[33m⚠️  ' + msg + '\x1b[0m');
-const blue = (msg) => console.log('\x1b[36mℹ️  ' + msg + '\x1b[0m');
-const divider = () => console.log('\x1b[90m' + '─'.repeat(60) + '\x1b[0m');
+const green = (msg) => console.log(`\x1b[32m✅ ${msg}\x1b[0m`);
+const red = (msg) => console.log(`\x1b[31m❌ ${msg}\x1b[0m`);
+const yellow = (msg) => console.log(`\x1b[33m⚠️  ${msg}\x1b[0m`);
+const blue = (msg) => console.log(`\x1b[36mℹ️  ${msg}\x1b[0m`);
+const divider = () => console.log(`\x1b[90m${'─'.repeat(60)}\x1b[0m`);
 
 // ── Check environment variables ──────────────────────────
 function checkEnv() {
@@ -27,7 +27,7 @@ function checkEnv() {
     const val = process.env[key];
     if (val) {
       // Mask sensitive values
-      const display = key.includes('PASS') ? val.substring(0, 3) + '***' : val;
+      const display = key.includes('PASS') ? `${val.substring(0, 3)}***` : val;
       green(`${key} = ${display}`);
     } else {
       red(`${key} = MISSING`);
@@ -81,10 +81,9 @@ async function verifyConnection(transporter) {
     if (verify) {
       green('SMTP server is reachable and accepting connections');
       return true;
-    } else {
-      red('SMTP verify returned false — server may be rejecting');
-      return false;
     }
+    red('SMTP verify returned false — server may be rejecting');
+    return false;
   } catch (err) {
     red('SMTP connection failed');
     console.error('   Error:', err.message);
@@ -113,7 +112,7 @@ async function sendTestEmail(transporter, toEmail) {
   const mailOptions = {
     from: process.env.EMAIL_FROM || 'Trosc Club <noreply@trosc.club>',
     to: toEmail,
-    subject: 'Trosc Email Test — ' + new Date().toLocaleString(),
+    subject: `Trosc Email Test — ${new Date().toLocaleString()}`,
     text: `Hello!\n\nThis is a test email from your Trosc backend.\n\nIf you received this, your email configuration is working correctly.\n\nTimestamp: ${new Date().toISOString()}\nEnvironment: ${process.env.NODE_ENV || 'development'}\n\nHappy coding! 🚀`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
@@ -135,19 +134,19 @@ async function sendTestEmail(transporter, toEmail) {
   try {
     const info = await transporter.sendMail(mailOptions);
     green('Email sent successfully!');
-    blue('Message ID: ' + info.messageId);
+    blue(`Message ID: ${info.messageId}`);
     if (info.accepted && info.accepted.length > 0) {
-      green('Accepted by: ' + info.accepted.join(', '));
+      green(`Accepted by: ${info.accepted.join(', ')}`);
     }
     if (info.rejected && info.rejected.length > 0) {
-      red('Rejected: ' + info.rejected.join(', '));
+      red(`Rejected: ${info.rejected.join(', ')}`);
     }
     return true;
   } catch (err) {
     red('Failed to send email');
     console.error('   Error:', err.message);
     if (err.response) {
-      yellow('   Server response: ' + err.response);
+      yellow(`   Server response: ${err.response}`);
     }
     return false;
   }

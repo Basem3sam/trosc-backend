@@ -4,7 +4,9 @@ const { createTestUser } = require('./helpers/testUser');
 
 describe('Track & Course CRUD', () => {
   describe('Tracks', () => {
-    let instructorToken, adminToken, trackId;
+    let instructorToken;
+    let adminToken;
+    let trackId;
 
     beforeEach(async () => {
       const { token: instToken } = await createTestUser({ role: 'instructor' });
@@ -90,7 +92,8 @@ describe('Track & Course CRUD', () => {
   });
 
   describe('Courses', () => {
-    let instructorToken, courseId;
+    let instructorToken;
+    let courseId;
 
     beforeEach(async () => {
       const { token: instToken } = await createTestUser({ role: 'instructor' });

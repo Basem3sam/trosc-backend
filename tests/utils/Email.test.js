@@ -6,10 +6,11 @@ jest.mock('../../src/utils/logger', () => ({
 jest.mock('html-to-text', () => ({
   convert: jest.fn((html) => `TEXT: ${html}`),
 }));
+const { convert } = require('html-to-text');
 const Email = require('../../src/utils/Email');
 const createTransporter = require('../../src/config/mailer.config');
 const { logger } = require('../../src/utils/logger');
-const { convert } = require('html-to-text');
+
 const mockTransporter = { sendMail: jest.fn() };
 describe('Email', () => {
   let user;

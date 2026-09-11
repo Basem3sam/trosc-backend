@@ -12,8 +12,28 @@ exports.createAnnouncementSchema = Joi.object({
     'string.min': 'Message must be at least 10 characters',
   }),
   audience: Joi.string().valid('all', 'track', 'course').default('all'),
-  targetTrack: objectId.optional(),
-  targetCourse: objectId.optional(),
+  // Required/forbidden based on audience so it's impossible to create a
+  // 'track'/'course' announcement with no matching target — that document
+  // would then be invisible to everyone except admins forever, since
+  // announcement.service.js's audience filter has nothing to match against.
+  targetTrack: Joi.when('audience', {
+    is: 'track',
+    then: objectId.required().messages({
+      'any.required': 'targetTrack is required when audience is "track"',
+    }),
+    otherwise: Joi.forbidden().messages({
+      'any.unknown': 'targetTrack is only allowed when audience is "track"',
+    }),
+  }),
+  targetCourse: Joi.when('audience', {
+    is: 'course',
+    then: objectId.required().messages({
+      'any.required': 'targetCourse is required when audience is "course"',
+    }),
+    otherwise: Joi.forbidden().messages({
+      'any.unknown': 'targetCourse is only allowed when audience is "course"',
+    }),
+  }),
   attachments: Joi.array().items(Joi.string()).optional(),
   isPinned: Joi.boolean().default(false),
 });

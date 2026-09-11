@@ -5,13 +5,13 @@ const { createTestUser } = require('../helpers/testUser');
 const { buildTrackAndCourseFixture } = require('../helpers/fixtures');
 
 describe('WeeklyTask Controller – Update and Delete', () => {
-  let instructor,
-    instructorToken,
-    adminToken,
-    otherInstructorToken,
-    studentToken,
-    course,
-    task;
+  let instructor;
+  let instructorToken;
+  let adminToken;
+  let otherInstructorToken;
+  let studentToken;
+  let course;
+  let task;
 
   beforeEach(async () => {
     const fixture = await buildTrackAndCourseFixture();

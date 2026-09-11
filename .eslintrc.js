@@ -63,13 +63,18 @@ module.exports = {
     {
       files: ['tests/**/*.js'],
       rules: {
-        // Test files legitimately import devDependencies (jest, supertest,
-        // mongodb-memory-server helpers); airbnb-base's default glob list
-        // already covers most of this, but be explicit for this repo's layout.
         'import/no-extraneous-dependencies': [
           'error',
           { devDependencies: true },
         ],
+      },
+    },
+    {
+      // Jest manual mocks are intentionally empty no-op classes.
+      files: ['tests/__mocks__/**/*.js'],
+      rules: {
+        'class-methods-use-this': 'off',
+        'no-unused-vars': 'off',
       },
     },
   ],

@@ -3,11 +3,11 @@ const { AsyncLocalStorage } = require('async_hooks');
 
 // Mock winston and winston-daily-rotate-file
 jest.mock('winston', () => {
-  const format = jest.fn().mockImplementation((fn) => {
-    return jest.fn().mockImplementation(() => ({
+  const format = jest.fn().mockImplementation((fn) =>
+    jest.fn().mockImplementation(() => ({
       transform: fn,
-    }));
-  });
+    })),
+  );
 
   format.combine = jest.fn().mockImplementation((...args) => args);
   format.timestamp = jest.fn().mockImplementation(() => jest.fn());
@@ -37,9 +37,9 @@ jest.mock('winston', () => {
   };
 });
 
-jest.mock('winston-daily-rotate-file', () => {
-  return jest.fn().mockImplementation(() => ({}));
-});
+jest.mock('winston-daily-rotate-file', () =>
+  jest.fn().mockImplementation(() => ({})),
+);
 
 describe('Logger', () => {
   let originalEnv;

@@ -8,7 +8,11 @@ const { buildTrackAndCourseFixture } = require('../helpers/fixtures');
 
 describe('Course Controller – Missing Endpoints', () => {
   describe('add/remove session to/from course', () => {
-    let instructor, instructorToken, course, session, otherInstructorToken;
+    let instructor;
+    let instructorToken;
+    let course;
+    let session;
+    let otherInstructorToken;
 
     beforeEach(async () => {
       const fixture = await buildTrackAndCourseFixture();
@@ -92,12 +96,12 @@ describe('Course Controller – Missing Endpoints', () => {
   });
 
   describe('add/remove student to/from course', () => {
-    let instructor,
-      instructorToken,
-      course,
-      student,
-      studentToken,
-      otherInstructorToken;
+    let instructor;
+    let instructorToken;
+    let course;
+    let student;
+    let studentToken;
+    let otherInstructorToken;
 
     beforeEach(async () => {
       const fixture = await buildTrackAndCourseFixture();
@@ -180,7 +184,12 @@ describe('Course Controller – Missing Endpoints', () => {
   });
 
   describe('filtering endpoints', () => {
-    let instructor, instructorToken, course, student, studentToken, track;
+    let instructor;
+    let instructorToken;
+    let course;
+    let student;
+    let studentToken;
+    let track;
 
     beforeEach(async () => {
       const fixture = await buildTrackAndCourseFixture();

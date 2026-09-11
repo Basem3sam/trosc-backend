@@ -2,11 +2,12 @@ const assignmentSubmissionService = require('../services/assignmentSubmission.se
 const catchAsync = require('../utils/catchAsync');
 
 exports.submitAssignment = catchAsync(async (req, res, next) => {
-  const { submission, late } = await assignmentSubmissionService.submitAssignment(
-    req.params.id,
-    req.user.id,
-    req.body,
-  );
+  const { submission, late } =
+    await assignmentSubmissionService.submitAssignment(
+      req.params.id,
+      req.user.id,
+      req.body,
+    );
 
   res.status(200).json({
     status: 'success',

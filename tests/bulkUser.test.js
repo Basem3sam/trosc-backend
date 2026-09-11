@@ -4,7 +4,8 @@ const User = require('../src/models/user.model');
 const { createTestUser } = require('./helpers/testUser');
 
 describe('Bulk User Actions', () => {
-  let adminToken, userIds;
+  let adminToken;
+  let userIds;
 
   beforeEach(async () => {
     const { token } = await createTestUser({ role: 'admin' });

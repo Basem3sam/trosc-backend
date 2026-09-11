@@ -5,7 +5,10 @@ const { createTestUser } = require('./helpers/testUser');
 const { buildTrackAndCourseFixture } = require('./helpers/fixtures');
 
 describe('Session URL Gating', () => {
-  let session, studentToken, outsiderToken, course;
+  let session;
+  let studentToken;
+  let outsiderToken;
+  let course;
 
   beforeEach(async () => {
     const fixture = await buildTrackAndCourseFixture();

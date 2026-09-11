@@ -36,18 +36,16 @@ module.exports = (resourceType) => {
       reviewController.getReviews(resourceType),
     );
 
-  router
-    .route('/:reviewId')
-    .delete(
-      protect,
-      validate(deleteReviewSchema, 'params'),
-      checkOwnership({
-        model: 'Review',
-        ownerField: 'user',
-        paramName: 'reviewId',
-      }),
-      reviewController.deleteReview,
-    );
+  router.route('/:reviewId').delete(
+    protect,
+    validate(deleteReviewSchema, 'params'),
+    checkOwnership({
+      model: 'Review',
+      ownerField: 'user',
+      paramName: 'reviewId',
+    }),
+    reviewController.deleteReview,
+  );
 
   return router;
 };

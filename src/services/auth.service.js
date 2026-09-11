@@ -87,7 +87,9 @@ exports.forgotPassword = async (email) => {
   // 1) Get user based on POSTed email
   const user = await User.findOne({ email }).select('+active');
   if (!user || !user.active) {
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Artificial delay to prevent email enumeration
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1000);
+    }); // Artificial delay to prevent email enumeration
     return; // Do not reveal if user exists or not for security reasons
   }
 

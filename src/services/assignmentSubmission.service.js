@@ -17,7 +17,10 @@ async function assertEnrolled(assignment, userId) {
   if (!resource) {
     // Shouldn't normally happen (the parent was required to create the
     // assignment), but guards against a deleted course/session.
-    throw new AppError(`The ${label} this assignment belongs to no longer exists`, 404);
+    throw new AppError(
+      `The ${label} this assignment belongs to no longer exists`,
+      404,
+    );
   }
 
   const isEnrolled = resource.students.some(
@@ -91,7 +94,10 @@ exports.gradeSubmission = async (assignmentId, studentId, grade) => {
     (s) => s.student.toString() === studentId,
   );
   if (!submission) {
-    throw new AppError('This student has not submitted this assignment yet', 404);
+    throw new AppError(
+      'This student has not submitted this assignment yet',
+      404,
+    );
   }
 
   submission.grade = grade;

@@ -76,7 +76,7 @@ const activityLogSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-//TODO - Future feature: User activity log - This model will store logs of user activities such as logins, course enrollments, assignment submissions, and other interactions. This can be used for auditing, analytics, and improving user experience by understanding user behavior on the platform.
+// TODO - Future feature: User activity log - This model will store logs of user activities such as logins, course enrollments, assignment submissions, and other interactions. This can be used for auditing, analytics, and improving user experience by understanding user behavior on the platform.
 // const ActivityLog = mongoose.model('ActivityLog', activityLogSchema);
 // module.exports = ActivityLog;
 

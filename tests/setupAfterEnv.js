@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+
 jest.mock('../src/utils/Email');
 
 // Each test FILE gets its own Mongoose connection to the shared in-memory

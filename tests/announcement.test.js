@@ -3,7 +3,10 @@ const app = require('../src/app');
 const { createTestUser } = require('./helpers/testUser');
 
 describe('Announcements CRUD', () => {
-  let adminToken, instructorToken, studentToken, announcementId;
+  let adminToken;
+  let instructorToken;
+  let studentToken;
+  let announcementId;
 
   beforeEach(async () => {
     const admin = await createTestUser({ role: 'admin' });

@@ -9,6 +9,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 
+const crypto = require('crypto');
 const swaggerSpec = require('./config/swagger.config');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./controllers/error.controller');
@@ -23,7 +24,6 @@ const contactRouter = require('./routes/contact.route');
 const weeklyTaskProgressRouter = require('./routes/weeklyTaskProgress.route');
 const assignmentSubmissionRouter = require('./routes/assignmentSubmission.route');
 const { logger, asyncLocalStorage } = require('./utils/logger');
-const crypto = require('crypto');
 
 const { authLimiter } = require('./middlewares/rateLimit.middleware');
 
@@ -125,8 +125,8 @@ app.options('*', cors()); // Handle preflight requests
 
 // Limit request from same IP
 const limiter = rateLimit({
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 300,
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 Minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 300,
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 Minutes
   message: 'Too many requests from this IP, please try again in 15 minutes',
 });
 
@@ -142,7 +142,7 @@ app.use('/v1/users/resetPassword', authLimiter);
 /* BODY PARSER */
 
 // Body parser, reading data from body into req.body
-app.use(express.json({ limit: '100kb' })); //limit the json by 100kb only to prevent attacks with too much data
+app.use(express.json({ limit: '100kb' })); // limit the json by 100kb only to prevent attacks with too much data
 
 // Handle form data
 app.use(

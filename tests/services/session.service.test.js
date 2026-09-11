@@ -10,7 +10,9 @@ const { createTestUser } = require('../helpers/testUser');
 const sId = (user) => user._id.toString();
 
 describe('Session Service', () => {
-  let instructor, student, otherInstructor;
+  let instructor;
+  let student;
+  let otherInstructor;
 
   beforeEach(async () => {
     instructor = (await createTestUser({ role: 'instructor' })).user;

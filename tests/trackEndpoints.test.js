@@ -129,7 +129,10 @@ describe('Track Endpoints (Missing Coverage)', () => {
   });
 
   describe('Leave requests (GET/POST)', () => {
-    let instructor, student, track, studentId;
+    let instructor;
+    let student;
+    let track;
+    let studentId;
 
     beforeEach(async () => {
       instructor = await createTestUser({ role: 'instructor' });

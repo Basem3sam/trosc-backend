@@ -2,9 +2,6 @@ const User = require('../models/user.model');
 const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
-const Assignment = require('../models/assignment.model');
-const Review = require('../models/review.model');
-const WeeklyTask = require('../models/weeklytask.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
@@ -162,63 +159,11 @@ exports.updateTrack = async (trackId, updateBody) => {
  * @throws {AppError} 404 if track not found
  */
 exports.deleteTrack = async (trackId) => {
-  const track = await Track.findById(trackId);
-  if (!track) throw new AppError('No track found with that ID', 404);
-
-  await Assignment.deleteMany({
-    $or: [
-      { course: { $in: track.courses } },
-      { session: { $in: track.sessions } },
-    ],
-  });
-  await WeeklyTask.deleteMany({ course: { $in: track.courses } });
-  await Review.deleteMany({ track: trackId }); // this one's fine — Review does have a track field
-
-  // Courses become standalone (no track)
-  await Course.updateMany(
-    { _id: { $in: track.courses } },
-    { $set: { track: null } },
-  );
-
-  // Sessions become standalone if not in a course
-  const sessionsInTrack = await Session.find({ _id: { $in: track.sessions } });
-  for (const session of sessionsInTrack) {
-    session.tracks.pull(trackId);
-    session.isStandalone = !session.tracks?.length && !session.course;
-    await session.save();
-  }
-
-  // Remove all track students from track courses and sessions
-  if (track.students?.length) {
-    if (track.courses?.length) {
-      await Course.updateMany(
-        { _id: { $in: track.courses } },
-        { $pull: { students: { $in: track.students } } },
-      );
-    }
-    if (track.sessions?.length) {
-      await Session.updateMany(
-        { _id: { $in: track.sessions } },
-        { $pull: { students: { $in: track.students } } },
-      );
-    }
-  }
-
-  // Clean up User enrollments ONLY for actual track students
-  if (track.students?.length) {
-    await User.updateMany(
-      { _id: { $in: track.students } },
-      {
-        $unset: { enrolledTrack: 1 },
-        $pull: {
-          enrolledCourses: { $in: track.courses || [] },
-          enrolledSessions: { $in: track.sessions || [] },
-        },
-      },
-    );
-  }
-
-  await Track.findByIdAndDelete(trackId);
+  // Delegates to cascade.service's transactional implementation: deleting a
+  // track touches assignments, weekly tasks, reviews, courses, sessions,
+  // and every enrolled student's user document, so it needs to be all-or-
+  // nothing rather than a sequence of independent writes.
+  await cascade.deleteTrackCascade(trackId);
   return null;
 };
 

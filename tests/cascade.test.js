@@ -7,7 +7,11 @@ const Session = require('../src/models/session.model');
 const { createTestUser } = require('./helpers/testUser');
 
 describe('Cascade Service (Transactions)', () => {
-  let user, instructor, track, course, session;
+  let user;
+  let instructor;
+  let track;
+  let course;
+  let session;
 
   beforeEach(async () => {
     user = (await createTestUser()).user;

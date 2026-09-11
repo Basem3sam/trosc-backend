@@ -249,7 +249,7 @@ describe('POST /v1/users/logout', () => {
       .post('/v1/users/login')
       .send(credentials);
     expect(loginRes.status).toBe(200);
-    const token = loginRes.body.token;
+    const { token } = loginRes.body;
 
     const logoutRes = await request(app)
       .post('/v1/users/logout')

@@ -41,10 +41,7 @@ exports.getAllSessions = catchAsync(async (req, res, next) => {
 
 // Get single session
 exports.getSession = catchAsync(async (req, res, next) => {
-  const session = await sessionService.getSessionById(
-    req.params.id,
-    req.user,
-  );
+  const session = await sessionService.getSessionById(req.params.id, req.user);
 
   res.status(200).json({
     status: 'success',

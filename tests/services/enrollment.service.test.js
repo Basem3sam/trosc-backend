@@ -7,7 +7,9 @@ const User = require('../../src/models/user.model');
 const { createTestUser } = require('../helpers/testUser');
 
 describe('Enrollment Service', () => {
-  let instructor, student, student2;
+  let instructor;
+  let student;
+  let student2;
 
   beforeEach(async () => {
     instructor = (await createTestUser({ role: 'instructor' })).user;

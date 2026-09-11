@@ -6,7 +6,10 @@ const WeeklyTask = require('../../src/models/weeklytask.model');
 const { createTestUser } = require('../helpers/testUser');
 
 describe('WeeklyTask Service', () => {
-  let instructor, student, otherInstructor, course;
+  let instructor;
+  let student;
+  let otherInstructor;
+  let course;
 
   beforeEach(async () => {
     instructor = (await createTestUser({ role: 'instructor' })).user;

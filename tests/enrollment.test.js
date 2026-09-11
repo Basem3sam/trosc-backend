@@ -6,7 +6,12 @@ const Session = require('../src/models/session.model');
 const { createTestUser } = require('./helpers/testUser');
 
 describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
-  let instructorToken, studentToken, studentId, trackId, courseId, sessionId;
+  let instructorToken;
+  let studentToken;
+  let studentId;
+  let trackId;
+  let courseId;
+  let sessionId;
 
   beforeEach(async () => {
     const instructor = await createTestUser({ role: 'instructor' });
@@ -274,7 +279,13 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
   });
 
   describe('Course Self-Enrollment (Prerequisites)', () => {
-    let instructor, student, studentToken, studentId, track, courseA, courseB;
+    let instructor;
+    let student;
+    let studentToken;
+    let studentId;
+    let track;
+    let courseA;
+    let courseB;
 
     beforeEach(async () => {
       instructor = await createTestUser({ role: 'instructor' });

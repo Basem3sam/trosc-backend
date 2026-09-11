@@ -1,8 +1,11 @@
+const mongoose = require('mongoose');
 const User = require('../models/user.model');
 const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
-const mongoose = require('mongoose');
+const Assignment = require('../models/assignment.model');
+const Review = require('../models/review.model');
+const WeeklyTask = require('../models/weeklytask.model');
 const AppError = require('../utils/AppError');
 
 // Called when a student joins a track (self-approve or instructor add)
@@ -123,4 +126,94 @@ exports.unsyncSessionEnrollment = async (userId, sessionId) => {
   await User.findByIdAndUpdate(userId, {
     $pull: { enrolledSessions: sessionId },
   });
+};
+
+// Called when a track is deleted. Wipes track-scoped assignments/weekly
+// tasks/reviews, detaches the track's courses and sessions (they become
+// standalone rather than being deleted themselves), unenrolls every track
+// student from those courses/sessions, and finally removes the track
+// document itself — all inside one transaction so a failure partway
+// through can't leave courses/sessions/users out of sync with a
+// half-deleted (or fully deleted) track.
+exports.deleteTrackCascade = async (trackId) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const track = await Track.findById(trackId).session(session);
+    if (!track) {
+      throw new AppError('No track found with that ID', 404);
+    }
+
+    // Sequential for the same reason as the sync/unsync helpers above: one
+    // ClientSession, one operation in flight at a time.
+    await Assignment.deleteMany({
+      $or: [
+        { course: { $in: track.courses } },
+        { session: { $in: track.sessions } },
+      ],
+    }).session(session);
+
+    await WeeklyTask.deleteMany({ course: { $in: track.courses } }).session(
+      session,
+    );
+
+    await Review.deleteMany({ track: trackId }).session(session); // Review does have a track field
+
+    // Courses become standalone (no track)
+    await Course.updateMany(
+      { _id: { $in: track.courses } },
+      { $set: { track: null } },
+    ).session(session);
+
+    // Sessions become standalone if not in a course
+    const sessionsInTrack = await Session.find({
+      _id: { $in: track.sessions },
+    }).session(session);
+    for (const trackSession of sessionsInTrack) {
+      trackSession.tracks.pull(trackId);
+      trackSession.isStandalone =
+        !trackSession.tracks?.length && !trackSession.course;
+      await trackSession.save({ session });
+    }
+
+    // Remove all track students from track courses and sessions
+    if (track.students?.length) {
+      if (track.courses?.length) {
+        await Course.updateMany(
+          { _id: { $in: track.courses } },
+          { $pull: { students: { $in: track.students } } },
+        ).session(session);
+      }
+      if (track.sessions?.length) {
+        await Session.updateMany(
+          { _id: { $in: track.sessions } },
+          { $pull: { students: { $in: track.students } } },
+        ).session(session);
+      }
+    }
+
+    // Clean up User enrollments ONLY for actual track students
+    if (track.students?.length) {
+      await User.updateMany(
+        { _id: { $in: track.students } },
+        {
+          $unset: { enrolledTrack: 1 },
+          $pull: {
+            enrolledCourses: { $in: track.courses || [] },
+            enrolledSessions: { $in: track.sessions || [] },
+          },
+        },
+      ).session(session);
+    }
+
+    await Track.findByIdAndDelete(trackId).session(session);
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
 };

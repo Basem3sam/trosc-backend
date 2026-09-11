@@ -15,7 +15,7 @@ exports.createAnnouncement = catchAsync(async (req, res, next) => {
 
 exports.getAllAnnouncements = catchAsync(async (req, res, next) => {
   const { announcements, total, pagination } =
-    await announcementService.getAnnouncements(req.query);
+    await announcementService.getAnnouncements(req.query, req.user);
 
   res.status(200).json({
     status: 'success',
@@ -29,6 +29,7 @@ exports.getAllAnnouncements = catchAsync(async (req, res, next) => {
 exports.getAnnouncement = catchAsync(async (req, res, next) => {
   const announcement = await announcementService.getAnnouncementById(
     req.params.id,
+    req.user,
   );
 
   res.status(200).json({

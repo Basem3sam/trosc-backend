@@ -296,7 +296,7 @@ const resourceSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Resource URL is required.'],
     validate: {
-      validator: function (v) {
+      validator(v) {
         if (!v) return true;
         try {
           const parsed = new URL(v);
@@ -327,7 +327,7 @@ const sessionSchema = new mongoose.Schema(
       type: String,
       trim: true,
       validate: {
-        validator: function (v) {
+        validator(v) {
           if (!v) return true;
           const youtubeRegex =
             /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
@@ -380,11 +380,11 @@ const sessionSchema = new mongoose.Schema(
       type: String,
       default: 'https://placehold.co/800x400?text=Trosc+Session',
       validate: {
-        validator: function (v) {
+        validator(v) {
           if (!v || v === 'https://placehold.co/800x400?text=Trosc+Session')
             return true;
           if (validator.isURL(v, { require_protocol: true })) return true;
-          return /^(?!.*[\/\\])[a-zA-Z0-9_\-]+\.(jpg|jpeg|png|webp)$/i.test(v);
+          return /^(?!.*[/\\])[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp)$/i.test(v);
         },
         message: 'Cover image must be a valid URL or image filename',
       },

@@ -332,13 +332,13 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: 'https://placehold.co/800x400?text=Trosc+User',
       validate: {
-        validator: function (v) {
+        validator(v) {
           if (!v || v === 'https://placehold.co/800x400?text=Trosc+User')
             return true;
           if (v.startsWith('data:image/') && v.includes(';base64,'))
             return true;
           if (validator.isURL(v, { require_protocol: true })) return true;
-          return /^(?!.*[\/\\])[a-zA-Z0-9_\-]+\.(jpg|jpeg|png|webp)$/i.test(v);
+          return /^(?!.*[/\\])[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp)$/i.test(v);
         },
         message: 'Photo must be a valid URL, base64 image, or image filename',
       },
@@ -352,7 +352,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
       validate: {
-        validator: function (v) {
+        validator(v) {
           if (!v) return true;
           return validator.isURL(v, { require_protocol: true });
         },
@@ -364,7 +364,7 @@ const userSchema = new mongoose.Schema(
         type: String,
         trim: true,
         validate: {
-          validator: function (v) {
+          validator(v) {
             if (!v) return true;
             return validator.isURL(v, { require_protocol: true });
           },
@@ -375,7 +375,7 @@ const userSchema = new mongoose.Schema(
         type: String,
         trim: true,
         validate: {
-          validator: function (v) {
+          validator(v) {
             if (!v) return true;
             return validator.isURL(v, { require_protocol: true });
           },
@@ -386,7 +386,7 @@ const userSchema = new mongoose.Schema(
         type: String,
         trim: true,
         validate: {
-          validator: function (v) {
+          validator(v) {
             if (!v) return true;
             return validator.isURL(v, { require_protocol: true });
           },
@@ -414,7 +414,7 @@ const userSchema = new mongoose.Schema(
       required: [true, 'Please confirm your password'],
       validate: {
         // Works only on CREATE & SAVE!
-        validator: function (el) {
+        validator(el) {
           return el === this.password;
         },
         message: 'Passwords are not the same!',

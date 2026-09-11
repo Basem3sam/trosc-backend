@@ -31,9 +31,8 @@ const logger = winston.createLogger({
         requestIdFormat(),
         winston.format.timestamp(),
         winston.format.printf(
-          ({ timestamp, level, message, requestId, ...meta }) => {
-            return `${timestamp} [${requestId}] ${level}: ${message} ${Object.keys(meta).length ? JSON.stringify(meta) : ''}`;
-          },
+          ({ timestamp, level, message, requestId, ...meta }) =>
+            `${timestamp} [${requestId}] ${level}: ${message} ${Object.keys(meta).length ? JSON.stringify(meta) : ''}`,
         ),
       ),
     }),

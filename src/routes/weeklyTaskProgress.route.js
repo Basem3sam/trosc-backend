@@ -154,10 +154,7 @@
 
 const express = require('express');
 const weeklyTaskController = require('../controllers/weeklyTask.controller');
-const {
-  protect,
-  checkOwnership,
-} = require('../middlewares/auth.middleware');
+const { protect, checkOwnership } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   taskIdSchema,

@@ -1,4 +1,3 @@
-const User = require('../models/user.model');
 const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');

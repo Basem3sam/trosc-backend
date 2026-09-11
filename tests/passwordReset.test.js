@@ -62,7 +62,8 @@ describe('Password Reset Flow', () => {
   });
 
   describe('PATCH /v1/users/updateMyPassword', () => {
-    let user, token;
+    let user;
+    let token;
 
     beforeEach(async () => {
       const result = await createTestUser({ email: 'update-pw@example.com' });

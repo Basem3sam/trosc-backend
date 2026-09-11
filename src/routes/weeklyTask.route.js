@@ -20,7 +20,11 @@ router
   .post(
     protect,
     restrictTo('admin', 'instructor'),
-    checkOwnership({ model: 'Course', ownerField: 'instructor', paramName: 'id' }),
+    checkOwnership({
+      model: 'Course',
+      ownerField: 'instructor',
+      paramName: 'id',
+    }),
     validate(resourceIdSchema, 'params'),
     validate(createWeeklyTaskSchema),
     weeklyTaskController.createWeeklyTask,

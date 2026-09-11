@@ -138,7 +138,10 @@ exports.removeStudent = catchAsync(async (req, res, next) => {
 });
 
 exports.enrollMe = catchAsync(async (req, res, next) => {
-  const track = await enrollmentService.enrollMeInTrack(req.params.id, req.user.id);
+  const track = await enrollmentService.enrollMeInTrack(
+    req.params.id,
+    req.user.id,
+  );
   res.status(200).json({
     status: 'success',
     message: 'Application submitted. Waiting for instructor approval.',

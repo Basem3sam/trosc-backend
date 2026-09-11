@@ -10,7 +10,9 @@ const User = require('../../src/models/user.model');
 const { createTestUser } = require('../helpers/testUser');
 
 describe('Track Service (Edge Cases & Transactions)', () => {
-  let instructor, student1, student2;
+  let instructor;
+  let student1;
+  let student2;
 
   beforeEach(async () => {
     instructor = (await createTestUser({ role: 'instructor' })).user;
