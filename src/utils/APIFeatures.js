@@ -70,33 +70,25 @@ class APIFeatures {
     const searchTerm = this.queryString.search || this.queryString.keyword;
 
     if (searchTerm && searchFields.length > 0) {
-      try {
-        const searchRegex = new RegExp(
-          searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-          'i',
-        );
+      // The escaping below means `new RegExp(...)` here cannot throw, so
+      // the fallback catch branch was unreachable dead code — and if it
+      // ever *did* run, it would use the unescaped searchTerm directly,
+      // reintroducing the ReDoS this escaping exists to prevent.
+      const searchRegex = new RegExp(
+        searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'i',
+      );
 
-        const searchConditions = searchFields.map((field) => ({
-          [field]: { $regex: searchRegex },
-        }));
+      const searchConditions = searchFields.map((field) => ({
+        [field]: { $regex: searchRegex },
+      }));
 
-        const searchQuery = { $or: searchConditions };
-        this.query = this.query.find(searchQuery);
+      const searchQuery = { $or: searchConditions };
+      this.query = this.query.find(searchQuery);
 
-        this.conditions = this.conditions
-          ? { $and: [this.conditions, searchQuery] }
-          : searchQuery;
-      } catch (error) {
-        const searchConditions = searchFields.map((field) => ({
-          [field]: { $regex: searchTerm, $options: 'i' },
-        }));
-        const searchQuery = { $or: searchConditions };
-        this.query = this.query.find(searchQuery);
-
-        this.conditions = this.conditions
-          ? { $and: [this.conditions, searchQuery] }
-          : searchQuery;
-      }
+      this.conditions = this.conditions
+        ? { $and: [this.conditions, searchQuery] }
+        : searchQuery;
     }
     return this;
   }

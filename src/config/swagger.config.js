@@ -4,9 +4,18 @@ const path = require('path');
 const getBaseUrl = () => {
   if (process.env.BASE_URL) return process.env.BASE_URL;
   const port = process.env.PORT || 5000;
-  return process.env.NODE_ENV === 'production'
-    ? process.env.BASE_URL || 'https://your-production-domain.com'
-    : `http://localhost:${port}`;
+  if (process.env.NODE_ENV === 'production') {
+    // Was a silent fallback to a placeholder URL — surface it loudly so
+    // a missing BASE_URL in production doesn't ship an unusable
+    // swagger.json without anyone noticing.
+    // eslint-disable-next-line no-console
+    console.warn(
+      'WARNING: BASE_URL is not set in production. Swagger docs will ' +
+        'reference a placeholder URL (https://your-production-domain.com).',
+    );
+    return 'https://your-production-domain.com';
+  }
+  return `http://localhost:${port}`;
 };
 
 // Fix Windows backslashes in glob patterns

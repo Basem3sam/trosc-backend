@@ -20,6 +20,7 @@ exports.submitContactForm = async (data) => {
       const adminNotification = new Email(
         { email: process.env.ADMIN_EMAIL, name: 'Admin' },
         null,
+        data.email, // reply-to the submitter so an admin can just hit Reply
       );
       await adminNotification.send(
         `New Contact Form Submission — ${data.username}`,

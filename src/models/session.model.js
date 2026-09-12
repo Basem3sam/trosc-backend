@@ -333,11 +333,17 @@ const sessionSchema = new mongoose.Schema(
             /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
           const driveRegex =
             /^(https?:\/\/)?(drive\.google\.com|docs\.google\.com)\/.+/i;
-          return (
-            youtubeRegex.test(v) ||
-            driveRegex.test(v) ||
-            validator.isURL(v, { require_protocol: true })
-          );
+          if (youtubeRegex.test(v) || driveRegex.test(v)) return true;
+          // Same trusted-host allowlist as resourceSchema.url below —
+          // this fallback used to accept ANY https?:// URL
+          // (validator.isURL), which let session.url bypass the
+          // allowlist that resources[].url enforces.
+          try {
+            const parsed = new URL(v);
+            return isTrustedHost(parsed.hostname) && parsed.protocol === 'https:';
+          } catch {
+            return false;
+          }
         },
         message:
           'Session URL must be a valid YouTube, Google Drive, or other valid URL',

@@ -200,11 +200,5 @@ describe('Error Controller', () => {
       );
     });
 
-    // RateLimitError – we removed this handler, but if it's still present,
-    // we can test it. However, it's dead code now.
-    it('handles RateLimitError (if present)', async () => {
-      // We'll skip this if not needed.
-      // If you have a RateLimitError branch, you can add a test here.
-    });
   });
 });

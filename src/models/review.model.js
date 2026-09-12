@@ -63,6 +63,11 @@ const reviewSchema = new mongoose.Schema(
       type: mongoose.Schema.ObjectId,
       ref: 'Course',
     },
+    // Planned: no route currently creates an assignment-targeted review.
+    // Field + unique index below are kept for the upcoming feature rather
+    // than removed, since the index enforces a real invariant (one review
+    // per user per assignment) that should already hold once a route
+    // exists to populate this field.
     assignment: {
       type: mongoose.Schema.ObjectId,
       ref: 'Assignment',

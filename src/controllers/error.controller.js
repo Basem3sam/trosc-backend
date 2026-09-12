@@ -29,10 +29,6 @@ const handleJWTExpiredError = () =>
     401,
   );
 
-// Rate Limit Error
-const handleRateLimitError = () =>
-  new AppError('Too many requests from this IP. Please try again later.', 429);
-
 const sendErrorDev = (err, res) => {
   res.status(err.statusCode).json({
     status: err.status,
@@ -85,7 +81,6 @@ module.exports = (err, req, res, next) => {
       error = handleValidationErrorDB(error);
     if (error.name === 'JsonWebTokenError') error = handleJWTError();
     if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
-    if (error.name === 'RateLimitError') error = handleRateLimitError();
     sendErrorProd(error, res);
   }
 };

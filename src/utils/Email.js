@@ -5,22 +5,41 @@ const escapeHtml = require('./escapeHtml');
 
 // Singleton transporter
 let transporter = null;
+// A failed createTransporter() used to leave `transporter` unset, so
+// every subsequent Email construction retried the same broken call and
+// logged the same failure again. Cache the failure too, so a persistent
+// misconfiguration (e.g. bad SMTP credentials) fails once, not on every
+// email send. Deliberately not made fatal at startup here — that's a
+// separate behavior change (crash the whole app vs. degrade email only)
+// worth a decision rather than bundling into this fix.
+let transporterError = null;
 
 function getTransporter() {
-  if (!transporter) {
+  if (transporter) return transporter;
+  if (transporterError) throw transporterError;
+
+  try {
     transporter = createTransporter();
+    return transporter;
+  } catch (err) {
+    transporterError = err;
+    throw err;
   }
-  return transporter;
 }
 
 class Email {
-  constructor(user, url) {
+  constructor(user, url, replyTo) {
     this.to = user.email;
     // user.name is user-supplied and gets interpolated straight into HTML
     // email templates below — escape it once here so every template is safe.
     this.firstName = escapeHtml(user.name.split(' ')[0]);
     this.url = url;
     this.from = process.env.EMAIL_FROM || 'Trosc Club <noreply@trosc.club>';
+    // Optional: lets a notification be "From" the system but "Reply-To"
+    // whoever the notification is actually about — e.g. the contact-form
+    // submitter, so an admin can hit Reply instead of digging the
+    // address out of the email body.
+    this.replyTo = replyTo;
     this.transporter = getTransporter(); // reuse the singleton
   }
 
@@ -40,6 +59,8 @@ class Email {
           'X-Mailer': 'Trosc Mailer 1.0',
         },
       };
+
+      if (this.replyTo) mailOptions.replyTo = this.replyTo;
 
       const info = await this.transporter.sendMail(mailOptions);
       logger.info(`Email sent to ${this.to}: ${info.messageId}`);

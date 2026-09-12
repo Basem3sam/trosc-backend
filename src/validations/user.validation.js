@@ -27,7 +27,13 @@ exports.signupSchema = Joi.object({
     linkedin: Joi.string().uri().allow(''),
     github: Joi.string().uri().allow(''),
   }).optional(),
-  role: Joi.string().optional(),
+  // authService.signUp already strips this before it ever reaches the
+  // model, so accepting it here was never a live privilege-escalation
+  // path — but a schema that tolerates `role` on signup is a foot-gun if
+  // that stripping logic ever changes. Reject it outright instead.
+  role: Joi.forbidden().messages({
+    'any.unknown': 'role cannot be set at signup',
+  }),
 });
 
 exports.loginSchema = Joi.object({

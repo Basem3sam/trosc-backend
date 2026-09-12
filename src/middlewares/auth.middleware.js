@@ -47,6 +47,45 @@ exports.protect = catchAsync(async (req, res, next) => {
   next();
 });
 
+// Like `protect`, but for routes that must stay reachable by anonymous
+// users while still behaving differently for signed-in ones (e.g. the
+// dashboard feed showing targeted announcements only to enrolled
+// students). Populates req.user on a valid token; on a missing or
+// invalid token it falls through as anonymous instead of rejecting.
+exports.optionalAuth = catchAsync(async (req, res, next) => {
+  let token;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    [, token] = req.headers.authorization.split(' ');
+  } else if (req.cookies?.jwt) {
+    token = req.cookies.jwt;
+  }
+
+  if (!token) return next();
+
+  try {
+    const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+    const currentUser = await User.findById(decoded.id).select(
+      '+active +passwordChangedAt',
+    );
+
+    if (
+      currentUser &&
+      currentUser.active &&
+      !currentUser.changedPasswordAfter(decoded.iat)
+    ) {
+      req.user = currentUser;
+    }
+  } catch (err) {
+    // Expired/invalid token on an optional-auth route: proceed as
+    // anonymous rather than failing the request.
+  }
+
+  next();
+});
+
 exports.restrictTo =
   (...roles) =>
   (req, res, next) => {

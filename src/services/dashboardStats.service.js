@@ -186,8 +186,18 @@ async function computeStats(cutoff, rangeStart) {
       {
         $addFields: {
           completionRate: {
-            $multiply: [
-              { $divide: ['$submissionCount', '$enrolledCount'] },
+            // A student can submit and then unenroll, dropping the
+            // current roster below the submission count — cap at 100
+            // rather than let a single assignment push the rate over,
+            // which would fail the schema's max:100 validator in
+            // generateSnapshot and silently kill the whole snapshot.
+            $min: [
+              {
+                $multiply: [
+                  { $divide: ['$submissionCount', '$enrolledCount'] },
+                  100,
+                ],
+              },
               100,
             ],
           },

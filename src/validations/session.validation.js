@@ -21,8 +21,10 @@ const createSessionValidation = Joi.object({
   url: Joi.string().uri().optional().allow('').messages({
     'string.uri': 'Session URL must be a valid URL.',
   }),
-  students: Joi.array().items(Joi.string().hex().length(24)).optional(),
-  isStandalone: Joi.boolean().default(false),
+  // students/isStandalone are always stripped by
+  // session.controller.js#createSession before reaching the service —
+  // accepting them here was misleading (looked configurable but silently
+  // dropped). Removed for clarity; no behavior change.
   duration: Joi.number().integer().min(1).optional().messages({
     'number.min': 'Duration must be at least 1 minute.',
   }),
@@ -46,16 +48,10 @@ const updateSessionValidation = Joi.object({
   url: Joi.string().uri().optional().allow('').messages({
     'string.uri': 'Session URL must be a valid URL.',
   }),
-  students: Joi.array().items(Joi.string().hex().length(24)).optional(),
-  tracks: Joi.array()
-    .items(Joi.string().hex().length(24))
-    .optional()
-    .allow('')
-    .messages({
-      'string.hex': 'Track must be a valid MongoDB ID.',
-      'string.length': 'Track must be a valid MongoDB ID.',
-    }),
-  isStandalone: Joi.boolean().optional(),
+  // students/tracks/isStandalone are always stripped by
+  // session.controller.js#updateSession before reaching the service —
+  // accepting them here was misleading (looked configurable but silently
+  // dropped). Removed for clarity; no behavior change.
   duration: Joi.number().integer().min(1).optional().messages({
     'number.min': 'Duration must be at least 1 minute.',
   }),

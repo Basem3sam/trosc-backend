@@ -42,8 +42,39 @@ exports.updateAnnouncementSchema = Joi.object({
   title: Joi.string().trim().min(3).max(200).optional(),
   message: Joi.string().trim().min(10).optional(),
   audience: Joi.string().valid('all', 'track', 'course').optional(),
-  targetTrack: objectId.optional(),
-  targetCourse: objectId.optional(),
+  // Same guard as createAnnouncementSchema, but only kicks in when the
+  // PATCH actually touches `audience` — a partial update that leaves
+  // audience untouched shouldn't have to resend targetTrack/targetCourse.
+  // Without this, `PATCH { audience: 'track' }` with no targetTrack
+  // silently orphans the announcement (see announcement.service.js's
+  // audience filter, which then has nothing to match against).
+  targetTrack: Joi.when('audience', {
+    is: 'track',
+    then: objectId.required().messages({
+      'any.required': 'targetTrack is required when audience is "track"',
+    }),
+    otherwise: Joi.when('audience', {
+      is: Joi.exist(),
+      then: Joi.forbidden().messages({
+        'any.unknown': 'targetTrack is only allowed when audience is "track"',
+      }),
+      otherwise: objectId.optional(),
+    }),
+  }),
+  targetCourse: Joi.when('audience', {
+    is: 'course',
+    then: objectId.required().messages({
+      'any.required': 'targetCourse is required when audience is "course"',
+    }),
+    otherwise: Joi.when('audience', {
+      is: Joi.exist(),
+      then: Joi.forbidden().messages({
+        'any.unknown':
+          'targetCourse is only allowed when audience is "course"',
+      }),
+      otherwise: objectId.optional(),
+    }),
+  }),
   attachments: Joi.array().items(Joi.string()).optional(),
   isPinned: Joi.boolean().optional(),
 })

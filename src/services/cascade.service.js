@@ -145,12 +145,32 @@ exports.deleteTrackCascade = async (trackId) => {
       throw new AppError('No track found with that ID', 404);
     }
 
+    // Sessions can belong to MULTIPLE tracks (Session.tracks is an
+    // array), unlike courses (Course.track is a single ref). Fetch them
+    // up front so the assignment purge below can tell "session is
+    // exclusively scoped to this track" (safe to wipe its assignments)
+    // apart from "session also belongs to another track or still has a
+    // course" (that session — and its assignments — survive this
+    // delete, they just lose this track's reference).
+    const sessionsInTrack = await Session.find({
+      _id: { $in: track.sessions },
+    }).session(session);
+
+    const orphanedSessionIds = sessionsInTrack
+      .filter((s) => {
+        const remainingTracks = s.tracks.filter(
+          (t) => t.toString() !== trackId.toString(),
+        );
+        return remainingTracks.length === 0 && !s.course;
+      })
+      .map((s) => s._id);
+
     // Sequential for the same reason as the sync/unsync helpers above: one
     // ClientSession, one operation in flight at a time.
     await Assignment.deleteMany({
       $or: [
         { course: { $in: track.courses } },
-        { session: { $in: track.sessions } },
+        { session: { $in: orphanedSessionIds } },
       ],
     }).session(session);
 
@@ -167,9 +187,6 @@ exports.deleteTrackCascade = async (trackId) => {
     ).session(session);
 
     // Sessions become standalone if not in a course
-    const sessionsInTrack = await Session.find({
-      _id: { $in: track.sessions },
-    }).session(session);
     for (const trackSession of sessionsInTrack) {
       trackSession.tracks.pull(trackId);
       trackSession.isStandalone =

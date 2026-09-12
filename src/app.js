@@ -102,34 +102,41 @@ if (process.env.FRONTEND_URL) {
 }
 
 // Enable CORS
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, etc.)
-      if (!origin) return callback(null, true);
+// Shared so the preflight handler below enforces the same whitelist +
+// credentials policy as the real request — previously `app.options('*',
+// cors())` ran with the library defaults (origin: '*', no credentials),
+// so browsers rejected credentialed preflights even for allowed origins.
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
 
-      if (
-        allowedOrigins.some((allowed) =>
-          allowed instanceof RegExp ? allowed.test(origin) : allowed === origin,
-        )
-      ) {
-        callback(null, true);
-      } else {
-        callback(new AppError(`Origin ${origin} not allowed by CORS`, 403));
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }),
-);
-app.options('*', cors()); // Handle preflight requests
+    if (
+      allowedOrigins.some((allowed) =>
+        allowed instanceof RegExp ? allowed.test(origin) : allowed === origin,
+      )
+    ) {
+      callback(null, true);
+    } else {
+      callback(new AppError(`Origin ${origin} not allowed by CORS`, 403));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
 
 // Limit request from same IP
 const limiter = rateLimit({
   max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 300,
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 Minutes
   message: 'Too many requests from this IP, please try again in 15 minutes',
+  // Monitoring tools poll /health frequently (e.g. every 30s) — without
+  // this it eventually trips the same global limit as real traffic.
+  skip: (req) => req.path === '/health' || req.path === '/v1/health',
 });
 
 app.use(limiter);

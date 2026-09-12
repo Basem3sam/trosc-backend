@@ -1,5 +1,6 @@
 // scripts/createAdmin.js
 require('dotenv').config();
+require('../src/config/env.config')();
 const mongoose = require('mongoose');
 const User = require('../src/models/user.model');
 

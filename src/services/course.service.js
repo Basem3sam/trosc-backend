@@ -115,6 +115,17 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
  * @throws {AppError} 404 if course not found
  */
 exports.updateCourse = async (courseId, updateBody) => {
+  // Self-reference can only happen on update (a client can't know a
+  // course's own ID before it's created to list it as its own
+  // prerequisite at creation time). Once set, the course's own
+  // prerequisites-met check can never pass, permanently blocking
+  // self-enrollment.
+  if (
+    updateBody.prerequisites?.some((id) => id.toString() === courseId.toString())
+  ) {
+    throw new AppError('A course cannot be listed as its own prerequisite', 400);
+  }
+
   const course = await Course.findByIdAndUpdate(courseId, updateBody, {
     new: true,
     runValidators: true,
@@ -138,8 +149,29 @@ exports.updateCourse = async (courseId, updateBody) => {
  * @throws {AppError} 404 if course not found
  */
 exports.deleteCourse = async (courseId) => {
-  const course = await Course.findByIdAndDelete(courseId);
+  const course = await Course.findById(courseId);
   if (!course) throw new AppError('No course found with that ID', 404);
+
+  // Mirror track.service.js#removeCourseFromTrack: a track must keep at
+  // least one course or session. Deleting this course entirely (not just
+  // detaching it) can empty the parent track the same way removing it
+  // could, so apply the same guard before the delete goes through.
+  if (course.track) {
+    const parentTrack = await Track.findById(course.track);
+    if (parentTrack) {
+      const remainingCourses = parentTrack.courses.filter(
+        (id) => id.toString() !== courseId.toString(),
+      );
+      if (remainingCourses.length === 0 && parentTrack.sessions.length === 0) {
+        throw new AppError(
+          'Cannot delete last course: track must have at least one course or session',
+          400,
+        );
+      }
+    }
+  }
+
+  await Course.findByIdAndDelete(courseId);
 
   await Promise.all([
     Assignment.deleteMany({ course: courseId }),

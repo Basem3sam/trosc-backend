@@ -84,20 +84,28 @@ exports.bulkUserAction = catchAsync(async (req, res, next) => {
 });
 
 exports.getMyEnrollments = catchAsync(async (req, res, next) => {
-  const [tracks, courses, sessions] = await Promise.all([
-    Track.find({ students: req.user.id }).select(
-      'title description coverImage level published',
-    ),
-    Course.find({ students: req.user.id }).select(
+  // Query the User document's own enrolledTrack/enrolledCourses/
+  // enrolledSessions fields rather than the reverse `students` arrays on
+  // Track/Course/Session — those two are supposed to stay in sync (see
+  // cascade.service.js), but the User fields are the side every
+  // enroll/unenroll flow ultimately writes to, so they're the
+  // authoritative source if the two ever drift apart.
+  const [track, courses, sessions] = await Promise.all([
+    req.user.enrolledTrack
+      ? Track.findById(req.user.enrolledTrack).select(
+          'title description coverImage level published',
+        )
+      : null,
+    Course.find({ _id: { $in: req.user.enrolledCourses || [] } }).select(
       'title description coverImage level track published',
     ),
-    Session.find({ students: req.user.id }).select(
+    Session.find({ _id: { $in: req.user.enrolledSessions || [] } }).select(
       'title description coverImage level published startDate',
     ),
   ]);
 
   res.status(200).json({
     status: 'success',
-    data: { tracks, courses, sessions },
+    data: { tracks: track ? [track] : [], courses, sessions },
   });
 });

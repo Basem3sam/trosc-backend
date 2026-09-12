@@ -52,7 +52,12 @@ exports.getTrends = catchAsync(async (req, res, next) => {
   // The Joi default() on `limit` never makes it back onto req.query (the
   // validate middleware only checks for errors — see
   // middlewares/validate.middleware.js), so the actual default lives here.
-  const limit = req.query.limit ? Number(req.query.limit) : 30;
+  // Joi's own type check already rejects non-numeric `limit` values with
+  // a 400 before this runs, but guard the coercion anyway — cheap, and
+  // it means this line stays correct even if the validation schema for
+  // this route ever changes.
+  const parsedLimit = req.query.limit ? Number(req.query.limit) : 30;
+  const limit = Number.isNaN(parsedLimit) ? 30 : parsedLimit;
   const trends = await dashboardStatsService.getTrends(
     req.query.period,
     limit,
