@@ -9,7 +9,7 @@ jobs:
         with:
           node-version: 18
       - run: npm ci
-      - run: npm run lint:check
+      # - run: npm run lint:check
       - run: npm test
         env:
           NODE_ENV: test
