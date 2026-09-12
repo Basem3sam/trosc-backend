@@ -153,6 +153,14 @@
  *       - name: period
  *         in: query
  *         schema: { type: string, enum: [daily, weekly, monthly] }
+ *       - name: date[gte]
+ *         in: query
+ *         schema: { type: string, format: date }
+ *         description: Only snapshots on/after this date
+ *       - name: date[lte]
+ *         in: query
+ *         schema: { type: string, format: date }
+ *         description: Only snapshots on/before this date
  *     responses:
  *       200:
  *         description: Snapshots retrieved
@@ -160,6 +168,8 @@
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/DashboardStatsResponse'
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
@@ -238,30 +248,31 @@
  *         $ref: '#/components/responses/NotFound'
  */
 
-const express = require('express');
-const dashboardStatsController = require('../controllers/dashboardStats.controller');
-const { protect, restrictTo } = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+const express = require("express");
+const dashboardStatsController = require("../controllers/dashboardStats.controller");
+const { protect, restrictTo } = require("../middlewares/auth.middleware");
+const validate = require("../middlewares/validate.middleware");
 const {
   dashboardStatsIdSchema,
   generateSnapshotSchema,
   latestQuerySchema,
   trendsQuerySchema,
+  listSnapshotsQuerySchema,
   pruneDashboardStatsSchema,
-} = require('../validations/dashboardStats.validation');
+} = require("../validations/dashboardStats.validation");
 
 const router = express.Router();
 
 // The whole module is admin-only — this is platform-wide analytics, not
 // something any authenticated user should see.
-router.use(protect, restrictTo('admin'));
+router.use(protect, restrictTo("admin"));
 
 /**
  * @route   GET /dashboard-stats/live
  * @desc    Current stats, computed on the fly (not persisted)
  * @access  Private/Admin
  */
-router.get('/live', dashboardStatsController.getLiveStats);
+router.get("/live", dashboardStatsController.getLiveStats);
 
 /**
  * @route   GET /dashboard-stats/latest?period=daily
@@ -269,8 +280,8 @@ router.get('/live', dashboardStatsController.getLiveStats);
  * @access  Private/Admin
  */
 router.get(
-  '/latest',
-  validate(latestQuerySchema, 'query'),
+  "/latest",
+  validate(latestQuerySchema, "query"),
   dashboardStatsController.getLatestSnapshot,
 );
 
@@ -280,8 +291,8 @@ router.get(
  * @access  Private/Admin
  */
 router.get(
-  '/trends',
-  validate(trendsQuerySchema, 'query'),
+  "/trends",
+  validate(trendsQuerySchema, "query"),
   dashboardStatsController.getTrends,
 );
 
@@ -291,7 +302,7 @@ router.get(
  * @access  Private/Admin
  */
 router.post(
-  '/snapshot',
+  "/snapshot",
   validate(generateSnapshotSchema),
   dashboardStatsController.generateSnapshot,
 );
@@ -301,7 +312,11 @@ router.post(
  * @desc    List stored snapshots (filterable, paginated)
  * @access  Private/Admin
  */
-router.get('/', dashboardStatsController.getAllSnapshots);
+router.get(
+  "/",
+  validate(listSnapshotsQuerySchema, "query"),
+  dashboardStatsController.getAllSnapshots,
+);
 
 /**
  * @route   DELETE /dashboard-stats?olderThanDays=365
@@ -309,8 +324,8 @@ router.get('/', dashboardStatsController.getAllSnapshots);
  * @access  Private/Admin
  */
 router.delete(
-  '/',
-  validate(pruneDashboardStatsSchema, 'query'),
+  "/",
+  validate(pruneDashboardStatsSchema, "query"),
   dashboardStatsController.pruneSnapshots,
 );
 
@@ -320,8 +335,8 @@ router.delete(
  * @access  Private/Admin
  */
 router.get(
-  '/:id',
-  validate(dashboardStatsIdSchema, 'params'),
+  "/:id",
+  validate(dashboardStatsIdSchema, "params"),
   dashboardStatsController.getSnapshot,
 );
 
@@ -331,8 +346,8 @@ router.get(
  * @access  Private/Admin
  */
 router.delete(
-  '/:id',
-  validate(dashboardStatsIdSchema, 'params'),
+  "/:id",
+  validate(dashboardStatsIdSchema, "params"),
   dashboardStatsController.deleteSnapshot,
 );
 
