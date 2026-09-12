@@ -58,10 +58,7 @@ exports.getTrends = catchAsync(async (req, res, next) => {
   // this route ever changes.
   const parsedLimit = req.query.limit ? Number(req.query.limit) : 30;
   const limit = Number.isNaN(parsedLimit) ? 30 : parsedLimit;
-  const trends = await dashboardStatsService.getTrends(
-    req.query.period,
-    limit,
-  );
+  const trends = await dashboardStatsService.getTrends(req.query.period, limit);
 
   res.status(200).json({
     status: 'success',

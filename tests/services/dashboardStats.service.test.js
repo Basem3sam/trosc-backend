@@ -92,7 +92,8 @@ describe('DashboardStats Service', () => {
     });
 
     it('only counts submissions that existed by the snapshot cutoff', async () => {
-      const { instructor, course, student } = await buildTrackAndCourseFixture();
+      const { instructor, course, student } =
+        await buildTrackAndCourseFixture();
 
       const assignment = await Assignment.create({
         title: 'Assignment 1',
@@ -128,7 +129,8 @@ describe('DashboardStats Service', () => {
     });
 
     it('computes avgCompletionRate as (submissions / enrolled) across assignments', async () => {
-      const { instructor, course, student } = await buildTrackAndCourseFixture();
+      const { instructor, course, student } =
+        await buildTrackAndCourseFixture();
       // Add a second enrolled student so the course has 2 students total.
       const { user: secondStudent } = await createTestUser({ role: 'student' });
       await Course.findByIdAndUpdate(course._id, {
@@ -191,7 +193,9 @@ describe('DashboardStats Service', () => {
 
       const snapshot = await dashboardStatsService.generateSnapshot('daily');
       expect(snapshot.mostActiveTrack.toString()).toBe(big._id.toString());
-      expect(snapshot.mostActiveTrack.toString()).not.toBe(small._id.toString());
+      expect(snapshot.mostActiveTrack.toString()).not.toBe(
+        small._id.toString(),
+      );
     });
 
     it('upserts rather than duplicating when run twice for the same period/date', async () => {

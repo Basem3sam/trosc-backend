@@ -53,7 +53,13 @@ describe('POST /v1/users/signup', () => {
     expect(stored.password).toMatch(/^\$2[aby]\$/);
   });
 
-  it('defaults role to student even if the caller sends role: admin', async () => {
+  it('rejects a signup that tries to inject role: admin', async () => {
+    // The schema now uses Joi.forbidden() on `role` (see
+    // user.validation.js#signupSchema), so a client supplying it is
+    // rejected at the validation layer rather than being silently
+    // stripped. This is stricter than the previous "accept then drop"
+    // behavior — the point is that a schema which *tolerates* role
+    // becomes a footgun if the stripping logic ever changes.
     const res = await request(app)
       .post('/v1/users/signup')
       .send({
@@ -62,13 +68,16 @@ describe('POST /v1/users/signup', () => {
         role: 'admin',
       });
 
-    expect(res.status).toBe(201);
-    expect(res.body.data.user.role).toBe('student');
+    expect(res.status).toBe(400);
+    expect(res.body.status).toBe('fail');
+    expect(res.body.message).toMatch(/role cannot be set at signup/i);
 
+    // And nothing was persisted — a 400 that still creates the user
+    // would be worse than the old silent-strip behavior.
     const stored = await User.findOne({
       email: 'signup-roleinjection@example.com',
     });
-    expect(stored.role).toBe('student');
+    expect(stored).toBeNull();
   });
 
   it('rejects a duplicate email with 409', async () => {

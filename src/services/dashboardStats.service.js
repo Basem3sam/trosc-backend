@@ -170,10 +170,7 @@ async function computeStats(cutoff, rangeStart) {
               },
               {
                 $size: {
-                  $ifNull: [
-                    { $arrayElemAt: ['$sessionDoc.students', 0] },
-                    [],
-                  ],
+                  $ifNull: [{ $arrayElemAt: ['$sessionDoc.students', 0] }, []],
                 },
               },
             ],
@@ -336,10 +333,7 @@ exports.getLatestSnapshot = async (periodName) => {
     .sort({ date: -1 })
     .populate('mostActiveTrack', 'title');
   if (!snapshot) {
-    throw new AppError(
-      `No ${periodName} snapshot has been generated yet`,
-      404,
-    );
+    throw new AppError(`No ${periodName} snapshot has been generated yet`, 404);
   }
   return snapshot;
 };

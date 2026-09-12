@@ -69,8 +69,7 @@ exports.updateAnnouncementSchema = Joi.object({
     otherwise: Joi.when('audience', {
       is: Joi.exist(),
       then: Joi.forbidden().messages({
-        'any.unknown':
-          'targetCourse is only allowed when audience is "course"',
+        'any.unknown': 'targetCourse is only allowed when audience is "course"',
       }),
       otherwise: objectId.optional(),
     }),

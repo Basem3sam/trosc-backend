@@ -340,7 +340,9 @@ const sessionSchema = new mongoose.Schema(
           // allowlist that resources[].url enforces.
           try {
             const parsed = new URL(v);
-            return isTrustedHost(parsed.hostname) && parsed.protocol === 'https:';
+            return (
+              isTrustedHost(parsed.hostname) && parsed.protocol === 'https:'
+            );
           } catch {
             return false;
           }

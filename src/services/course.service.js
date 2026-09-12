@@ -121,9 +121,14 @@ exports.updateCourse = async (courseId, updateBody) => {
   // prerequisites-met check can never pass, permanently blocking
   // self-enrollment.
   if (
-    updateBody.prerequisites?.some((id) => id.toString() === courseId.toString())
+    updateBody.prerequisites?.some(
+      (id) => id.toString() === courseId.toString(),
+    )
   ) {
-    throw new AppError('A course cannot be listed as its own prerequisite', 400);
+    throw new AppError(
+      'A course cannot be listed as its own prerequisite',
+      400,
+    );
   }
 
   const course = await Course.findByIdAndUpdate(courseId, updateBody, {

@@ -199,6 +199,5 @@ describe('Error Controller', () => {
         'Your authentication token has expired! Please log in again.',
       );
     });
-
   });
 });

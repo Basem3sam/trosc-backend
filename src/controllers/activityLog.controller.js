@@ -42,10 +42,7 @@ exports.getMyActivityLogs = catchAsync(async (req, res, next) => {
 // GET /activity-logs/user/:userId — admin viewing a specific user's timeline
 exports.getUserActivityLogs = catchAsync(async (req, res, next) => {
   const { activityLogs, total, pagination } =
-    await activityLogService.getUserActivityLogs(
-      req.params.userId,
-      req.query,
-    );
+    await activityLogService.getUserActivityLogs(req.params.userId, req.query);
 
   res.status(200).json({
     status: 'success',

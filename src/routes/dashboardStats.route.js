@@ -248,10 +248,10 @@
  *         $ref: '#/components/responses/NotFound'
  */
 
-const express = require("express");
-const dashboardStatsController = require("../controllers/dashboardStats.controller");
-const { protect, restrictTo } = require("../middlewares/auth.middleware");
-const validate = require("../middlewares/validate.middleware");
+const express = require('express');
+const dashboardStatsController = require('../controllers/dashboardStats.controller');
+const { protect, restrictTo } = require('../middlewares/auth.middleware');
+const validate = require('../middlewares/validate.middleware');
 const {
   dashboardStatsIdSchema,
   generateSnapshotSchema,
@@ -259,20 +259,20 @@ const {
   trendsQuerySchema,
   listSnapshotsQuerySchema,
   pruneDashboardStatsSchema,
-} = require("../validations/dashboardStats.validation");
+} = require('../validations/dashboardStats.validation');
 
 const router = express.Router();
 
 // The whole module is admin-only — this is platform-wide analytics, not
 // something any authenticated user should see.
-router.use(protect, restrictTo("admin"));
+router.use(protect, restrictTo('admin'));
 
 /**
  * @route   GET /dashboard-stats/live
  * @desc    Current stats, computed on the fly (not persisted)
  * @access  Private/Admin
  */
-router.get("/live", dashboardStatsController.getLiveStats);
+router.get('/live', dashboardStatsController.getLiveStats);
 
 /**
  * @route   GET /dashboard-stats/latest?period=daily
@@ -280,8 +280,8 @@ router.get("/live", dashboardStatsController.getLiveStats);
  * @access  Private/Admin
  */
 router.get(
-  "/latest",
-  validate(latestQuerySchema, "query"),
+  '/latest',
+  validate(latestQuerySchema, 'query'),
   dashboardStatsController.getLatestSnapshot,
 );
 
@@ -291,8 +291,8 @@ router.get(
  * @access  Private/Admin
  */
 router.get(
-  "/trends",
-  validate(trendsQuerySchema, "query"),
+  '/trends',
+  validate(trendsQuerySchema, 'query'),
   dashboardStatsController.getTrends,
 );
 
@@ -302,7 +302,7 @@ router.get(
  * @access  Private/Admin
  */
 router.post(
-  "/snapshot",
+  '/snapshot',
   validate(generateSnapshotSchema),
   dashboardStatsController.generateSnapshot,
 );
@@ -313,8 +313,8 @@ router.post(
  * @access  Private/Admin
  */
 router.get(
-  "/",
-  validate(listSnapshotsQuerySchema, "query"),
+  '/',
+  validate(listSnapshotsQuerySchema, 'query'),
   dashboardStatsController.getAllSnapshots,
 );
 
@@ -324,8 +324,8 @@ router.get(
  * @access  Private/Admin
  */
 router.delete(
-  "/",
-  validate(pruneDashboardStatsSchema, "query"),
+  '/',
+  validate(pruneDashboardStatsSchema, 'query'),
   dashboardStatsController.pruneSnapshots,
 );
 
@@ -335,8 +335,8 @@ router.delete(
  * @access  Private/Admin
  */
 router.get(
-  "/:id",
-  validate(dashboardStatsIdSchema, "params"),
+  '/:id',
+  validate(dashboardStatsIdSchema, 'params'),
   dashboardStatsController.getSnapshot,
 );
 
@@ -346,8 +346,8 @@ router.get(
  * @access  Private/Admin
  */
 router.delete(
-  "/:id",
-  validate(dashboardStatsIdSchema, "params"),
+  '/:id',
+  validate(dashboardStatsIdSchema, 'params'),
   dashboardStatsController.deleteSnapshot,
 );
 
