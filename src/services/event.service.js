@@ -20,7 +20,7 @@ exports.createEvent = async (data, requestingUserId) => {
 exports.getAllEvents = async (query) => {
   const features = new APIFeatures(Event.find(), query, Event)
     .filter()
-    .search(['title', 'message'])
+    .search(['title', 'description'])
     .sort()
     .limitFields();
 
