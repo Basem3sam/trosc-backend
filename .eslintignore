@@ -1,11 +1,11 @@
-node_modules
-coverage
-logs
-swagger.json
-combined_output.txt
+- node_modules
+- coverage
+- logs
+- swagger.json
+- combined_output.txt
 
 # dev tooling — not app code, intentionally uses console/for-of
-combine.js
-script.js
-testEmail.js
-scripts/
+- combine.js
+- script.js
+- testEmail.js
+- scripts/
