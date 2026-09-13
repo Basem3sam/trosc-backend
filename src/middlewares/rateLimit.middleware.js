@@ -7,7 +7,7 @@ const authLimiter = rateLimit({
     parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
   message:
     'Too many auth attempts from this IP, please try again in 15 minutes',
-  // skipSuccessfulRequests: true, // Don't count successful requests
+  skipSuccessfulRequests: true, // Don't count successful requests
 });
 
 module.exports = { authLimiter };

@@ -29,6 +29,11 @@ function getTransporter() {
 
 class Email {
   constructor(user, url, replyTo) {
+    if (!user?.email) {
+      throw new Error(
+        'Email: cannot construct without a recipient user.email',
+      );
+    }
     this.to = user.email;
     // user.name is user-supplied and gets interpolated straight into HTML
     // email templates below — escape it once here so every template is safe.

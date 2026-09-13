@@ -5,6 +5,8 @@ const Session = require('../models/session.model');
 const Assignment = require('../models/assignment.model');
 const Review = require('../models/review.model');
 const WeeklyTask = require('../models/weeklytask.model');
+const Event = require('../models/event.model');
+const Announcement = require('../models/announcement.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
@@ -202,6 +204,23 @@ exports.deleteCourse = async (courseId, requestingUserId) => {
   await Track.updateMany(
     { courses: courseId },
     { $pull: { courses: courseId } },
+  );
+
+  // T4: other courses may still list this course as a prerequisite —
+  // pull the dangling reference so prerequisite checks don't reference
+  // a course that no longer exists.
+  await Course.updateMany(
+    { prerequisites: courseId },
+    { $pull: { prerequisites: courseId } },
+  );
+
+  // T5: Event.course and Announcement.targetCourse are optional refs —
+  // not required, so this doesn't block the delete, but leaving them
+  // dangling produces populated-null responses downstream.
+  await Event.updateMany({ course: courseId }, { $set: { course: null } });
+  await Announcement.updateMany(
+    { targetCourse: courseId },
+    { $set: { targetCourse: null } },
   );
 
   // Orphan sessions — they become standalone or keep their track

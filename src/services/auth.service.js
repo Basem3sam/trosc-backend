@@ -89,13 +89,21 @@ exports.login = async (email, password) => {
 };
 
 exports.forgotPassword = async (email) => {
+  // T24: the delay must apply to BOTH branches, or its timing becomes the
+  // enumeration signal it was meant to prevent (previously only the
+  // not-found path waited ~1s, while the found path returned in the time
+  // its DB write + email send took — often much less than 1s. Running the
+  // delay in parallel with the real work via Promise.all means both
+  // branches take at least ~1s, closing the gap without adding to it.
+  const minDelay = new Promise((resolve) => {
+    setTimeout(resolve, 1000);
+  });
+
   // 1) Get user based on POSTed email
   const user = await User.findOne({ email }).select('+active');
   if (!user || !user.active) {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
-    }); // Artificial delay to prevent email enumeration
-    return; // Do not reveal if user exists or not for security reasons
+    await minDelay; // Do not reveal if user exists or not for security reasons
+    return;
   }
 
   // 2) Generate the random token
@@ -108,7 +116,10 @@ exports.forgotPassword = async (email) => {
 
   // 3) Send it to user's email
   try {
-    await new Email(user, resetURL).sendPasswordReset();
+    await Promise.all([
+      new Email(user, resetURL).sendPasswordReset(),
+      minDelay,
+    ]);
   } catch (err) {
     // If sending fails, reset token data and save again
     user.passwordResetToken = undefined;

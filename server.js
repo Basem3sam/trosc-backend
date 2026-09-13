@@ -20,6 +20,18 @@ const connectDB = require('./src/config/db.config');
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
+// T22: register a handler BEFORE connectDB() so a rejection during startup
+// (e.g. a config load failure) is caught instead of crashing uncaught.
+// This bootstrap handler can't reference `server` yet, so it just logs
+// and exits; once `server` exists below we swap in the version that
+// closes it gracefully first.
+process.on('unhandledRejection', (err) => {
+  logger.error('UNHANDLED REJECTION during startup! Shutting down...', {
+    error: err,
+  });
+  process.exit(1);
+});
+
 // Async startup
 (async () => {
   try {
@@ -28,7 +40,9 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
       logger.info(`Server running in ${NODE_ENV} mode on port ${PORT}`);
     });
 
-    // Move unhandled rejection and SIGTERM handlers here (they need `server`)
+    // Now that `server` exists, replace the bootstrap handler with one
+    // that shuts it down gracefully.
+    process.removeAllListeners('unhandledRejection');
     process.on('unhandledRejection', (err) => {
       logger.error('UNHANDLED REJECTION! Shutting down...', { error: err });
       server.close(() => process.exit(1));

@@ -31,8 +31,10 @@ describe('Error Handling', () => {
     expect(res.body.message).toMatch(/invalid authentication token/i);
   });
 
-  it('handles JWT expired error', async () => {
-    // We can't easily generate an expired token here, but we can test the handler
-    // by mocking it if needed. This is a known gap – we can skip for now.
-  });
+  // NOTE: JWT-expired handling is exercised end-to-end in
+  // error.controller.test.js ("handles TokenExpiredError"), which
+  // constructs a real jwt.TokenExpiredError and asserts on the response.
+  // The stub that used to live here never generated a real expired
+  // token, so it asserted nothing — removed rather than left as a
+  // false-positive passing test.
 });

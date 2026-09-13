@@ -831,6 +831,7 @@ const {
   protect,
   restrictTo,
   checkOwnership,
+  optionalAuth,
 } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
@@ -889,7 +890,11 @@ router.delete('/:id/leave-me', authLimiter, protect, courseController.leaveMe);
 
 router
   .route('/:id')
-  .get(validate(getCourseSchema, 'params'), courseController.getCourse)
+  .get(
+    optionalAuth,
+    validate(getCourseSchema, 'params'),
+    courseController.getCourse,
+  )
   .patch(
     protect,
     restrictTo('admin', 'instructor'),

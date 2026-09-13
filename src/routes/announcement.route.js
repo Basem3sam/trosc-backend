@@ -151,6 +151,7 @@ const {
   protect,
   restrictTo,
   checkOwnership,
+  optionalAuth,
 } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
@@ -165,9 +166,10 @@ const router = express.Router();
 // PUBLIC ROUTES
 // ===================================================================
 
-router.get('/', announcementController.getAllAnnouncements);
+router.get('/', optionalAuth, announcementController.getAllAnnouncements);
 router.get(
   '/:id',
+  optionalAuth,
   validate(announcementIdSchema, 'params'),
   announcementController.getAnnouncement,
 );

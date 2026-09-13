@@ -257,20 +257,46 @@ exports.setItemCompletion = async (
   }
 
   if (complete) {
-    await WeeklyTask.updateOne(
-      { _id: taskId },
+    // T16: the previous implementation issued $pull then $push as two
+    // separate writes — not atomic, so a crash between them could lose
+    // the completion. A single aggregation-pipeline update (Mongo 4.2+)
+    // replaces the completions array in one atomic operation: drop any
+    // existing entry for this student+item, then append the new one.
+    await WeeklyTask.updateOne({ _id: taskId }, [
       {
-        $pull: { completions: { student: requestingUser.id, item: itemId } },
-      },
-    );
-    await WeeklyTask.updateOne(
-      { _id: taskId },
-      {
-        $push: {
-          completions: { student: requestingUser.id, item: itemId },
+        $set: {
+          completions: {
+            $concatArrays: [
+              {
+                $filter: {
+                  input: '$completions',
+                  cond: {
+                    $not: {
+                      $and: [
+                        {
+                          $eq: [
+                            { $toString: '$$this.student' },
+                            requestingUser.id,
+                          ],
+                        },
+                        { $eq: [{ $toString: '$$this.item' }, itemId] },
+                      ],
+                    },
+                  },
+                },
+              },
+              [
+                {
+                  student: { $toObjectId: requestingUser.id },
+                  item: { $toObjectId: itemId },
+                  completedAt: '$$NOW',
+                },
+              ],
+            ],
+          },
         },
       },
-    );
+    ]);
 
     await logActivity({
       userId: requestingUser.id,

@@ -12,6 +12,11 @@ const AppError = require('../utils/AppError');
 
 // Called when a student joins a track (self-approve or instructor add)
 exports.syncUserEnrollments = async (userId, trackId) => {
+  const trackExists = await Track.exists({ _id: trackId });
+  if (!trackExists) {
+    throw new AppError('No track found with that ID', 404);
+  }
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -226,6 +231,18 @@ exports.deleteTrackCascade = async (trackId) => {
       ).session(session);
     }
 
+    // T5: Event.track and Announcement.targetTrack are optional refs —
+    // not required, so they don't block the delete, but leaving them
+    // dangling produces populated-null responses and confusing UI.
+    await Event.updateMany(
+      { track: trackId },
+      { $set: { track: null } },
+    ).session(session);
+    await Announcement.updateMany(
+      { targetTrack: trackId },
+      { $set: { targetTrack: null } },
+    ).session(session);
+
     await Track.findByIdAndDelete(trackId).session(session);
 
     await session.commitTransaction();
@@ -248,26 +265,53 @@ exports.deleteTrackCascade = async (trackId) => {
 // required, but a review has no standalone meaning without its author,
 // so those are deleted outright rather than blocking. Everything else
 // below is a non-required array membership and gets pulled.
+// Called by user.service.js#deleteUser / #bulkUserAction. Design decision
+// (see the E1 design doc): Course.instructor, Track.instructor,
+// Event.createdBy, Announcement.createdBy, Session.instructor,
+// Assignment.instructor, and WeeklyTask.instructor are all `required`
+// fields in their schemas, so they can't simply be nulled out — a
+// deleted user who still owns one of those is a real conflict, not
+// something a cascade can silently resolve. Block the delete and tell
+// the caller what needs reassigning first, same as the "track must keep
+// a course/session" guard elsewhere in this file. Review.user is also
+// required, but a review has no standalone meaning without its author,
+// so those are deleted outright rather than blocking. Everything else
+// below is a non-required array membership and gets pulled.
 exports.hardDeleteUserCascade = async (userId) => {
-  const [ownedCourses, ownedTracks, ownedEvents, ownedAnnouncements] =
-    await Promise.all([
-      Course.find({ instructor: userId }).select('_id title'),
-      Track.find({ instructor: userId }).select('_id title'),
-      Event.find({ createdBy: userId }).select('_id title'),
-      Announcement.find({ createdBy: userId }).select('_id title'),
-    ]);
+  const [
+    ownedCourses,
+    ownedTracks,
+    ownedEvents,
+    ownedAnnouncements,
+    ownedSessions,
+    ownedAssignments,
+    ownedWeeklyTasks,
+  ] = await Promise.all([
+    Course.find({ instructor: userId }).select('_id title'),
+    Track.find({ instructor: userId }).select('_id title'),
+    Event.find({ createdBy: userId }).select('_id title'),
+    Announcement.find({ createdBy: userId }).select('_id title'),
+    Session.find({ instructor: userId }).select('_id title'),
+    Assignment.find({ instructor: userId }).select('_id title'),
+    WeeklyTask.find({ instructor: userId }).select('_id week'),
+  ]);
 
   if (
     ownedCourses.length ||
     ownedTracks.length ||
     ownedEvents.length ||
-    ownedAnnouncements.length
+    ownedAnnouncements.length ||
+    ownedSessions.length ||
+    ownedAssignments.length ||
+    ownedWeeklyTasks.length
   ) {
     throw new AppError(
       'This user is the required instructor/creator of existing content ' +
         `(${ownedCourses.length} course(s), ${ownedTracks.length} track(s), ` +
         `${ownedEvents.length} event(s), ${ownedAnnouncements.length} ` +
-        'announcement(s)). Reassign that content to another user before ' +
+        `announcement(s), ${ownedSessions.length} session(s), ` +
+        `${ownedAssignments.length} assignment(s), ${ownedWeeklyTasks.length} ` +
+        'weekly task(s)). Reassign that content to another user before ' +
         'deleting this account.',
       409,
     );
@@ -282,6 +326,10 @@ exports.hardDeleteUserCascade = async (userId) => {
       { $pull: { students: userId } },
     ).session(session);
     await Track.updateMany(
+      { students: userId },
+      { $pull: { students: userId } },
+    ).session(session);
+    await Session.updateMany(
       { students: userId },
       { $pull: { students: userId } },
     ).session(session);

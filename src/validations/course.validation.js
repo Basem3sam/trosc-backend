@@ -28,6 +28,9 @@ exports.createCourseSchema = Joi.object({
     'string.pattern.base': 'Track must be a valid MongoDB ID',
   }),
   level: Joi.string().valid('beginner', 'intermediate', 'advanced'),
+  access: Joi.string().valid('public', 'track-only', 'private').messages({
+    'any.only': 'Access must be one of: public, track-only, private',
+  }),
   coverImage: photoValidation,
   published: Joi.boolean(),
   prerequisites: Joi.array().items(objectId),
@@ -49,6 +52,7 @@ exports.updateCourseSchema = Joi.object({
   description: Joi.string().min(10),
   track: objectId,
   level: Joi.string().valid('beginner', 'intermediate', 'advanced'),
+  access: Joi.string().valid('public', 'track-only', 'private'),
   coverImage: photoValidation,
   published: Joi.boolean(),
   prerequisites: Joi.array().items(objectId),

@@ -24,8 +24,16 @@ exports.updateTrackSchema = Joi.object({
   level: Joi.string().valid('beginner', 'intermediate', 'advanced', 'all'),
   coverImage: photoValidation,
   published: Joi.boolean(),
-  courses: Joi.array().items(objectId),
-  sessions: Joi.array().items(objectId),
+  // M2: courses/sessions are intentionally NOT accepted here. Setting
+  // them directly via track.set() would overwrite Track.courses/sessions
+  // without updating the corresponding Course.track / Session.tracks
+  // side, desyncing the two-way relationship that
+  // addCourseToTrack/removeCourseFromTrack maintain. Use the dedicated
+  // /:trackId/courses/:courseId and /:trackId/sessions/:sessionId
+  // endpoints to add or remove membership instead. The controller
+  // already stripped these keys before this schema ran; removing them
+  // here too keeps the documented API contract honest about what this
+  // route actually accepts.
 }).min(1);
 
 exports.deleteTrackSchema = Joi.object({

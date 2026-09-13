@@ -597,6 +597,7 @@ const {
   protect,
   restrictTo,
   checkOwnership,
+  optionalAuth,
 } = require('../middlewares/auth.middleware');
 const validateMiddleware = require('../middlewares/validate.middleware');
 const {
@@ -624,7 +625,7 @@ router
     validateMiddleware(createSessionValidation),
     sessionController.createSession,
   )
-  .get(sessionController.getAllSessions);
+  .get(optionalAuth, sessionController.getAllSessions);
 
 // ===================================================================
 // 🔍 FILTERING ROUTES

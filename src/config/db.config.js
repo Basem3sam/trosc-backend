@@ -74,6 +74,14 @@ const connectDB = async () => {
 
     logger.info('Database indexes sync completed.');
   } catch (err) {
+    // M19: intentional fast-fail, no retry loop. In a container/orchestrator
+    // deployment (the assumption this project runs under) a transient
+    // network blip is expected to be handled by the orchestrator restarting
+    // the pod, not by this process looping internally. If you deploy
+    // somewhere without that restart behavior, a bounded retry loop here
+    // would be the alternative — that's a real behavior change (affects
+    // startup semantics under prolonged outages) so it's left as a decision
+    // rather than silently added.
     logger.error(`DB Connection Error: ${err.message}`, { stack: err.stack });
     process.exit(1);
   }

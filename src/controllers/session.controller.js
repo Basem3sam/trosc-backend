@@ -26,6 +26,7 @@ exports.createSession = catchAsync(async (req, res, next) => {
 exports.getAllSessions = catchAsync(async (req, res, next) => {
   const { sessions, total, pagination } = await sessionService.getAllSessions(
     req.query,
+    req.user,
   );
 
   res.status(200).json({

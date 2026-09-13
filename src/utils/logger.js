@@ -18,6 +18,10 @@ const requestIdFormat = winston.format((info) => {
 
 const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  // Winston defaults to exitOnError: true — a transport failure (e.g. a
+  // full disk on the file transports below) would otherwise kill the
+  // whole process. A logging failure shouldn't take the app down with it.
+  exitOnError: false,
   format: winston.format.combine(
     requestIdFormat(),
     winston.format.timestamp(),

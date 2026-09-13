@@ -2,6 +2,8 @@ const User = require('../models/user.model');
 const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
+const Assignment = require('../models/assignment.model');
+const Review = require('../models/review.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
@@ -21,7 +23,7 @@ exports.createSession = async (sessionData, requestingUserId) => {
   );
 };
 
-exports.getAllSessions = async (query) => {
+exports.getAllSessions = async (query, requestingUser = null) => {
   const features = new APIFeatures(Session.find(), query, Session)
     .filter()
     .search(['title', 'description'])
@@ -30,17 +32,34 @@ exports.getAllSessions = async (query) => {
 
   await features.paginate();
 
-  const sessions = await features.query.populate(
-    'instructor',
-    'name email role',
-  );
+  const sessions = await features.query
+    .populate('instructor', 'name email role')
+    .populate('students', 'role');
 
-  // Always strip URLs from list view
+  const userId = requestingUser?.id;
+  const isAdmin = requestingUser?.role === 'admin';
+
+  // M16: previously stripped url/embedUrl/resources unconditionally, even
+  // for the session's own instructor or an admin — meaning an instructor
+  // couldn't audit their own session URLs via the list view. Apply the
+  // same owner/admin/direct-student gate getSessionById uses. Track- or
+  // course-only enrollment is intentionally NOT checked here (that would
+  // mean an extra query per session in a paginated list) — those viewers
+  // still get the gated (safe) view, same as before this fix.
   const sanitized = sessions.map((s) => {
     const obj = s.toObject();
-    delete obj.url;
-    delete obj.embedUrl;
-    delete obj.resources;
+
+    const isOwner = !!userId && obj.instructor?._id?.toString() === userId;
+    const isDirectStudent =
+      !!userId &&
+      obj.students?.some((student) => student._id?.toString() === userId);
+
+    if (!isAdmin && !isOwner && !isDirectStudent) {
+      delete obj.url;
+      delete obj.embedUrl;
+      delete obj.resources;
+    }
+    delete obj.students; // was only populated for the gating check above
     return obj;
   });
 
@@ -111,6 +130,14 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
     delete sessionObj.url;
     delete sessionObj.embedUrl;
     delete sessionObj.resources;
+    // M3: students were populated with name/email/role above regardless
+    // of viewer — course.service.js#getCourseDetails and
+    // track.service.js#getTrackDetails only populate that for
+    // owner/admin/enrolled. Collapse to bare IDs for everyone else so an
+    // outsider can't read classmates' emails off a session detail call.
+    if (sessionObj.students) {
+      sessionObj.students = sessionObj.students.map((s) => s._id ?? s);
+    }
   }
 
   return sessionObj;
@@ -148,6 +175,13 @@ exports.deleteSession = async (sessionId, requestingUserId) => {
   if (!session) {
     throw new AppError('Session not found', 404);
   }
+
+  // T3: mirror Course delete — clean up Assignments and Reviews scoped
+  // to this session, not just the parent Course/Track pointers.
+  await Promise.all([
+    Assignment.deleteMany({ session: sessionId }),
+    Review.deleteMany({ session: sessionId }),
+  ]);
 
   // Remove from every Course and Track that still lists it
   await Course.updateMany(

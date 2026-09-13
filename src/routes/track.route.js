@@ -971,6 +971,7 @@ const {
   protect,
   restrictTo,
   checkOwnership,
+  optionalAuth,
 } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
@@ -1082,7 +1083,11 @@ router.get(
 
 router
   .route('/:id')
-  .get(validate(getTrackSchema, 'params'), trackController.getTrack)
+  .get(
+    optionalAuth,
+    validate(getTrackSchema, 'params'),
+    trackController.getTrack,
+  )
   .patch(
     protect,
     restrictTo('admin', 'instructor'),

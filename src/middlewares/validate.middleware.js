@@ -31,12 +31,20 @@ const validateMiddleware =
     // definition, so there is no way for a client to inject an unexpected
     // params key. 'body' and 'query' are real user-controlled input and
     // keep strict unknown-key rejection.
-    const { error } = validationSchema.validate(req[source], {
+    const { error, value } = validationSchema.validate(req[source], {
       allowUnknown: source === 'params',
     });
     if (error) {
       return next(new AppError(error.details[0].message, 400));
     }
+    // E9: Joi's `value` here is the coerced/defaulted output (Joi
+    // .default(...), .trim(), lowercase email, string→number, etc). The
+    // old code discarded it and left req[source] as the raw input, so
+    // every default and coercion was silently lost — downstream code had
+    // to re-implement defaults defensively (see dashboardStats.controller.js
+    // for a documented example). Writing it back makes req.body/query/params
+    // reflect what was actually validated.
+    req[source] = value;
     next();
   };
 

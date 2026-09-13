@@ -335,12 +335,19 @@ const userSchema = new mongoose.Schema(
         validator(v) {
           if (!v || v === 'https://placehold.co/800x400?text=Trosc+User')
             return true;
-          if (v.startsWith('data:image/') && v.includes(';base64,'))
-            return true;
+          if (v.startsWith('data:image/') && v.includes(';base64,')) {
+            // Base64 encodes ~4 chars per 3 raw bytes, so cap the encoded
+            // string length at roughly 200KB of decoded image data.
+            const MAX_DECODED_BYTES = 200 * 1024;
+            const base64Data = v.split(';base64,')[1] || '';
+            const approxDecodedBytes = Math.floor((base64Data.length * 3) / 4);
+            return approxDecodedBytes <= MAX_DECODED_BYTES;
+          }
           if (validator.isURL(v, { require_protocol: true })) return true;
           return /^(?!.*[/\\])[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp)$/i.test(v);
         },
-        message: 'Photo must be a valid URL, base64 image, or image filename',
+        message:
+          'Photo must be a valid URL, image filename, or a base64 image under 200KB',
       },
     },
     bio: {

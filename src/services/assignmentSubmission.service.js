@@ -113,6 +113,13 @@ exports.gradeSubmission = async (
     );
   }
 
+  // M10: defensive only — instructors aren't enrolled as students so this
+  // shouldn't be reachable in practice, but costs nothing to guard against
+  // an instructor grading their own submission.
+  if (assignment.instructor?.toString() === studentId) {
+    throw new AppError('An instructor cannot grade their own submission', 400);
+  }
+
   submission.grade = grade;
   await assignment.save();
 

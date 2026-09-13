@@ -19,6 +19,13 @@ const handleValidationErrorDB = (err) => {
   return new AppError(message, 400);
 };
 
+// express.json() throws a SyntaxError with type 'entity.parse.failed' on
+// malformed JSON bodies. Without this, it falls through as a
+// non-operational error → generic 500 in production, even though the
+// client sent bad input.
+const handleSyntaxErrorDB = () =>
+  new AppError('Invalid JSON in request body', 400);
+
 // JWT Errors
 const handleJWTError = () =>
   new AppError('Invalid authentication token. Please log in again.', 401);
@@ -75,6 +82,8 @@ module.exports = (err, req, res, next) => {
     // Mongoose errors lose their name property when spread; manually preserve it
     let error = { ...err, name: err.name };
     error.message = err.message;
+    if (err.type === 'entity.parse.failed' || err instanceof SyntaxError)
+      error = handleSyntaxErrorDB();
     if (error.name === 'CastError') error = handleCastErrorDB(error);
     if (error.code === 11000) error = handleDuplicateFieldsDB(error);
     if (error.name === 'ValidationError')

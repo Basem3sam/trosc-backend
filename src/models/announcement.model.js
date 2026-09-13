@@ -64,6 +64,7 @@ const announcementSchema = new mongoose.Schema(
     title: {
       type: String,
       required: [true, 'Announcement must have a title'],
+      maxlength: [200, 'Announcement title cannot exceed 200 characters'],
     },
     message: {
       type: String,
