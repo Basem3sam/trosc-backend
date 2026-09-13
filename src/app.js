@@ -88,6 +88,17 @@ app.use(helmet());
 
 const allowedOrigins = [];
 
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
+if (process.env.EXTRA_CORS_ORIGINS) {
+  process.env.EXTRA_CORS_ORIGINS.split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+    .forEach((o) => allowedOrigins.push(o));
+}
+
 // Only add localhost/ngrok origins in development
 if (!isProduction) {
   allowedOrigins.push(
@@ -258,18 +269,18 @@ app.get('/health', healthHandler);
 // For Swagger consistency
 app.get('/v1/health', healthHandler);
 
-if (!isProduction) {
-  // helmet()'s default CSP blocks the inline scripts/styles Swagger UI
-  // needs to render in a browser. This route is already dev-only
-  // (never mounted in production), so disable CSP just for it rather
-  // than weakening the app-wide helmet() config above.
-  app.use(
-    '/api-docs',
-    helmet({ contentSecurityPolicy: false }),
-    swaggerUi.serve,
-    swaggerUi.setup(swaggerSpec),
-  );
-}
+// if (!isProduction) {
+// helmet()'s default CSP blocks the inline scripts/styles Swagger UI
+// needs to render in a browser. This route is already dev-only
+// (never mounted in production), so disable CSP just for it rather
+// than weakening the app-wide helmet() config above.
+app.use(
+  '/api-docs',
+  helmet({ contentSecurityPolicy: false }),
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec),
+);
+// }
 
 // Handle undefined routes
 app.use((req, res, next) => {
