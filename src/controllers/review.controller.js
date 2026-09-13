@@ -40,7 +40,7 @@ exports.getReviews = (resourceType) =>
   });
 
 exports.deleteReview = catchAsync(async (req, res, next) => {
-  await reviewService.deleteReview(req.params.reviewId);
+  await reviewService.deleteReview(req.params.reviewId, req.user.id);
 
   res.status(204).json({
     status: 'success',

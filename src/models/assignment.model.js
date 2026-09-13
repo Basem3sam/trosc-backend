@@ -187,7 +187,7 @@ assignmentSchema.index({ course: 1 });
 assignmentSchema.index({ session: 1 });
 assignmentSchema.index({ instructor: 1 });
 
-assignmentSchema.pre('validate', function (next) {
+assignmentSchema.pre('validate', function validateAssignment(next) {
   const hasCourse = !!this.course;
   const hasSession = !!this.session;
   if (hasCourse === hasSession) {

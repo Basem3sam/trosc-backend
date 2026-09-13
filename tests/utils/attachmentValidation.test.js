@@ -1,4 +1,3 @@
-const Joi = require('joi');
 const attachmentValidation = require('../../src/utils/attachmentValidation');
 
 describe('attachmentValidation', () => {

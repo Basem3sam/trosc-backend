@@ -8,6 +8,7 @@ const WeeklyTask = require('../models/weeklytask.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
+const { logActivity } = require('./activityLog.service');
 
 // ===================================================================
 // 🎯 COURSE CRUD OPERATIONS
@@ -19,8 +20,14 @@ const cascade = require('./cascade.service');
  * @returns {Promise<Course>} Newly created course
  * @throws {AppError} 400 if validation fails, 409 if title exists
  */
-exports.createCourse = async (courseBody) => {
+exports.createCourse = async (courseBody, requestingUserId) => {
   const course = await Course.create(courseBody);
+  await logActivity({
+    userId: requestingUserId,
+    action: 'created_course',
+    targetModel: 'Course',
+    targetId: course._id,
+  });
   return course;
 };
 
@@ -114,7 +121,7 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
  * @returns {Promise<Course>} Updated course document
  * @throws {AppError} 404 if course not found
  */
-exports.updateCourse = async (courseId, updateBody) => {
+exports.updateCourse = async (courseId, updateBody, requestingUserId) => {
   // Self-reference can only happen on update (a client can't know a
   // course's own ID before it's created to list it as its own
   // prerequisite at creation time). Once set, the course's own
@@ -145,6 +152,13 @@ exports.updateCourse = async (courseId, updateBody) => {
     { path: 'track', select: 'title description' },
   ]);
 
+  await logActivity({
+    userId: requestingUserId,
+    action: 'updated_course',
+    targetModel: 'Course',
+    targetId: courseId,
+  });
+
   return course;
 };
 
@@ -153,7 +167,7 @@ exports.updateCourse = async (courseId, updateBody) => {
  * @param {string} courseId - MongoDB course ID
  * @throws {AppError} 404 if course not found
  */
-exports.deleteCourse = async (courseId) => {
+exports.deleteCourse = async (courseId, requestingUserId) => {
   const course = await Course.findById(courseId);
   if (!course) throw new AppError('No course found with that ID', 404);
 
@@ -207,6 +221,13 @@ exports.deleteCourse = async (courseId) => {
       { $pull: { enrolledCourses: courseId } },
     );
   }
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'deleted_course',
+    targetModel: 'Course',
+    targetId: courseId,
+  });
 
   return null;
 };
@@ -311,15 +332,25 @@ exports.enrollStudentInCourse = async (courseId, studentId) => {
     throw new AppError('No course found with that ID', 404);
   }
 
+  // Fast-path check, same caveat as enrollment.service.js: the query
+  // guard on the update below is what actually closes the race.
   if (course.students.some((id) => id.toString() === studentId)) {
     throw new AppError('Student is already enrolled in this course', 400);
   }
 
-  const updatedCourse = await Course.findByIdAndUpdate(
-    courseId,
+  // Was already using $addToSet, but findByIdAndUpdate with no
+  // `students` condition would silently no-op on a race and still
+  // return 200 — matching only when studentId isn't already present
+  // makes a racing duplicate surface the same 400 a sequential one gets.
+  const updatedCourse = await Course.findOneAndUpdate(
+    { _id: courseId, students: { $ne: studentId } },
     { $addToSet: { students: studentId } },
     { new: true, runValidators: true },
   );
+
+  if (!updatedCourse) {
+    throw new AppError('Student is already enrolled in this course', 400);
+  }
 
   await cascade.syncCourseEnrollment(studentId, courseId);
 

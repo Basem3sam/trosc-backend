@@ -6,6 +6,8 @@ const Session = require('../models/session.model');
 const Assignment = require('../models/assignment.model');
 const Review = require('../models/review.model');
 const WeeklyTask = require('../models/weeklytask.model');
+const Event = require('../models/event.model');
+const Announcement = require('../models/announcement.model');
 const AppError = require('../utils/AppError');
 
 // Called when a student joins a track (self-approve or instructor add)
@@ -225,6 +227,81 @@ exports.deleteTrackCascade = async (trackId) => {
     }
 
     await Track.findByIdAndDelete(trackId).session(session);
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+};
+
+// Called by user.service.js#deleteUser / #bulkUserAction. Design decision
+// (see the E1 design doc): Course.instructor, Track.instructor,
+// Event.createdBy, and Announcement.createdBy are all `required` fields
+// in their schemas, so they can't simply be nulled out — a deleted user
+// who still owns one of those is a real conflict, not something a
+// cascade can silently resolve. Block the delete and tell the caller
+// what needs reassigning first, same as the "track must keep a
+// course/session" guard elsewhere in this file. Review.user is also
+// required, but a review has no standalone meaning without its author,
+// so those are deleted outright rather than blocking. Everything else
+// below is a non-required array membership and gets pulled.
+exports.hardDeleteUserCascade = async (userId) => {
+  const [ownedCourses, ownedTracks, ownedEvents, ownedAnnouncements] =
+    await Promise.all([
+      Course.find({ instructor: userId }).select('_id title'),
+      Track.find({ instructor: userId }).select('_id title'),
+      Event.find({ createdBy: userId }).select('_id title'),
+      Announcement.find({ createdBy: userId }).select('_id title'),
+    ]);
+
+  if (
+    ownedCourses.length ||
+    ownedTracks.length ||
+    ownedEvents.length ||
+    ownedAnnouncements.length
+  ) {
+    throw new AppError(
+      'This user is the required instructor/creator of existing content ' +
+        `(${ownedCourses.length} course(s), ${ownedTracks.length} track(s), ` +
+        `${ownedEvents.length} event(s), ${ownedAnnouncements.length} ` +
+        'announcement(s)). Reassign that content to another user before ' +
+        'deleting this account.',
+      409,
+    );
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    await Course.updateMany(
+      { students: userId },
+      { $pull: { students: userId } },
+    ).session(session);
+    await Track.updateMany(
+      { students: userId },
+      { $pull: { students: userId } },
+    ).session(session);
+    await Assignment.updateMany(
+      { 'submissions.student': userId },
+      { $pull: { submissions: { student: userId } } },
+    ).session(session);
+    await WeeklyTask.updateMany(
+      { 'completions.student': userId },
+      { $pull: { completions: { student: userId } } },
+    ).session(session);
+    await Event.updateMany(
+      { attendees: userId },
+      { $pull: { attendees: userId } },
+    ).session(session);
+    // No standalone meaning without their author — delete outright
+    // rather than leave a required field unset.
+    await Review.deleteMany({ user: userId }).session(session);
+
+    await User.findByIdAndDelete(userId).session(session);
 
     await session.commitTransaction();
   } catch (error) {

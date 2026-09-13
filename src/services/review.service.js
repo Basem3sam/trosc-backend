@@ -4,6 +4,7 @@ const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
 const APIFeatures = require('../utils/APIFeatures');
+const { logActivity } = require('./activityLog.service');
 
 // Each reviewable resource type: its Mongoose model, the field on Review
 // that stores the reference, and a human label for error messages.
@@ -58,6 +59,13 @@ exports.createReview = async (resourceType, resourceId, userId, data) => {
     content: data.content,
   });
 
+  await logActivity({
+    userId,
+    action: 'created_review',
+    targetModel: 'Review',
+    targetId: review._id,
+  });
+
   return review;
 };
 
@@ -98,10 +106,18 @@ exports.getReviews = async (resourceType, resourceId, query) => {
  * checkOwnership middleware before this runs.
  * @param {string} reviewId
  */
-exports.deleteReview = async (reviewId) => {
+exports.deleteReview = async (reviewId, requestingUserId) => {
   const review = await Review.findByIdAndDelete(reviewId);
   if (!review) {
     throw new AppError('No review found with that ID', 404);
   }
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'deleted_review',
+    targetModel: 'Review',
+    targetId: reviewId,
+  });
+
   return null;
 };

@@ -2,6 +2,7 @@ const APIFeatures = require('../utils/APIFeatures');
 const User = require('../models/user.model');
 const AppError = require('../utils/AppError');
 const { logActivity } = require('./activityLog.service');
+const cascade = require('./cascade.service');
 
 const filterObj = (obj, ...allowedFields) => {
   const newObj = {};
@@ -33,7 +34,7 @@ exports.getUserById = async (id) => {
   return user;
 };
 
-exports.createUser = async (userData) => {
+exports.createUser = async (userData, requestingUserId) => {
   const existingUser = await User.findOne({ email: userData.email });
   if (existingUser) {
     throw new AppError('Email already in use. Please try another one.', 400);
@@ -55,6 +56,13 @@ exports.createUser = async (userData) => {
 
   newUser.password = undefined;
 
+  await logActivity({
+    userId: requestingUserId,
+    action: 'created_user',
+    targetModel: 'User',
+    targetId: newUser._id,
+  });
+
   return newUser;
 };
 
@@ -72,9 +80,19 @@ exports.updateUser = async (id, data) => {
   return user;
 };
 
-exports.deleteUser = async (id) => {
-  const user = await User.findByIdAndDelete(id);
+exports.deleteUser = async (id, requestingUserId) => {
+  const user = await User.findById(id);
   if (!user) throw new AppError('No user found with that ID', 404);
+
+  await cascade.hardDeleteUserCascade(id);
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'deleted_user',
+    targetModel: 'User',
+    targetId: id,
+  });
+
   return null;
 };
 
@@ -150,7 +168,29 @@ exports.bulkUserAction = async (userIds, action, requestingUserId) => {
   } else if (action === 'deactivate') {
     await User.updateMany({ _id: { $in: userIds } }, { active: false });
   } else if (action === 'delete') {
-    await User.deleteMany({ _id: { $in: userIds } });
+    // Sequential, not Promise.all: hardDeleteUserCascade opens its own
+    // transaction per user, and if one user in the batch owns content
+    // that blocks deletion (see cascade.service.js), the rest should
+    // still be processed rather than the whole batch failing atomically
+    // on one bad ID.
+    const failures = [];
+    // Sequential by design (see comment above this block).
+    // eslint-disable-next-line no-restricted-syntax
+    for (const targetId of userIds) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await cascade.hardDeleteUserCascade(targetId);
+      } catch (err) {
+        failures.push({ userId: targetId, reason: err.message });
+      }
+    }
+    if (failures.length) {
+      throw new AppError(
+        `${failures.length} of ${userIds.length} user(s) could not be deleted: ` +
+          `${failures.map((f) => `${f.userId} (${f.reason})`).join('; ')}`,
+        409,
+      );
+    }
   }
 
   await logActivity({

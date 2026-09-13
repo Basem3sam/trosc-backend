@@ -430,14 +430,14 @@ sessionSchema.index({ instructor: 1 });
 // For published + level filtering
 sessionSchema.index({ published: 1, level: 1 });
 
-sessionSchema.pre('save', function (next) {
+sessionSchema.pre('save', function setIsStandalone(next) {
   // Auto-set isStandalone based on relationships
   this.isStandalone = !this.tracks?.length && !this.course;
   next();
 });
 
 // Middleware to automatically populate the instructor
-sessionSchema.pre(/^find/, function (next) {
+sessionSchema.pre(/^find/, function populateInstructor(next) {
   this.populate({
     path: 'instructor',
     select: 'name email role', // Select only the fields you need

@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const cascade = require('../src/services/cascade.service');
 const User = require('../src/models/user.model');
 const Track = require('../src/models/track.model');

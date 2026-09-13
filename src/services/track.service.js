@@ -5,6 +5,7 @@ const Session = require('../models/session.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
+const { logActivity } = require('./activityLog.service');
 
 // ===================================================================
 // 🎯 TRACK CRUD OPERATIONS
@@ -16,8 +17,14 @@ const cascade = require('./cascade.service');
  * @returns {Promise<Track>} Newly created track
  * @throws {AppError} 400 if validation fails, 409 if title exists
  */
-exports.createTrack = async (trackBody) => {
+exports.createTrack = async (trackBody, requestingUserId) => {
   const track = await Track.create(trackBody);
+  await logActivity({
+    userId: requestingUserId,
+    action: 'created_track',
+    targetModel: 'Track',
+    targetId: track._id,
+  });
   return track;
 };
 
@@ -121,7 +128,7 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
  * @returns {Promise<Track>} Updated track document
  * @throws {AppError} 404 if track not found, 400 if validation fails
  */
-exports.updateTrack = async (trackId, updateBody) => {
+exports.updateTrack = async (trackId, updateBody, requestingUserId) => {
   // If the update touches courses or sessions, validate BEFORE saving
   if (updateBody.courses !== undefined || updateBody.sessions !== undefined) {
     const existing = await Track.findById(trackId);
@@ -148,6 +155,13 @@ exports.updateTrack = async (trackId, updateBody) => {
 
   await track.populate({ path: 'instructor', select: 'name email role photo' });
 
+  await logActivity({
+    userId: requestingUserId,
+    action: 'updated_track',
+    targetModel: 'Track',
+    targetId: trackId,
+  });
+
   return track;
 };
 
@@ -158,12 +172,18 @@ exports.updateTrack = async (trackId, updateBody) => {
  * @returns {Promise<null>} Null on successful deletion
  * @throws {AppError} 404 if track not found
  */
-exports.deleteTrack = async (trackId) => {
+exports.deleteTrack = async (trackId, requestingUserId) => {
   // Delegates to cascade.service's transactional implementation: deleting a
   // track touches assignments, weekly tasks, reviews, courses, sessions,
   // and every enrolled student's user document, so it needs to be all-or-
   // nothing rather than a sequence of independent writes.
   await cascade.deleteTrackCascade(trackId);
+  await logActivity({
+    userId: requestingUserId,
+    action: 'deleted_track',
+    targetModel: 'Track',
+    targetId: trackId,
+  });
   return null;
 };
 

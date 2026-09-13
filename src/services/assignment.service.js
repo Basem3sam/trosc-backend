@@ -3,6 +3,7 @@ const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
+const { logActivity } = require('./activityLog.service');
 
 // Each directly-reviewable/assignable resource type: its Mongoose model,
 // the field on Assignment that stores the reference, and a label for
@@ -143,6 +144,13 @@ exports.createAssignment = async (
     instructor: instructorId,
   });
 
+  await logActivity({
+    userId: instructorId,
+    action: 'created_assignment',
+    targetModel: 'Assignment',
+    targetId: assignment._id,
+  });
+
   return assignment;
 };
 
@@ -154,7 +162,7 @@ exports.createAssignment = async (
  * @param {Object} data
  * @returns {Promise<Assignment>}
  */
-exports.updateAssignment = async (assignmentId, data) => {
+exports.updateAssignment = async (assignmentId, data, requestingUserId) => {
   const assignment = await Assignment.findByIdAndUpdate(assignmentId, data, {
     new: true,
     runValidators: true,
@@ -162,6 +170,14 @@ exports.updateAssignment = async (assignmentId, data) => {
   if (!assignment) {
     throw new AppError('No assignment found with that ID', 404);
   }
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'updated_assignment',
+    targetModel: 'Assignment',
+    targetId: assignmentId,
+  });
+
   return assignment;
 };
 
@@ -171,9 +187,16 @@ exports.updateAssignment = async (assignmentId, data) => {
  * middleware before this runs.
  * @param {string} assignmentId
  */
-exports.deleteAssignment = async (assignmentId) => {
+exports.deleteAssignment = async (assignmentId, requestingUserId) => {
   const assignment = await Assignment.findByIdAndDelete(assignmentId);
   if (!assignment) {
     throw new AppError('No assignment found with that ID', 404);
   }
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'deleted_assignment',
+    targetModel: 'Assignment',
+    targetId: assignmentId,
+  });
 };

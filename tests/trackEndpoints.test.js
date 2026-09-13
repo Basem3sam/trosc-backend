@@ -1,8 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
 const Track = require('../src/models/track.model');
-const Course = require('../src/models/course.model');
-const Session = require('../src/models/session.model');
 const { createTestUser } = require('./helpers/testUser');
 
 describe('Track Endpoints (Missing Coverage)', () => {

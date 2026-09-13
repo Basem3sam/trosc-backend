@@ -114,8 +114,7 @@ describe('Weekly Tasks', () => {
   describe('completion tracking', () => {
     it('reflects a student marking an item done, and only for that student', async () => {
       const fixture = await buildCourseFixture();
-      const { course, instructor, instructorToken, student, studentToken } =
-        fixture;
+      const { course, instructorToken, studentToken } = fixture;
 
       const createRes = await request(app)
         .post(`/v1/courses/${course._id}/weekly-tasks`)

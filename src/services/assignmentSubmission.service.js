@@ -2,6 +2,7 @@ const Assignment = require('../models/assignment.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
+const { logActivity } = require('./activityLog.service');
 
 /**
  * Check whether a user is enrolled in the course or session an assignment
@@ -69,6 +70,13 @@ exports.submitAssignment = async (assignmentId, studentId, data) => {
     (s) => s.student.toString() === studentId,
   );
 
+  await logActivity({
+    userId: studentId,
+    action: 'submitted_assignment',
+    targetModel: 'Assignment',
+    targetId: assignmentId,
+  });
+
   return {
     submission,
     late: submission.submittedAt > assignment.deadline,
@@ -84,7 +92,12 @@ exports.submitAssignment = async (assignmentId, studentId, data) => {
  * @param {number} grade
  * @returns {Promise<Object>} the updated submission
  */
-exports.gradeSubmission = async (assignmentId, studentId, grade) => {
+exports.gradeSubmission = async (
+  assignmentId,
+  studentId,
+  grade,
+  requestingUserId,
+) => {
   const assignment = await Assignment.findById(assignmentId);
   if (!assignment) {
     throw new AppError('No assignment found with that ID', 404);
@@ -102,6 +115,14 @@ exports.gradeSubmission = async (assignmentId, studentId, grade) => {
 
   submission.grade = grade;
   await assignment.save();
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'graded_assignment',
+    targetModel: 'Assignment',
+    targetId: assignmentId,
+    metadata: { studentId, grade },
+  });
 
   return submission;
 };

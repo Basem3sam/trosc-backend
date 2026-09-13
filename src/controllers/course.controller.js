@@ -10,7 +10,7 @@ exports.createCourse = catchAsync(async (req, res, next) => {
   delete req.body.students;
   req.body.instructor = req.user.id;
 
-  const course = await courseService.createCourse(req.body);
+  const course = await courseService.createCourse(req.body, req.user.id);
 
   res.status(201).json({
     status: 'success',
@@ -53,7 +53,11 @@ exports.updateCourse = catchAsync(async (req, res, next) => {
   delete req.body.students;
   delete req.body.sessions;
 
-  const course = await courseService.updateCourse(req.params.id, req.body);
+  const course = await courseService.updateCourse(
+    req.params.id,
+    req.body,
+    req.user.id,
+  );
 
   res.status(200).json({
     status: 'success',
@@ -64,7 +68,7 @@ exports.updateCourse = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteCourse = catchAsync(async (req, res, next) => {
-  await courseService.deleteCourse(req.params.id);
+  await courseService.deleteCourse(req.params.id, req.user.id);
 
   res.status(204).json({
     status: 'success',

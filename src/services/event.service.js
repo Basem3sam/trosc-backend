@@ -1,9 +1,16 @@
 const Event = require('../models/event.model');
 const AppError = require('../utils/AppError');
 const APIFeatures = require('../utils/APIFeatures');
+const { logActivity } = require('./activityLog.service');
 
-exports.createEvent = async (data) => {
+exports.createEvent = async (data, requestingUserId) => {
   const event = await Event.create(data);
+  await logActivity({
+    userId: requestingUserId,
+    action: 'created_event',
+    targetModel: 'Event',
+    targetId: event._id,
+  });
   return await Event.findById(event._id).populate(
     'createdBy',
     'name photo role',
@@ -34,19 +41,35 @@ exports.getEventById = async (id) => {
   return event;
 };
 
-exports.updateEvent = async (id, data) => {
+exports.updateEvent = async (id, data, requestingUserId) => {
   const event = await Event.findByIdAndUpdate(id, data, {
     new: true,
     runValidators: true,
   }).populate('createdBy', 'name photo role');
 
   if (!event) throw new AppError('Event not found', 404);
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'updated_event',
+    targetModel: 'Event',
+    targetId: id,
+  });
+
   return event;
 };
 
-exports.deleteEvent = async (id) => {
+exports.deleteEvent = async (id, requestingUserId) => {
   const event = await Event.findByIdAndDelete(id);
   if (!event) throw new AppError('Event not found', 404);
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'deleted_event',
+    targetModel: 'Event',
+    targetId: id,
+  });
+
   return null;
 };
 
@@ -60,6 +83,14 @@ exports.rsvpEvent = async (eventId, userId) => {
 
   event.attendees.push(userId);
   await event.save();
+
+  await logActivity({
+    userId,
+    action: 'rsvped_to_event',
+    targetModel: 'Event',
+    targetId: eventId,
+  });
+
   return await Event.findById(eventId).populate('attendees', 'name photo');
 };
 
@@ -73,6 +104,14 @@ exports.cancelRsvp = async (eventId, userId) => {
 
   event.attendees.pull(userId);
   await event.save();
+
+  await logActivity({
+    userId,
+    action: 'cancelled_event_rsvp',
+    targetModel: 'Event',
+    targetId: eventId,
+  });
+
   return event;
 };
 

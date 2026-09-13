@@ -12,7 +12,7 @@ exports.createTrack = catchAsync(async (req, res, next) => {
   // Add instructor from the logged-in user (security)
   req.body.instructor = req.user.id;
 
-  const track = await trackService.createTrack(req.body);
+  const track = await trackService.createTrack(req.body, req.user.id);
 
   res.status(201).json({
     status: 'success',
@@ -56,7 +56,11 @@ exports.updateTrack = catchAsync(async (req, res, next) => {
   delete req.body.courses;
   delete req.body.sessions;
 
-  const track = await trackService.updateTrack(req.params.id, req.body);
+  const track = await trackService.updateTrack(
+    req.params.id,
+    req.body,
+    req.user.id,
+  );
 
   res.status(200).json({
     status: 'success',
@@ -67,7 +71,7 @@ exports.updateTrack = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteTrack = catchAsync(async (req, res, next) => {
-  await trackService.deleteTrack(req.params.id);
+  await trackService.deleteTrack(req.params.id, req.user.id);
 
   res.status(204).json({
     status: 'success',

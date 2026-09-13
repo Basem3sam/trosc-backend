@@ -377,12 +377,12 @@ const courseSchema = new mongoose.Schema(
 );
 
 // Virtual for enrolled students count
-courseSchema.virtual('studentCount').get(function () {
+courseSchema.virtual('studentCount').get(function studentCount() {
   return this.students ? this.students.length : 0;
 });
 
 // Virtual for session count
-courseSchema.virtual('sessionCount').get(function () {
+courseSchema.virtual('sessionCount').get(function sessionCount() {
   return this.sessions ? this.sessions.length : 0;
 });
 
@@ -394,7 +394,7 @@ courseSchema.index({ published: 1, level: 1 });
 courseSchema.index({ title: 'text', description: 'text' });
 
 // Populate instructor and track on every query
-courseSchema.pre(/^find/, function (next) {
+courseSchema.pre(/^find/, function populateInstructorAndTrack(next) {
   this.populate({
     path: 'instructor',
     select: 'name email role photo',

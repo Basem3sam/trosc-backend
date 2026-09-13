@@ -24,7 +24,7 @@ exports.getUser = catchAsync(async (req, res, next) => {
 });
 
 exports.createUser = catchAsync(async (req, res, next) => {
-  const user = await userService.createUser(req.body);
+  const user = await userService.createUser(req.body, req.user.id);
   res.status(201).json({
     status: 'success',
     data: { user },
@@ -40,7 +40,7 @@ exports.updateUser = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteUser = catchAsync(async (req, res, next) => {
-  await userService.deleteUser(req.params.id);
+  await userService.deleteUser(req.params.id, req.user.id);
   res.status(204).json({
     status: 'success',
     data: null,

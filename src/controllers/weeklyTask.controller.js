@@ -41,7 +41,7 @@ exports.getTrackWeeklyTasks = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteWeeklyTask = catchAsync(async (req, res, next) => {
-  await weeklyTaskService.deleteWeeklyTask(req.params.taskId);
+  await weeklyTaskService.deleteWeeklyTask(req.params.taskId, req.user.id);
 
   res.status(204).json({
     status: 'success',
@@ -81,6 +81,7 @@ exports.updateWeeklyTask = catchAsync(async (req, res, next) => {
   const task = await weeklyTaskService.updateWeeklyTask(
     req.params.taskId,
     req.body,
+    req.user.id,
   );
   res.status(200).json({ status: 'success', data: { task } });
 });

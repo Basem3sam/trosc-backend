@@ -58,6 +58,7 @@ exports.updateAssignment = catchAsync(async (req, res, next) => {
   const assignment = await assignmentService.updateAssignment(
     req.params.id,
     req.body,
+    req.user.id,
   );
 
   res.status(200).json({
@@ -67,7 +68,7 @@ exports.updateAssignment = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteAssignment = catchAsync(async (req, res, next) => {
-  await assignmentService.deleteAssignment(req.params.id);
+  await assignmentService.deleteAssignment(req.params.id, req.user.id);
 
   res.status(204).json({
     status: 'success',

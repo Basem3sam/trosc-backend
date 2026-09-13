@@ -4,34 +4,39 @@ const Track = require('../src/models/track.model');
 const Course = require('../src/models/course.model');
 const Assignment = require('../src/models/assignment.model');
 const Review = require('../src/models/review.model');
+const User = require('../src/models/user.model');
 const { createTestUser } = require('./helpers/testUser');
 const { buildTrackAndCourseFixture } = require('./helpers/fixtures');
 
 // ===========================================================================
-// PARTIAL-CASCADE DIAGNOSTIC — updated.
+// HARD-DELETE BEHAVIOR
 //
 // deleteMe (self-service) soft-deletes (`active: false`). deleteUser
-// (admin) and bulkUserAction('delete') hard-delete
-// (findByIdAndDelete/deleteMany).
+// (admin) and bulkUserAction('delete') hard-delete via
+// cascade.service.js#hardDeleteUserCascade, which:
 //
-// As of the current implementation, hard-delete DOES clean up the
-// "instructor" side of the graph — Course.instructor and Track.instructor
-// are nulled out — but does NOT clean up the "student" side:
-// Course.students, Assignment.submissions, and Review.user are left as
-// dangling ObjectIds. This asymmetry is almost certainly a bug, not an
-// intentional design. The tests below split into two groups:
+//   1. REFUSES (409) if the user is the required instructor/creator of any
+//      Course, Track, Event, or Announcement. Those refs are `required` in
+//      their schemas, so a cascade can't legally null them out — the caller
+//      must reassign the content first.
 //
-//   1. Instructor-side tests assert the CLEANED behaviour. If these start
-//      failing because cleanup was removed, that's a regression.
-//   2. Student-side tests assert the CURRENT (dangling) behaviour. If
-//      these start failing because cleanup was ADDED, that's the signal
-//      to update them — not a bug in the test.
+//   2. CLEANS UP student-side references atomically in a transaction:
+//      Course.students, Track.students, Assignment.submissions,
+//      WeeklyTask.completions, Event.attendees — and DELETES any Reviews
+//      authored by the user (Review.user is required, and a review has no
+//      standalone meaning without its author).
 //
-// See cascade.service.js#deleteTrackCascade for the precedent of what a
-// full cascade looks like.
+// NOTE on assertions below: Course and Track both register a
+// `pre(/^find/)` populate hook on `instructor` (see course.model.js and
+// track.model.js). That hook fires on *every* find* query, including
+// findById — so `courseDoc.instructor` from a normal Mongoose read is a
+// full populated document, not an ObjectId. To assert on the *stored*
+// reference (which is what "was the ref mutated?" is really asking),
+// the tests below read via `Model.collection.findOne`, the driver-level
+// collection, which bypasses Mongoose middleware entirely.
 // ===========================================================================
 
-describe('User hard-delete — reference cleanup diagnostic', () => {
+describe('User hard-delete', () => {
   let adminToken;
 
   beforeEach(async () => {
@@ -41,63 +46,70 @@ describe('User hard-delete — reference cleanup diagnostic', () => {
 
   describe('DELETE /v1/users/:id (admin hard delete)', () => {
     // -------------------------------------------------------------------
-    // Instructor-side: cascade cleanup IS present. These tests spec it.
+    // Instructor-side: blocked with 409 when the user owns required
+    // content. Nothing is mutated — the caller must reassign first.
     // -------------------------------------------------------------------
 
-    it('removes the instructor doc and clears Course.instructor (cascade cleanup present)', async () => {
+    it('refuses (409) to delete an instructor who owns a Course', async () => {
       const { instructor, course } = await buildTrackAndCourseFixture();
 
       const res = await request(app)
         .delete(`/v1/users/${instructor._id}`)
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(res.status).toBe(204);
 
-      const courseDoc = await Course.findById(course._id);
-      expect(courseDoc).not.toBeNull();
+      expect(res.status).toBe(409);
+      expect(res.body.message).toMatch(/required instructor\/creator/i);
 
-      // Cascade cleanup is expected to null the ref (not leave a dangling
-      // ObjectId). The downstream observable — populate('instructor')
-      // resolving to null — is the same either way, but the stored value
-      // is now clean.
-      expect(courseDoc.instructor).toBeNull();
+      // User still exists.
+      expect(await User.findById(instructor._id)).not.toBeNull();
 
-      const populated = await courseDoc.populate('instructor');
-      expect(populated.instructor).toBeNull();
+      // Read via the raw collection to bypass Course's pre(/^find/)
+      // populate hook — we want to assert on the *stored* reference,
+      // not the populated view that hook produces.
+      const stored = await Course.collection.findOne({ _id: course._id });
+      expect(stored).not.toBeNull();
+      expect(stored.instructor.toString()).toBe(instructor._id.toString());
     });
 
-    it('removes the instructor doc and clears Track.instructor (cascade cleanup present)', async () => {
+    it('refuses (409) to delete an instructor who owns a Track', async () => {
       const { instructor, track } = await buildTrackAndCourseFixture();
 
       const res = await request(app)
         .delete(`/v1/users/${instructor._id}`)
         .set('Authorization', `Bearer ${adminToken}`);
-      expect(res.status).toBe(204);
 
-      const trackDoc = await Track.findById(track._id);
-      expect(trackDoc).not.toBeNull();
-      expect(trackDoc.instructor).toBeNull();
+      expect(res.status).toBe(409);
+
+      expect(await User.findById(instructor._id)).not.toBeNull();
+
+      // Same reasoning as the Course test above — Track also registers a
+      // pre(/^find/) populate hook on `instructor`.
+      const stored = await Track.collection.findOne({ _id: track._id });
+      expect(stored).not.toBeNull();
+      expect(stored.instructor.toString()).toBe(instructor._id.toString());
     });
 
     // -------------------------------------------------------------------
-    // Student-side: cascade cleanup is MISSING. These tests document the
-    // actual (dangling) behaviour and should start failing once the gap
-    // is closed.
+    // Student-side: hard delete succeeds and cleans up every reference
+    // atomically.
     // -------------------------------------------------------------------
 
-    it('removes the student doc but leaves them in Course.students (cleanup MISSING)', async () => {
+    it('removes the student and pulls them out of Course.students', async () => {
       const { student, course } = await buildTrackAndCourseFixture();
 
-      await request(app)
+      const res = await request(app)
         .delete(`/v1/users/${student._id}`)
         .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(204);
 
+      expect(await User.findById(student._id)).toBeNull();
       const courseDoc = await Course.findById(course._id);
-      expect(courseDoc.students.map((id) => id.toString())).toContain(
+      expect(courseDoc.students.map((id) => id.toString())).not.toContain(
         student._id.toString(),
       );
     });
 
-    it('removes the student doc but leaves their Assignment.submissions entry intact (cleanup MISSING)', async () => {
+    it('removes the student and pulls their Assignment submissions', async () => {
       const { instructor, course, student } =
         await buildTrackAndCourseFixture();
 
@@ -119,14 +131,11 @@ describe('User hard-delete — reference cleanup diagnostic', () => {
         .delete(`/v1/users/${student._id}`)
         .set('Authorization', `Bearer ${adminToken}`);
 
-      const orphanedAssignment = await Assignment.findById(assignment._id);
-      expect(orphanedAssignment.submissions).toHaveLength(1);
-      expect(orphanedAssignment.submissions[0].student.toString()).toBe(
-        student._id.toString(),
-      );
+      const updated = await Assignment.findById(assignment._id);
+      expect(updated.submissions).toHaveLength(0);
     });
 
-    it('removes the reviewer doc but leaves their Review.user ref dangling (cleanup MISSING)', async () => {
+    it('removes the student and deletes any Reviews they authored', async () => {
       const { course, student } = await buildTrackAndCourseFixture();
 
       const review = await Review.create({
@@ -136,21 +145,19 @@ describe('User hard-delete — reference cleanup diagnostic', () => {
         content: 'Great course!',
       });
 
-      await request(app)
+      const res = await request(app)
         .delete(`/v1/users/${student._id}`)
         .set('Authorization', `Bearer ${adminToken}`);
+      expect(res.status).toBe(204);
 
-      const orphanedReview = await Review.findById(review._id);
-      expect(orphanedReview).not.toBeNull();
-      expect(orphanedReview.user.toString()).toBe(student._id.toString());
-
-      const populated = await orphanedReview.populate('user');
-      expect(populated.user).toBeNull();
+      // Review.user is required and a review has no standalone meaning
+      // without its author — so it's deleted, not orphaned.
+      expect(await Review.findById(review._id)).toBeNull();
     });
   });
 
   describe("POST /v1/users/bulk { action: 'delete' } (admin bulk hard delete)", () => {
-    it('removes the student doc but leaves dangling Course.students refs, same as single delete (cleanup MISSING)', async () => {
+    it('cleans up Course.students refs the same way as single delete', async () => {
       const { course, student } = await buildTrackAndCourseFixture();
 
       const res = await request(app)
@@ -159,8 +166,9 @@ describe('User hard-delete — reference cleanup diagnostic', () => {
         .send({ userIds: [student._id.toString()], action: 'delete' });
       expect(res.status).toBe(200);
 
+      expect(await User.findById(student._id)).toBeNull();
       const courseDoc = await Course.findById(course._id);
-      expect(courseDoc.students.map((id) => id.toString())).toContain(
+      expect(courseDoc.students.map((id) => id.toString())).not.toContain(
         student._id.toString(),
       );
     });

@@ -1,5 +1,6 @@
 const catchAsync = require('../utils/catchAsync');
 const authService = require('../services/auth.service');
+const { logActivity } = require('../services/activityLog.service');
 
 const setAuthCookie = (res, token) => {
   const days = parseInt(process.env.JWT_COOKIE_EXPIRES_IN, 10) || 7; // Default to 7 days if not set
@@ -42,6 +43,10 @@ exports.login = catchAsync(async (req, res, next) => {
 
 exports.logout = catchAsync(async (req, res, next) => {
   authService.logoutUser(res);
+
+  if (req.user) {
+    await logActivity({ userId: req.user.id, action: 'logout' });
+  }
 
   res.status(200).json({
     status: 'success',

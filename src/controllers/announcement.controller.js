@@ -5,7 +5,10 @@ exports.createAnnouncement = catchAsync(async (req, res, next) => {
   delete req.body.createdBy;
   req.body.createdBy = req.user.id;
 
-  const announcement = await announcementService.createAnnouncement(req.body);
+  const announcement = await announcementService.createAnnouncement(
+    req.body,
+    req.user.id,
+  );
 
   res.status(201).json({
     status: 'success',
@@ -43,6 +46,7 @@ exports.updateAnnouncement = catchAsync(async (req, res, next) => {
   const announcement = await announcementService.updateAnnouncement(
     req.params.id,
     req.body,
+    req.user.id,
   );
 
   res.status(200).json({
@@ -52,7 +56,7 @@ exports.updateAnnouncement = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteAnnouncement = catchAsync(async (req, res, next) => {
-  await announcementService.deleteAnnouncement(req.params.id);
+  await announcementService.deleteAnnouncement(req.params.id, req.user.id);
 
   res.status(204).json({
     status: 'success',

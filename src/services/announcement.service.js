@@ -1,6 +1,7 @@
 const Announcement = require('../models/announcement.model');
 const AppError = require('../utils/AppError');
 const APIFeatures = require('../utils/APIFeatures');
+const { logActivity } = require('./activityLog.service');
 
 // ===================================================================
 // 🎯 AUDIENCE TARGETING
@@ -93,8 +94,14 @@ const canViewAnnouncement = (announcement, requestingUser) => {
 // 📌 CRUD
 // ===================================================================
 
-exports.createAnnouncement = async (data) => {
+exports.createAnnouncement = async (data, requestingUserId) => {
   const ann = await Announcement.create(data);
+  await logActivity({
+    userId: requestingUserId,
+    action: 'created_announcement',
+    targetModel: 'Announcement',
+    targetId: ann._id,
+  });
   return Announcement.findById(ann._id).populate(
     'createdBy',
     'name photo role',
@@ -137,18 +144,34 @@ exports.getAnnouncementById = async (id, requestingUser = null) => {
   return ann;
 };
 
-exports.updateAnnouncement = async (id, data) => {
+exports.updateAnnouncement = async (id, data, requestingUserId) => {
   const ann = await Announcement.findByIdAndUpdate(id, data, {
     new: true,
     runValidators: true,
   }).populate('createdBy', 'name photo role');
 
   if (!ann) throw new AppError('Announcement not found', 404);
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'updated_announcement',
+    targetModel: 'Announcement',
+    targetId: id,
+  });
+
   return ann;
 };
 
-exports.deleteAnnouncement = async (id) => {
+exports.deleteAnnouncement = async (id, requestingUserId) => {
   const ann = await Announcement.findByIdAndDelete(id);
   if (!ann) throw new AppError('Announcement not found', 404);
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'deleted_announcement',
+    targetModel: 'Announcement',
+    targetId: id,
+  });
+
   return null;
 };

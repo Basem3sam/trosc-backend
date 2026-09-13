@@ -1,6 +1,5 @@
 const request = require('supertest');
 const express = require('express');
-const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 
 const errorHandler = require('../src/controllers/error.controller');

@@ -2,6 +2,7 @@ const WeeklyTask = require('../models/weeklytask.model');
 const Course = require('../models/course.model');
 const Track = require('../models/track.model');
 const AppError = require('../utils/AppError');
+const { logActivity } = require('./activityLog.service');
 
 function assertCanView(resource, label, requestingUser) {
   if (requestingUser.role === 'student') {
@@ -74,6 +75,13 @@ exports.createWeeklyTask = async (courseId, instructorId, data) => {
     items: data.items,
   });
 
+  await logActivity({
+    userId: instructorId,
+    action: 'created_weekly_task',
+    targetModel: 'WeeklyTask',
+    targetId: task._id,
+  });
+
   return task;
 };
 
@@ -139,7 +147,7 @@ exports.getTrackWeeklyTasks = async (trackId, requestingUser) => {
  * @param {Object} data - { week?, title?, items? }
  * @returns {Promise<WeeklyTask>}
  */
-exports.updateWeeklyTask = async (taskId, data) => {
+exports.updateWeeklyTask = async (taskId, data, requestingUserId) => {
   const task = await WeeklyTask.findById(taskId);
   if (!task) {
     throw new AppError('No weekly task found with that ID', 404);
@@ -178,6 +186,14 @@ exports.updateWeeklyTask = async (taskId, data) => {
   }
 
   await task.save();
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'updated_weekly_task',
+    targetModel: 'WeeklyTask',
+    targetId: taskId,
+  });
+
   return task;
 };
 
@@ -187,11 +203,18 @@ exports.updateWeeklyTask = async (taskId, data) => {
  * checkOwnership middleware before this runs.
  * @param {string} taskId
  */
-exports.deleteWeeklyTask = async (taskId) => {
+exports.deleteWeeklyTask = async (taskId, requestingUserId) => {
   const task = await WeeklyTask.findByIdAndDelete(taskId);
   if (!task) {
     throw new AppError('No weekly task found with that ID', 404);
   }
+
+  await logActivity({
+    userId: requestingUserId,
+    action: 'deleted_weekly_task',
+    targetModel: 'WeeklyTask',
+    targetId: taskId,
+  });
 };
 
 /**
@@ -248,6 +271,14 @@ exports.setItemCompletion = async (
         },
       },
     );
+
+    await logActivity({
+      userId: requestingUser.id,
+      action: 'completed_weekly_task_item',
+      targetModel: 'WeeklyTask',
+      targetId: taskId,
+      metadata: { itemId },
+    });
   } else {
     await WeeklyTask.updateOne(
       { _id: taskId },

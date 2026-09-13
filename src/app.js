@@ -151,7 +151,13 @@ app.use('/v1/users/resetPassword', authLimiter);
 /* BODY PARSER */
 
 // Body parser, reading data from body into req.body
-app.use(express.json({ limit: '100kb' })); // limit the json by 100kb only to prevent attacks with too much data
+// 1mb accommodates base64-encoded photo uploads (typically 200-500kb as
+// base64, which is ~33% larger than the binary they encode) — 100kb was
+// rejecting real uploads with 413 even though the Mongoose photo
+// validator and the updateMe tests both assume base64 works. Rate
+// limiting (below) is still the primary defense against abuse of a
+// larger body limit.
+app.use(express.json({ limit: '1mb' }));
 
 // Handle form data
 app.use(

@@ -2,7 +2,6 @@ const request = require('supertest');
 const app = require('../../src/app');
 const Course = require('../../src/models/course.model');
 const Session = require('../../src/models/session.model');
-const Track = require('../../src/models/track.model');
 const { createTestUser } = require('../helpers/testUser');
 const { buildTrackAndCourseFixture } = require('../helpers/fixtures');
 

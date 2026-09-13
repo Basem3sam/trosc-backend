@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const enrollmentService = require('../../src/services/enrollment.service');
 const Track = require('../../src/models/track.model');
 const Course = require('../../src/models/course.model');

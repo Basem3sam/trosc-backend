@@ -7,7 +7,7 @@ exports.createEvent = catchAsync(async (req, res, next) => {
   delete req.body.attendees;
   req.body.createdBy = req.user.id;
 
-  const event = await eventService.createEvent(req.body);
+  const event = await eventService.createEvent(req.body, req.user.id);
 
   res.status(201).json({
     status: 'success',
@@ -43,7 +43,11 @@ exports.updateEvent = catchAsync(async (req, res, next) => {
   delete req.body.createdBy;
   delete req.body.attendees;
 
-  const event = await eventService.updateEvent(req.params.id, req.body);
+  const event = await eventService.updateEvent(
+    req.params.id,
+    req.body,
+    req.user.id,
+  );
 
   res.status(200).json({
     status: 'success',
@@ -52,7 +56,7 @@ exports.updateEvent = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteEvent = catchAsync(async (req, res, next) => {
-  await eventService.deleteEvent(req.params.id);
+  await eventService.deleteEvent(req.params.id, req.user.id);
 
   res.status(204).json({
     status: 'success',

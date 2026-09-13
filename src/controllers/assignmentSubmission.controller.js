@@ -21,6 +21,7 @@ exports.gradeSubmission = catchAsync(async (req, res, next) => {
     req.params.id,
     req.params.studentId,
     req.body.grade,
+    req.user.id,
   );
 
   res.status(200).json({

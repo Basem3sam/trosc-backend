@@ -171,7 +171,7 @@ const eventSchema = new mongoose.Schema(
 eventSchema.index({ date: 1 });
 
 // Virtual to help the frontend render the correct button instantly
-eventSchema.virtual('locationAction').get(function () {
+eventSchema.virtual('locationAction').get(function locationAction() {
   if (this.locationType === 'online' && this.locationLink) {
     return {
       type: 'online',

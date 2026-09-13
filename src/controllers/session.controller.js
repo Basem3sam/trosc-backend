@@ -12,7 +12,7 @@ exports.createSession = catchAsync(async (req, res, next) => {
 
   req.body.instructor = req.user.id;
 
-  const session = await sessionService.createSession(req.body);
+  const session = await sessionService.createSession(req.body, req.user.id);
 
   res.status(201).json({
     status: 'success',
@@ -60,7 +60,11 @@ exports.updateSession = catchAsync(async (req, res, next) => {
   delete req.body.tracks;
   delete req.body.isStandalone;
 
-  const session = await sessionService.updateSession(req.params.id, req.body);
+  const session = await sessionService.updateSession(
+    req.params.id,
+    req.body,
+    req.user.id,
+  );
 
   res.status(200).json({
     status: 'success',
@@ -72,7 +76,7 @@ exports.updateSession = catchAsync(async (req, res, next) => {
 
 // Delete session
 exports.deleteSession = catchAsync(async (req, res, next) => {
-  await sessionService.deleteSession(req.params.id);
+  await sessionService.deleteSession(req.params.id, req.user.id);
 
   res.status(204).json({
     status: 'success',

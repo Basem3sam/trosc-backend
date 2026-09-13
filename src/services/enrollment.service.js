@@ -205,6 +205,10 @@ exports.enrollInCourse = async (userId, courseId) => {
   const course = await Course.findById(courseId);
   if (!course) throw new AppError('Course not found', 404);
 
+  // Fast-path check — not the source of truth. The atomic update below is
+  // what actually closes the race between two concurrent enroll requests;
+  // this just avoids running the access/prerequisite checks below for the
+  // common non-racing case of "already enrolled."
   if (course.students.some((id) => id.toString() === userId)) {
     throw new AppError('You are already enrolled in this course', 400);
   }
@@ -244,8 +248,20 @@ exports.enrollInCourse = async (userId, courseId) => {
     }
   }
 
-  course.students.push(userId);
-  await course.save();
+  // Atomic: only matches (and only then $addToSet's) if userId isn't
+  // already in students. Closes the race the fast-path check above can't
+  // — two concurrent requests can no longer both pass a check then both
+  // push; only one $ne match can succeed.
+  const updatedCourse = await Course.findOneAndUpdate(
+    { _id: courseId, students: { $ne: userId } },
+    { $addToSet: { students: userId } },
+    { new: true, runValidators: true },
+  );
+
+  if (!updatedCourse) {
+    throw new AppError('You are already enrolled in this course', 400);
+  }
+
   const user = await User.findByIdAndUpdate(userId, {
     $addToSet: { enrolledCourses: courseId },
   });
@@ -253,7 +269,9 @@ exports.enrollInCourse = async (userId, courseId) => {
   // Fire-and-forget confirmation email; don't fail enrollment if SMTP breaks
   try {
     const courseUrl = `${process.env.FRONTEND_URL}/courses/${courseId}`;
-    await new Email(user, courseUrl).sendEnrollmentConfirmation(course.title);
+    await new Email(user, courseUrl).sendEnrollmentConfirmation(
+      updatedCourse.title,
+    );
   } catch (err) {
     logger.error('Enrollment confirmation email failed:', err.message);
   }
@@ -265,7 +283,7 @@ exports.enrollInCourse = async (userId, courseId) => {
     targetId: courseId,
   });
 
-  return course;
+  return updatedCourse;
 };
 
 exports.leaveCourse = async (userId, courseId) => {
@@ -331,8 +349,19 @@ exports.enrollInSession = async (userId, sessionId) => {
     }
   }
 
-  session.students.push(userId);
-  await session.save();
+  // Atomic: mirrors enrollInCourse's fix above — only matches (and only
+  // then $addToSet's) if userId isn't already in students, closing the
+  // race that the earlier check-then-push pattern couldn't.
+  const updatedSession = await Session.findOneAndUpdate(
+    { _id: sessionId, students: { $ne: userId } },
+    { $addToSet: { students: userId } },
+    { new: true, runValidators: true },
+  );
+
+  if (!updatedSession) {
+    throw new AppError('You are already enrolled in this session', 400);
+  }
+
   await User.findByIdAndUpdate(userId, {
     $addToSet: { enrolledSessions: sessionId },
   });
@@ -344,7 +373,7 @@ exports.enrollInSession = async (userId, sessionId) => {
     targetId: sessionId,
   });
 
-  return session;
+  return updatedSession;
 };
 
 exports.leaveSession = async (userId, sessionId) => {

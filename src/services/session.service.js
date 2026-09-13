@@ -5,9 +5,16 @@ const Session = require('../models/session.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
+const { logActivity } = require('./activityLog.service');
 
-exports.createSession = async (sessionData) => {
+exports.createSession = async (sessionData, requestingUserId) => {
   const session = await Session.create(sessionData);
+  await logActivity({
+    userId: requestingUserId,
+    action: 'created_session',
+    targetModel: 'Session',
+    targetId: session._id,
+  });
   return await Session.findById(session._id).populate(
     'instructor',
     'name email role',
@@ -109,7 +116,7 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
   return sessionObj;
 };
 
-exports.updateSession = async (sessionId, updateData) => {
+exports.updateSession = async (sessionId, updateData, requestingUserId) => {
   const session = await Session.findByIdAndUpdate(sessionId, updateData, {
     new: true,
     runValidators: true,
@@ -125,10 +132,17 @@ exports.updateSession = async (sessionId, updateData) => {
     { path: 'tracks', select: 'title description' },
   ]);
 
+  await logActivity({
+    userId: requestingUserId,
+    action: 'updated_session',
+    targetModel: 'Session',
+    targetId: sessionId,
+  });
+
   return session;
 };
 
-exports.deleteSession = async (sessionId) => {
+exports.deleteSession = async (sessionId, requestingUserId) => {
   const session = await Session.findByIdAndDelete(sessionId);
 
   if (!session) {
@@ -152,6 +166,13 @@ exports.deleteSession = async (sessionId) => {
     );
   }
 
+  await logActivity({
+    userId: requestingUserId,
+    action: 'deleted_session',
+    targetModel: 'Session',
+    targetId: sessionId,
+  });
+
   return session;
 };
 
@@ -162,17 +183,30 @@ exports.addStudentToSession = async (sessionId, studentId) => {
     throw new AppError('Session not found', 404);
   }
 
+  // Fast-path check, same caveat as enrollment.service.js: the query
+  // guard on the update below is what actually closes the race.
   if (session.students.some((id) => id.toString() === studentId)) {
     throw new AppError('Student is already enrolled in this session', 400);
   }
 
-  const updatedSession = await Session.findByIdAndUpdate(
-    sessionId,
+  // Was already using $addToSet (so no duplicate could land in the
+  // array), but findByIdAndUpdate with no `students` condition would
+  // silently no-op and still return 200 on a race — the second of two
+  // concurrent requests looked successful without actually being a
+  // second enrollment. Matching only when studentId isn't already
+  // present makes that race surface as the same 400 a sequential
+  // duplicate call gets.
+  const updatedSession = await Session.findOneAndUpdate(
+    { _id: sessionId, students: { $ne: studentId } },
     { $addToSet: { students: studentId } },
     { new: true },
   )
     .populate('instructor', 'name email role')
     .populate('students', 'name email role');
+
+  if (!updatedSession) {
+    throw new AppError('Student is already enrolled in this session', 400);
+  }
 
   await cascade.syncSessionEnrollment(studentId, sessionId);
 

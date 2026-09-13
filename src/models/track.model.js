@@ -287,22 +287,22 @@ trackSchema.index({ published: 1, level: 1 });
 trackSchema.index({ title: 'text', description: 'text' }); // For search
 
 // Virtual for enrolled students count
-trackSchema.virtual('studentCount').get(function () {
+trackSchema.virtual('studentCount').get(function studentCount() {
   return this.students ? this.students.length : 0;
 });
 
 // Virtual for session count
-trackSchema.virtual('sessionCount').get(function () {
+trackSchema.virtual('sessionCount').get(function sessionCount() {
   return this.sessions ? this.sessions.length : 0;
 });
 
 // Virtual for course count
-trackSchema.virtual('courseCount').get(function () {
+trackSchema.virtual('courseCount').get(function courseCount() {
   return this.courses ? this.courses.length : 0;
 });
 
 // Virtual: total content count (courses + direct sessions)
-trackSchema.virtual('contentCount').get(function () {
+trackSchema.virtual('contentCount').get(function contentCount() {
   const courseCount = this.courses ? this.courses.length : 0;
   const sessionCount = this.sessions ? this.sessions.length : 0;
   return {
@@ -313,7 +313,7 @@ trackSchema.virtual('contentCount').get(function () {
 });
 
 // Populate instructor info on every query
-trackSchema.pre(/^find/, function (next) {
+trackSchema.pre(/^find/, function populateInstructor(next) {
   this.populate({
     path: 'instructor',
     select: 'name email role photo', // Customize fields as needed
