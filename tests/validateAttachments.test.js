@@ -30,4 +30,9 @@ describe('validateAttachments', () => {
     const urls = ['not-a-url'];
     expect(validateAttachments(urls)).toBe(false);
   });
+
+  it('returns false when an element is not a string', () => {
+    const urls = [12345];
+    expect(validateAttachments(urls)).toBe(false);
+  });
 });
