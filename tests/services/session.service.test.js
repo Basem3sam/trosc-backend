@@ -33,7 +33,7 @@ describe('Session Service', () => {
 
   describe('getAllSessions', () => {
     it('returns paginated sessions and strips sensitive fields', async () => {
-      const session = await Session.create({
+      await Session.create({
         title: 'Test',
         instructor: instructor._id,
         url: 'https://drive.google.com/file/d/abc', // trusted host
@@ -308,7 +308,7 @@ describe('Session Service', () => {
         description: 'test',
         instructor: instructor._id,
       });
-      const session = await Session.create({
+      await Session.create({
         title: 'Session',
         instructor: instructor._id,
         tracks: [track._id],
@@ -319,7 +319,7 @@ describe('Session Service', () => {
     });
 
     it('filters by student', async () => {
-      const session = await Session.create({
+      await Session.create({
         title: 'Session',
         instructor: instructor._id,
         students: [student._id],

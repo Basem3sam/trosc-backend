@@ -40,9 +40,15 @@ module.exports = {
     // Every Express handler wrapped in catchAsync declares (req, res, next)
     // for signature consistency even when it never calls next() itself
     // (errors are forwarded automatically by catchAsync). Don't flag that.
+    // Tests routinely do `const { fieldToOmit, ...rest } = payload` to build
+    // a payload missing one field; `fieldToOmit` is intentionally unused.
     'no-unused-vars': [
       'error',
-      { args: 'after-used', argsIgnorePattern: '^next$' },
+      {
+        args: 'after-used',
+        argsIgnorePattern: '^next$',
+        ignoreRestSiblings: true,
+      },
     ],
 
     // Swagger/JSDoc blocks in the models routinely exceed 100 chars on a

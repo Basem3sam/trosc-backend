@@ -18,7 +18,7 @@ describe('Track Endpoints (Missing Coverage)', () => {
       });
 
       // Create track with 0 students (should NOT appear)
-      const track2 = await Track.create({
+      await Track.create({
         title: 'Empty Track',
         description: 'No students',
         instructor: instructor.user._id,
@@ -27,7 +27,7 @@ describe('Track Endpoints (Missing Coverage)', () => {
       });
 
       // Create unpublished track with students (should NOT appear)
-      const track3 = await Track.create({
+      await Track.create({
         title: 'Hidden Track',
         description: 'Unpublished',
         instructor: instructor.user._id,

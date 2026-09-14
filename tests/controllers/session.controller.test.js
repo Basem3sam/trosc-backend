@@ -12,21 +12,17 @@ const { buildStandaloneSessionFixture } = require('../helpers/fixtures');
 
 describe('Session Controller – Missing Endpoints', () => {
   describe('add/remove student to/from session', () => {
-    let instructor;
     let instructorToken;
     let session;
     let student;
-    let studentToken;
     let otherInstructorToken;
 
     beforeEach(async () => {
       const fixture = await buildStandaloneSessionFixture();
 
-      instructor = fixture.instructor;
       instructorToken = fixture.instructorToken;
       session = fixture.session;
       student = fixture.student;
-      studentToken = fixture.studentToken;
 
       const otherInst = await createTestUser({
         role: 'instructor',

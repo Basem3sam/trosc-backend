@@ -6,7 +6,6 @@ describe('Track & Course CRUD', () => {
   describe('Tracks', () => {
     let instructorToken;
     let adminToken;
-    let trackId;
 
     beforeEach(async () => {
       const { token: instToken } = await createTestUser({ role: 'instructor' });
@@ -26,7 +25,6 @@ describe('Track & Course CRUD', () => {
           published: true,
         });
       expect(res.status).toBe(201);
-      trackId = res.body.data.track._id;
     });
 
     it('instructor can fetch their own track (published)', async () => {
@@ -93,7 +91,6 @@ describe('Track & Course CRUD', () => {
 
   describe('Courses', () => {
     let instructorToken;
-    let courseId;
 
     beforeEach(async () => {
       const { token: instToken } = await createTestUser({ role: 'instructor' });
@@ -111,7 +108,6 @@ describe('Track & Course CRUD', () => {
           published: true,
         });
       expect(res.status).toBe(201);
-      courseId = res.body.data.course._id;
     });
 
     it('instructor can add a session to their course', async () => {

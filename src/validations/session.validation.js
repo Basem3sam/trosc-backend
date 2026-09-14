@@ -31,11 +31,9 @@ const createSessionValidation = Joi.object({
   level: Joi.string()
     .valid('beginner', 'intermediate', 'advanced')
     .default('beginner'),
-  access: Joi.string()
-    .valid('public', 'track-only', 'private')
-    .messages({
-      'any.only': 'Access must be one of: public, track-only, private',
-    }),
+  access: Joi.string().valid('public', 'track-only', 'private').messages({
+    'any.only': 'Access must be one of: public, track-only, private',
+  }),
   coverImage: Joi.string().uri().optional().allow('').messages({
     'string.uri': 'Cover image must be a valid URL.',
   }),

@@ -8,12 +8,10 @@ const { createTestUser } = require('../helpers/testUser');
 describe('WeeklyTask Service', () => {
   let instructor;
   let student;
-  let otherInstructor;
   let course;
 
   beforeEach(async () => {
     instructor = (await createTestUser({ role: 'instructor' })).user;
-    otherInstructor = (await createTestUser({ role: 'instructor' })).user;
     student = (await createTestUser({ role: 'student' })).user;
     course = await Course.create({
       title: 'Course',

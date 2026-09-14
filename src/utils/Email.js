@@ -30,9 +30,7 @@ function getTransporter() {
 class Email {
   constructor(user, url, replyTo) {
     if (!user?.email) {
-      throw new Error(
-        'Email: cannot construct without a recipient user.email',
-      );
+      throw new Error('Email: cannot construct without a recipient user.email');
     }
     this.to = user.email;
     // user.name is user-supplied and gets interpolated straight into HTML
@@ -127,7 +125,7 @@ class Email {
       </html>
     `;
 
-    return await this.send(subject, htmlContent);
+    return this.send(subject, htmlContent);
   }
 
   async sendPasswordReset() {
@@ -184,7 +182,7 @@ class Email {
       </html>
     `;
 
-    return await this.send(subject, htmlContent);
+    return this.send(subject, htmlContent);
   }
 
   // Additional email templates you might need:
@@ -203,7 +201,7 @@ class Email {
       </div>
     `;
 
-    return await this.send(subject, htmlContent);
+    return this.send(subject, htmlContent);
   }
 
   async sendSessionReminder(sessionTitle, startTime) {
@@ -220,7 +218,7 @@ class Email {
       </div>
     `;
 
-    return await this.send(subject, htmlContent);
+    return this.send(subject, htmlContent);
   }
 }
 

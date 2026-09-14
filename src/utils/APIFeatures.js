@@ -180,7 +180,7 @@ class APIFeatures {
 
   // 8️⃣ NEW: Count only (without getting documents)
   async count() {
-    return await this.query.countDocuments();
+    return this.query.countDocuments();
   }
 
   // 9️⃣ NEW: Add custom query conditions

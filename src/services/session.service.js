@@ -17,7 +17,7 @@ exports.createSession = async (sessionData, requestingUserId) => {
     targetModel: 'Session',
     targetId: session._id,
   });
-  return await Session.findById(session._id).populate(
+  return Session.findById(session._id).populate(
     'instructor',
     'name email role',
   );

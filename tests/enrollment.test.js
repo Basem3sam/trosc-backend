@@ -281,8 +281,8 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
   describe('Course Self-Enrollment (Prerequisites)', () => {
     let instructor;
     let student;
-    let studentToken;
-    let studentId;
+    let prereqStudentToken;
+    let prereqStudentId;
     let track;
     let courseA;
     let courseB;
@@ -290,8 +290,8 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
     beforeEach(async () => {
       instructor = await createTestUser({ role: 'instructor' });
       student = await createTestUser({ role: 'student' });
-      studentToken = student.token;
-      studentId = student.user._id.toString();
+      prereqStudentToken = student.token;
+      prereqStudentId = student.user._id.toString();
 
       track = await Track.create({
         title: 'Prerequisite Track',
@@ -328,7 +328,7 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
     it('prevents enrollment if prerequisites are not met', async () => {
       const res = await request(app)
         .post(`/v1/courses/${courseB._id}/enroll-me`)
-        .set('Authorization', `Bearer ${studentToken}`);
+        .set('Authorization', `Bearer ${prereqStudentToken}`);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toMatch(/prerequisites/);
@@ -338,16 +338,18 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
       // Enroll in courseA first
       await request(app)
         .post(`/v1/courses/${courseA._id}/enroll-me`)
-        .set('Authorization', `Bearer ${studentToken}`);
+        .set('Authorization', `Bearer ${prereqStudentToken}`);
 
       // Now enroll in courseB (prereq met)
       const res = await request(app)
         .post(`/v1/courses/${courseB._id}/enroll-me`)
-        .set('Authorization', `Bearer ${studentToken}`);
+        .set('Authorization', `Bearer ${prereqStudentToken}`);
 
       expect(res.status).toBe(200);
       const course = await Course.findById(courseB._id);
-      expect(course.students.map((id) => id.toString())).toContain(studentId);
+      expect(course.students.map((id) => id.toString())).toContain(
+        prereqStudentId,
+      );
     });
   });
 });

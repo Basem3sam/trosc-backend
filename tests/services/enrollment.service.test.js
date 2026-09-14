@@ -8,12 +8,10 @@ const { createTestUser } = require('../helpers/testUser');
 describe('Enrollment Service', () => {
   let instructor;
   let student;
-  let student2;
 
   beforeEach(async () => {
     instructor = (await createTestUser({ role: 'instructor' })).user;
     student = (await createTestUser({ role: 'student' })).user;
-    student2 = (await createTestUser({ role: 'student' })).user;
   });
 
   // Helper to get string IDs
@@ -158,7 +156,7 @@ describe('Enrollment Service', () => {
     });
 
     it('throws 400 if student is pending in another track', async () => {
-      const otherTrack = await Track.create({
+      await Track.create({
         title: 'Other',
         description: 'test',
         instructor: instructor._id,

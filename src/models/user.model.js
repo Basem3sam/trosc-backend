@@ -479,7 +479,7 @@ userSchema.methods.correctPassword = async function correctPassword(
   candidatePassword,
   userPassword,
 ) {
-  return await bcrypt.compare(candidatePassword, userPassword);
+  return bcrypt.compare(candidatePassword, userPassword);
 };
 
 // Check if user changed password after token issued

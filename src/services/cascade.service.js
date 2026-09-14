@@ -194,12 +194,14 @@ exports.deleteTrackCascade = async (trackId) => {
     ).session(session);
 
     // Sessions become standalone if not in a course
-    for (const trackSession of sessionsInTrack) {
-      trackSession.tracks.pull(trackId);
-      trackSession.isStandalone =
-        !trackSession.tracks?.length && !trackSession.course;
-      await trackSession.save({ session });
-    }
+    await Promise.all(
+      sessionsInTrack.map(async (trackSession) => {
+        trackSession.tracks.pull(trackId);
+        trackSession.isStandalone =
+          !trackSession.tracks?.length && !trackSession.course;
+        await trackSession.save({ session });
+      }),
+    );
 
     // Remove all track students from track courses and sessions
     if (track.students?.length) {

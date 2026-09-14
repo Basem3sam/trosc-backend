@@ -228,11 +228,13 @@ exports.deleteCourse = async (courseId, requestingUserId) => {
   const sessionsInCourse = await Session.find({
     _id: { $in: course.sessions },
   });
-  for (const session of sessionsInCourse) {
-    session.course = null;
-    session.isStandalone = !session.tracks?.length && !session.course; // true only if no track
-    await session.save();
-  }
+  await Promise.all(
+    sessionsInCourse.map(async (session) => {
+      session.course = null;
+      session.isStandalone = !session.tracks?.length && !session.course; // true only if no track
+      await session.save();
+    }),
+  );
 
   if (course.students?.length) {
     await User.updateMany(

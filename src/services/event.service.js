@@ -11,10 +11,7 @@ exports.createEvent = async (data, requestingUserId) => {
     targetModel: 'Event',
     targetId: event._id,
   });
-  return await Event.findById(event._id).populate(
-    'createdBy',
-    'name photo role',
-  );
+  return Event.findById(event._id).populate('createdBy', 'name photo role');
 };
 
 exports.getAllEvents = async (query) => {
@@ -91,7 +88,7 @@ exports.rsvpEvent = async (eventId, userId) => {
     targetId: eventId,
   });
 
-  return await Event.findById(eventId).populate('attendees', 'name photo');
+  return Event.findById(eventId).populate('attendees', 'name photo');
 };
 
 exports.cancelRsvp = async (eventId, userId) => {

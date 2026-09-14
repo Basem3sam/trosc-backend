@@ -7,7 +7,7 @@ const AppError = require('../src/utils/AppError');
 const User = require('../src/models/user.model');
 
 // Helper to create an Express app with a test route that throws errors
-function createAppWithErrorRoute(errorToThrow, statusCode = 500) {
+function createAppWithErrorRoute(errorToThrow) {
   const app = express();
   app.use(express.json());
 
@@ -70,7 +70,7 @@ function createAppWithErrorRoute(errorToThrow, statusCode = 500) {
   });
 
   // A route that throws a generic Error (non-operational)
-  app.get('/generic-error', (req, res, next) => {
+  app.get('/generic-error', () => {
     throw new Error('Something went wrong');
   });
 
@@ -178,8 +178,6 @@ describe('Error Controller', () => {
     });
 
     it('handles TokenExpiredError', async () => {
-      const app = createAppWithErrorRoute(null);
-      const res = await request(app).get('/jwt-expired');
       // This test is timing‑sensitive; we can mock the error instead.
       // We'll create a route that directly throws a TokenExpiredError.
       // Directly trigger a TokenExpiredError via a dedicated route instead

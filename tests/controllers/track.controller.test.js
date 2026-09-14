@@ -9,7 +9,6 @@ const { createTestUser } = require('../helpers/testUser');
 describe('Track Controller – Missing Endpoints', () => {
   let instructor;
   let instructorToken;
-  let otherInstructor;
   let otherInstructorToken;
   let adminToken;
   let student;
@@ -24,7 +23,6 @@ describe('Track Controller – Missing Endpoints', () => {
     const otherInstructorData = await createTestUser({
       role: 'instructor',
     });
-    otherInstructor = otherInstructorData.user;
     otherInstructorToken = otherInstructorData.token;
 
     const adminData = await createTestUser({ role: 'admin' });

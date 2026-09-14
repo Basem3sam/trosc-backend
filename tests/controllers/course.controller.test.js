@@ -95,20 +95,16 @@ describe('Course Controller – Missing Endpoints', () => {
   });
 
   describe('add/remove student to/from course', () => {
-    let instructor;
     let instructorToken;
     let course;
     let student;
-    let studentToken;
     let otherInstructorToken;
 
     beforeEach(async () => {
       const fixture = await buildTrackAndCourseFixture();
-      instructor = fixture.instructor;
       instructorToken = fixture.instructorToken;
       course = fixture.course;
       student = fixture.student;
-      studentToken = fixture.studentToken;
       otherInstructorToken = fixture.otherInstructorToken;
     });
 
@@ -184,8 +180,6 @@ describe('Course Controller – Missing Endpoints', () => {
 
   describe('filtering endpoints', () => {
     let instructor;
-    let instructorToken;
-    let course;
     let student;
     let studentToken;
     let track;
@@ -193,8 +187,6 @@ describe('Course Controller – Missing Endpoints', () => {
     beforeEach(async () => {
       const fixture = await buildTrackAndCourseFixture();
       instructor = fixture.instructor;
-      instructorToken = fixture.instructorToken;
-      course = fixture.course;
       student = fixture.student;
       studentToken = fixture.studentToken;
       track = fixture.track;
