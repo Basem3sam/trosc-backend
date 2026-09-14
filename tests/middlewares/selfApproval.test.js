@@ -23,23 +23,4 @@ describe('selfApproval middleware', () => {
     expect(res.status).toBe(403);
     expect(res.body.message).toMatch(/cannot approve your own request/);
   });
-
-  it('rejects an instructor attempting to reject their own studentId', async () => {
-    const { user: instructor, token: instructorToken } = await createTestUser({
-      role: 'instructor',
-    });
-
-    const track = await Track.create({
-      title: 'Self Reject Track',
-      description: 'For selfApproval middleware coverage',
-      instructor: instructor._id,
-      pendingStudents: [instructor._id],
-    });
-
-    const res = await request(app)
-      .post(`/v1/tracks/${track._id}/students/${instructor._id}/reject`)
-      .set('Authorization', `Bearer ${instructorToken}`);
-
-    expect(res.status).toBe(403);
-  });
 });

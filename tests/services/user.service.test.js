@@ -63,7 +63,7 @@ describe('user.service — direct calls', () => {
       const { user } = await createTestUser();
       await userService.deleteMe(user._id);
 
-      const refreshed = await User.findById(user._id);
+      const refreshed = await User.findById(user._id).select('+active');
       expect(refreshed).not.toBeNull();
       expect(refreshed.active).toBe(false);
     });
@@ -111,7 +111,7 @@ describe('DELETE /v1/users/deleteMe (route)', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(204);
-    const refreshed = await User.findById(user._id);
+    const refreshed = await User.findById(user._id).select('+active');
     expect(refreshed.active).toBe(false);
   });
 });

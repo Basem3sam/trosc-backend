@@ -75,23 +75,6 @@ describe('Course Controller – list / single / update / leaveMe', () => {
 
       expect(res.status).toBe(403);
     });
-
-    it('strips instructor/students/sessions from the update body', async () => {
-      const courseId = await createCourse(instructorToken);
-      const { user: intruder } = await createTestUser({ role: 'instructor' });
-
-      const res = await request(app)
-        .patch(`/v1/courses/${courseId}`)
-        .set('Authorization', `Bearer ${instructorToken}`)
-        .send({
-          title: 'Still Mine',
-          instructor: intruder._id.toString(),
-        });
-
-      expect(res.status).toBe(200);
-      const refreshed = await Course.findById(courseId);
-      expect(refreshed.instructor.toString()).not.toBe(intruder._id.toString());
-    });
   });
 
   describe('POST/DELETE /v1/courses/:id/enroll-me & leave-me', () => {

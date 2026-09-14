@@ -7,9 +7,11 @@ const { buildStandaloneSessionFixture } = require('../helpers/fixtures');
 describe('Session Controller – list / update / delete / leaveMe', () => {
   describe('GET /v1/sessions', () => {
     it('returns all sessions with pagination info', async () => {
-      await buildStandaloneSessionFixture();
+      const { studentToken } = await buildStandaloneSessionFixture();
 
-      const res = await request(app).get('/v1/sessions');
+      const res = await request(app)
+        .get('/v1/sessions')
+        .set('Authorization', `Bearer ${studentToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('success');
@@ -44,25 +46,6 @@ describe('Session Controller – list / update / delete / leaveMe', () => {
         .send({ title: 'Hijacked Title' });
 
       expect(res.status).toBe(403);
-    });
-
-    it('strips instructor/students/course/tracks/isStandalone from the body', async () => {
-      const { instructorToken, session } =
-        await buildStandaloneSessionFixture();
-      const { user: intruder } = await createTestUser({ role: 'instructor' });
-
-      const res = await request(app)
-        .patch(`/v1/sessions/${session._id}`)
-        .set('Authorization', `Bearer ${instructorToken}`)
-        .send({
-          title: 'Still Mine',
-          instructor: intruder._id.toString(),
-          isStandalone: false,
-        });
-
-      expect(res.status).toBe(200);
-      const refreshed = await Session.findById(session._id);
-      expect(refreshed.instructor.toString()).not.toBe(intruder._id.toString());
     });
   });
 

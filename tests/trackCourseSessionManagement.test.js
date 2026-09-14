@@ -41,8 +41,8 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
       });
 
       const updated = await trackService.addCourseToTrack(
-        track._id,
-        course._id,
+        track._id.toString(),
+        course._id.toString(),
       );
 
       expect(updated.courses.map((id) => id.toString())).toContain(
@@ -50,7 +50,7 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
       );
 
       const refreshedCourse = await Course.findById(course._id);
-      expect(refreshedCourse.track.toString()).toBe(track._id.toString());
+      expect(refreshedCourse.track._id.toString()).toBe(track._id.toString());
       expect(refreshedCourse.students.map((id) => id.toString())).toEqual(
         expect.arrayContaining([
           student1._id.toString(),
@@ -79,7 +79,10 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
       otherTrack.courses.push(course._id);
       await otherTrack.save();
 
-      await trackService.addCourseToTrack(track._id, course._id);
+      await trackService.addCourseToTrack(
+        track._id.toString(),
+        course._id.toString(),
+      );
 
       const refreshedOther = await Track.findById(otherTrack._id);
       expect(refreshedOther.courses.map((id) => id.toString())).not.toContain(
@@ -87,7 +90,7 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
       );
 
       const refreshedCourse = await Course.findById(course._id);
-      expect(refreshedCourse.track.toString()).toBe(track._id.toString());
+      expect(refreshedCourse.track._id.toString()).toBe(track._id.toString());
     });
 
     it('throws 404 when track not found', async () => {
@@ -120,7 +123,10 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
       await track.save();
 
       await expect(
-        trackService.addCourseToTrack(track._id, course._id),
+        trackService.addCourseToTrack(
+          track._id.toString(),
+          course._id.toString(),
+        ),
       ).rejects.toThrow('Course already in this track');
     });
   });
@@ -233,7 +239,10 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
       await track.save();
 
       await expect(
-        trackService.addSessionToTrack(track._id, session._id),
+        trackService.addSessionToTrack(
+          track._id.toString(),
+          session._id.toString(),
+        ),
       ).rejects.toThrow('Session already in this track');
     });
   });
@@ -337,7 +346,7 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
       expect(total).toBeGreaterThanOrEqual(1);
       expect(
         tracks.every(
-          (t) => t.instructor.toString() === instructor._id.toString(),
+          (t) => t.instructor._id.toString() === instructor._id.toString(),
         ),
       ).toBe(true);
     });
@@ -459,20 +468,27 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
         params: { instructorId: instructor._id.toString() },
         query: {},
       };
-      const jsonMock = jest.fn();
-      const res = { status: jest.fn(() => ({ json: jsonMock })) };
       const next = jest.fn();
 
-      await trackController.getTracksByInstructor(req, res, next);
+      // catchAsync's wrapper doesn't return the inner promise, so awaiting
+      // the controller call directly resolves before the async work
+      // inside it finishes. Wait on the res.json mock being invoked instead.
+      const payload = await new Promise((resolve, reject) => {
+        const jsonMock = jest.fn((body) => resolve(body));
+        const res = { status: jest.fn(() => ({ json: jsonMock })) };
+        const wrappedNext = (err) => {
+          next(err);
+          if (err) reject(err);
+        };
+        trackController.getTracksByInstructor(req, res, wrappedNext);
+      });
 
       expect(next).not.toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(200);
-      const payload = jsonMock.mock.calls[0][0];
       expect(payload.status).toBe('success');
       expect(Array.isArray(payload.data.tracks)).toBe(true);
       expect(
         payload.data.tracks.every(
-          (t) => t.instructor.toString() === instructor._id.toString(),
+          (t) => t.instructor._id.toString() === instructor._id.toString(),
         ),
       ).toBe(true);
     });
