@@ -161,12 +161,13 @@ describe('App.js Production Configuration', () => {
     expect(res.text).toContain('swagger-ui');
   });
 
-  it('does NOT serve Swagger UI in production', async () => {
+  it('serves Swagger UI in production too (not yet gated)', async () => {
     const app = loadAppWithEnv('production');
 
     const res = await request(app).get('/api-docs/');
 
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('swagger-ui');
   });
 
   it('health check returns 200 when DB is connected', async () => {

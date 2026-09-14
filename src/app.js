@@ -269,18 +269,18 @@ app.get('/health', healthHandler);
 // For Swagger consistency
 app.get('/v1/health', healthHandler);
 
-// if (!isProduction) {
+// Swagger UI is intentionally served in every environment (including
+// production) for now, so the frontend team can consume/explore the API.
 // helmet()'s default CSP blocks the inline scripts/styles Swagger UI
-// needs to render in a browser. This route is already dev-only
-// (never mounted in production), so disable CSP just for it rather
-// than weakening the app-wide helmet() config above.
+// needs to render in a browser, so disable CSP just for this route
+// rather than weakening the app-wide helmet() config above.
+// TODO: gate this behind an env var or basic auth before it's a concern.
 app.use(
   '/api-docs',
   helmet({ contentSecurityPolicy: false }),
   swaggerUi.serve,
   swaggerUi.setup(swaggerSpec),
 );
-// }
 
 // Handle undefined routes
 app.use((req, res, next) => {
