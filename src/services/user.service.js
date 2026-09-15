@@ -71,7 +71,25 @@ exports.updateUser = async (id, data) => {
     throw new AppError('This route is not for password updates.', 400);
   }
 
-  const user = await User.findByIdAndUpdate(id, data, {
+  // Defense-in-depth: the route's Joi schema (adminUpdateUserSchema)
+  // already rejects unknown keys, but this service shouldn't rely on
+  // that being the only gate — filter here too, same as updateMe, so
+  // a future route/script that reuses this function without going
+  // through Joi validation can't mass-assign arbitrary fields.
+  const filteredData = filterObj(
+    data,
+    'name',
+    'email',
+    'role',
+    'photo',
+    'bio',
+    'website',
+    'socialMedia',
+    'active',
+    'emailVerified',
+  );
+
+  const user = await User.findByIdAndUpdate(id, filteredData, {
     new: true,
     runValidators: true,
   });

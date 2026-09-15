@@ -131,9 +131,35 @@ describe('APIFeatures', () => {
       { populate: 'instructor, students' },
       {},
     );
-    features.populate();
+    features.populate(['instructor', 'students']);
     expect(queryMock.populate).toHaveBeenCalledWith('instructor');
     expect(queryMock.populate).toHaveBeenCalledWith('students');
+  });
+
+  it('populate() ignores a requested field that is not in the whitelist', () => {
+    // Security property: a client sending ?populate=password (or any
+    // relation name the route didn't explicitly opt into) must not
+    // trigger an uncontrolled populate.
+    const features = new APIFeatures(
+      queryMock,
+      { populate: 'instructor,password,students' },
+      {},
+    );
+    features.populate(['instructor', 'students']);
+    expect(queryMock.populate).toHaveBeenCalledWith('instructor');
+    expect(queryMock.populate).toHaveBeenCalledWith('students');
+    expect(queryMock.populate).not.toHaveBeenCalledWith('password');
+    expect(queryMock.populate).toHaveBeenCalledTimes(2);
+  });
+
+  it('populate() is a no-op when no whitelist is supplied', () => {
+    const features = new APIFeatures(
+      queryMock,
+      { populate: 'instructor,students' },
+      {},
+    );
+    features.populate();
+    expect(queryMock.populate).not.toHaveBeenCalled();
   });
 
   it('populate() is a no-op when no populate param is given', () => {

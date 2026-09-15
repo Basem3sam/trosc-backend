@@ -11,6 +11,21 @@ class APIFeatures {
     this.pagination = {}; // ✅ Initialize pagination object
   }
 
+  // Fields marked `select: false` in the schema (password, password
+  // reset tokens, the `active` flag, etc). Computed from the actual
+  // schema metadata rather than name-matching (e.g. "contains
+  // 'password'"), so limitFields() blocks every select:false path
+  // regardless of what it's called — not just ones that happen to
+  // contain a word we thought to check for.
+  getHiddenFields() {
+    if (!this.model?.schema) return [];
+    const hidden = [];
+    this.model.schema.eachPath((path, schemaType) => {
+      if (schemaType.options?.select === false) hidden.push(path);
+    });
+    return hidden;
+  }
+
   // 1️⃣ Enhanced Filtering with Better Error Handling
   filter(defaultFilter = {}) {
     const queryObj = { ...this.queryString };
@@ -107,14 +122,23 @@ class APIFeatures {
   // 4️⃣ Enhanced Field Limiting with Security
   limitFields() {
     if (this.queryString.fields) {
-      const fields = this.queryString.fields.split(',').join(' ');
-      // ✅ Basic security: Remove potential dangerous fields
-      const safeFields = fields
-        .split(' ')
-        .filter(
-          (field) => !field.includes('password') && !field.includes('__v'),
-        )
+      const hiddenFields = this.getHiddenFields();
+      const requestedFields = this.queryString.fields
+        .split(',')
+        .map((f) => f.trim())
+        .filter(Boolean);
+
+      const safeFields = requestedFields
+        .filter((field) => {
+          // Mongoose's "+field" syntax force-includes a select:false
+          // field — strip the prefix before checking so `+password`
+          // (or `+passwordResetToken`, `+active`, ...) can't be used
+          // to bypass the block.
+          const bareField = field.startsWith('+') ? field.slice(1) : field;
+          return bareField !== '__v' && !hiddenFields.includes(bareField);
+        })
         .join(' ');
+
       this.query = this.query.select(safeFields);
     } else {
       this.query = this.query.select('-__v');
@@ -155,13 +179,21 @@ class APIFeatures {
   }
 
   // 6️⃣ Enhanced Population with Depth Control
-  populate() {
-    if (this.queryString.populate) {
+  // `allowedFields` is a whitelist of relation paths this endpoint is
+  // willing to populate for a client. Defaults to an empty array, i.e.
+  // ?populate= is a no-op unless the caller explicitly opts a route in
+  // — populating whatever relation name a client sends is uncontrolled
+  // query-shape input (expensive or unintended joins, over-fetching
+  // data the endpoint wasn't meant to expose).
+  populate(allowedFields = []) {
+    if (this.queryString.populate && allowedFields.length > 0) {
       const fields = this.queryString.populate.split(',');
       fields.forEach((field) => {
         const trimmedField = field.trim();
-        // ✅ Simple population without deep nesting to avoid performance issues
-        this.query = this.query.populate(trimmedField);
+        // ✅ Only populate paths this endpoint explicitly allows
+        if (allowedFields.includes(trimmedField)) {
+          this.query = this.query.populate(trimmedField);
+        }
       });
     }
     return this;

@@ -193,15 +193,21 @@ exports.deleteTrackCascade = async (trackId) => {
       { $set: { track: null } },
     ).session(session);
 
-    // Sessions become standalone if not in a course
-    await Promise.all(
-      sessionsInTrack.map(async (trackSession) => {
-        trackSession.tracks.pull(trackId);
-        trackSession.isStandalone =
-          !trackSession.tracks?.length && !trackSession.course;
-        await trackSession.save({ session });
-      }),
-    );
+    // Sessions become standalone if not in a course.
+    // Sequential for the same reason as every other write against this
+    // ClientSession in this file: one session, one operation in flight
+    // at a time. This used to run via Promise.all, which fired
+    // concurrent .save({ session }) calls against the same ClientSession
+    // and could intermittently throw "operation in progress" for tracks
+    // with more than one standalone session.
+    // eslint-disable-next-line no-restricted-syntax
+    for (const trackSession of sessionsInTrack) {
+      trackSession.tracks.pull(trackId);
+      trackSession.isStandalone =
+        !trackSession.tracks?.length && !trackSession.course;
+      // eslint-disable-next-line no-await-in-loop
+      await trackSession.save({ session });
+    }
 
     // Remove all track students from track courses and sessions
     if (track.students?.length) {
