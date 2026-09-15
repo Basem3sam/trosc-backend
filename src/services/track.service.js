@@ -294,6 +294,27 @@ exports.removeCourseFromTrack = async (trackId, courseId) => {
   if (course) {
     course.track = null; // Orphan the course
     await course.save();
+
+    // Unenroll the track's current students from the now-detached course —
+    // symmetric with addCourseToTrack, which auto-enrolls existing track
+    // students into a course when it's added. Without this, students stay
+    // enrolled in a course that's no longer gated behind the track they
+    // joined, with no way to notice or clean it up.
+    //
+    // Known limitation: a student who is both a track member *and*
+    // separately/directly enrolled in this exact course will also be
+    // unenrolled here, since enrollment doesn't currently record *how* a
+    // student got access (track vs. direct). Fixing that fully needs a
+    // provenance field on enrollment — a larger, separately-tracked change.
+    if (track.students?.length) {
+      await Course.findByIdAndUpdate(courseId, {
+        $pull: { students: { $in: track.students } },
+      });
+      await User.updateMany(
+        { _id: { $in: track.students } },
+        { $pull: { enrolledCourses: courseId } },
+      );
+    }
   }
 
   await track.save();
@@ -326,6 +347,27 @@ exports.removeSessionFromTrack = async (trackId, sessionId) => {
     session.tracks.pull(trackId);
     session.isStandalone = !session.tracks.length && !session.course; // true if also not in a course
     await session.save();
+
+    // Unenroll this track's current students from the session — symmetric
+    // with addSessionToTrack, which auto-enrolls existing track students
+    // into a session when it's added. Without this, students stay
+    // enrolled in a session that's no longer reachable via the track they
+    // joined, with no way to notice or clean it up.
+    //
+    // Known limitation: a student who is both a track member *and*
+    // separately/directly enrolled in this exact session will also be
+    // unenrolled here, since enrollment doesn't currently record *how* a
+    // student got access (track vs. direct). Fixing that fully needs a
+    // provenance field on enrollment — a larger, separately-tracked change.
+    if (track.students?.length) {
+      await Session.findByIdAndUpdate(sessionId, {
+        $pull: { students: { $in: track.students } },
+      });
+      await User.updateMany(
+        { _id: { $in: track.students } },
+        { $pull: { enrolledSessions: sessionId } },
+      );
+    }
   }
 
   await track.save();

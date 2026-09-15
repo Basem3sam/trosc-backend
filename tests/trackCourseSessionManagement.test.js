@@ -155,6 +155,37 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
       expect(refreshedCourse.track).toBeNull();
     });
 
+    it('unenrolls the track students from the detached course', async () => {
+      const course = await Course.create({
+        title: 'Removable Gated Course',
+        description: 'Was only reachable via the track',
+        instructor: instructor._id,
+        track: track._id,
+        students: [student1._id, student2._id],
+      });
+      track.courses.push(course._id);
+      track.sessions.push(new mongoose.Types.ObjectId()); // keep track non-empty
+      await User.updateMany(
+        { _id: { $in: [student1._id, student2._id] } },
+        { $addToSet: { enrolledCourses: course._id } },
+      );
+      await track.save();
+
+      await trackService.removeCourseFromTrack(track._id, course._id);
+
+      const refreshedCourse = await Course.findById(course._id);
+      expect(refreshedCourse.students.map((id) => id.toString())).toEqual([]);
+
+      const u1 = await User.findById(student1._id);
+      const u2 = await User.findById(student2._id);
+      expect(u1.enrolledCourses.map((id) => id.toString())).not.toContain(
+        course._id.toString(),
+      );
+      expect(u2.enrolledCourses.map((id) => id.toString())).not.toContain(
+        course._id.toString(),
+      );
+    });
+
     it('throws 404 when track not found', async () => {
       const fakeId = new mongoose.Types.ObjectId();
       await expect(
@@ -302,6 +333,42 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
 
       const refreshedSession = await Session.findById(session._id);
       expect(refreshedSession.isStandalone).toBe(true);
+    });
+
+    it('unenrolls the track students from the detached session', async () => {
+      const course = await Course.create({
+        title: 'Keep Track Non Empty For Unenroll Test',
+        description: 'So removing the session is allowed',
+        instructor: instructor._id,
+        track: track._id,
+      });
+      const session = await Session.create({
+        title: 'Gated Session',
+        instructor: instructor._id,
+        tracks: [track._id],
+        students: [student1._id, student2._id],
+      });
+      track.courses.push(course._id);
+      track.sessions.push(session._id);
+      await User.updateMany(
+        { _id: { $in: [student1._id, student2._id] } },
+        { $addToSet: { enrolledSessions: session._id } },
+      );
+      await track.save();
+
+      await trackService.removeSessionFromTrack(track._id, session._id);
+
+      const refreshedSession = await Session.findById(session._id);
+      expect(refreshedSession.students.map((id) => id.toString())).toEqual([]);
+
+      const u1 = await User.findById(student1._id);
+      const u2 = await User.findById(student2._id);
+      expect(u1.enrolledSessions.map((id) => id.toString())).not.toContain(
+        session._id.toString(),
+      );
+      expect(u2.enrolledSessions.map((id) => id.toString())).not.toContain(
+        session._id.toString(),
+      );
     });
 
     it('throws 404 when track not found', async () => {
