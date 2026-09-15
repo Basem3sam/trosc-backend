@@ -153,6 +153,33 @@ describe('Events CRUD & RSVP', () => {
       expect(res.status).toBe(400);
     });
 
+    it('concurrent RSVP requests from the same student only add them once', async () => {
+      // Regression test for a race in rsvpEvent: it used to do
+      // `event.attendees.push(userId); await event.save();` after a plain
+      // `.some()` check, so two requests that both read the event before
+      // either had saved could both push, duplicating the user in
+      // `attendees`. The fix guards the write with an atomic
+      // findOneAndUpdate({ attendees: { $ne: userId } }, $addToSet).
+      const [resA, resB] = await Promise.all([
+        request(app)
+          .post(`/v1/events/${rsvpEventId}/rsvp`)
+          .set('Authorization', `Bearer ${studentToken}`),
+        request(app)
+          .post(`/v1/events/${rsvpEventId}/rsvp`)
+          .set('Authorization', `Bearer ${studentToken}`),
+      ]);
+
+      // Exactly one of the two concurrent requests should succeed.
+      const statuses = [resA.status, resB.status].sort();
+      expect(statuses).toEqual([200, 400]);
+
+      const event = await Event.findById(rsvpEventId);
+      const occurrences = event.attendees.filter(
+        (id) => id.toString() === studentId.toString(),
+      );
+      expect(occurrences).toHaveLength(1);
+    });
+
     it('student can cancel RSVP', async () => {
       await request(app)
         .post(`/v1/events/${rsvpEventId}/rsvp`)

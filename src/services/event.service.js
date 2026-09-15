@@ -74,12 +74,28 @@ exports.rsvpEvent = async (eventId, userId) => {
   const event = await Event.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
 
+  // Fast-path check — not the source of truth. The atomic update below is
+  // what actually closes the race between two concurrent RSVP requests
+  // (double-click, flaky retry); this just avoids the extra round trip
+  // for the common non-racing case of "already RSVPd."
   if (event.attendees.some((id) => id.toString() === userId)) {
     throw new AppError('You have already RSVPd to this event', 400);
   }
 
-  event.attendees.push(userId);
-  await event.save();
+  // Atomic: only matches (and only then $addToSet's) if userId isn't
+  // already in attendees. Closes the race the fast-path check above
+  // can't — two concurrent requests can no longer both pass a check
+  // then both push, which used to be able to duplicate a user in
+  // `attendees` under a double-click or retry.
+  const updatedEvent = await Event.findOneAndUpdate(
+    { _id: eventId, attendees: { $ne: userId } },
+    { $addToSet: { attendees: userId } },
+    { new: true, runValidators: true },
+  );
+
+  if (!updatedEvent) {
+    throw new AppError('You have already RSVPd to this event', 400);
+  }
 
   await logActivity({
     userId,
