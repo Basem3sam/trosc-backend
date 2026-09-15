@@ -127,4 +127,45 @@ describe('Cascade Service (Transactions)', () => {
       standaloneSession._id,
     );
   });
+
+  it('deleteTrackCascade detaches multiple standalone sessions without a concurrent-save error', async () => {
+    // Regression test for a bug where sessions were detached from a
+    // deleted track via Promise.all(sessions.map((s) => s.save({ session }))).
+    // A single Mongoose ClientSession can only have one operation in
+    // flight at a time, so firing concurrent .save() calls against it
+    // could intermittently throw "operation in progress". That only
+    // surfaces once a track has 2+ standalone sessions being detached in
+    // the same delete, which is exactly what this test sets up.
+    const secondSession = await Session.create({
+      title: 'Second Cascade Session',
+      instructor: instructor._id,
+      tracks: [track._id],
+    });
+    await Track.findByIdAndUpdate(track._id, {
+      $addToSet: { sessions: secondSession._id },
+    });
+
+    await expect(cascade.deleteTrackCascade(track._id)).resolves.not.toThrow();
+
+    const firstSessionDoc = await Session.findById(session._id);
+    const secondSessionDoc = await Session.findById(secondSession._id);
+
+    // Both standalone sessions must survive the track deletion, with the
+    // track reference pulled and isStandalone flipped to true.
+    expect(firstSessionDoc).not.toBeNull();
+    expect(secondSessionDoc).not.toBeNull();
+
+    expect(firstSessionDoc.tracks.map((id) => id.toString())).not.toContain(
+      track._id.toString(),
+    );
+    expect(secondSessionDoc.tracks.map((id) => id.toString())).not.toContain(
+      track._id.toString(),
+    );
+
+    expect(firstSessionDoc.isStandalone).toBe(true);
+    expect(secondSessionDoc.isStandalone).toBe(true);
+
+    const deletedTrack = await Track.findById(track._id);
+    expect(deletedTrack).toBeNull();
+  });
 });
