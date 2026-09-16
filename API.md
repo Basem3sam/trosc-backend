@@ -50,18 +50,18 @@ All error responses follow this format:
 
 Common HTTP status codes:
 
-| Code | Meaning                              |
-| ---- | ------------------------------------ |
-| 200  | Success                              |
-| 201  | Created                              |
-| 204  | No Content (successful delete)       |
-| 400  | Bad Request (validation error)       |
-| 401  | Unauthorized (missing/invalid token) |
-| 403  | Forbidden (insufficient permissions) |
-| 404  | Not Found                            |
-| 409  | Conflict (duplicate resource)        |
-| 429  | Too Many Requests (rate limited)     |
-| 500  | Internal Server Error                |
+| Code | Meaning                                                                                                    |
+| ---- | ---------------------------------------------------------------------------------------------------------- |
+| 200  | Success                                                                                                    |
+| 201  | Created                                                                                                    |
+| 204  | No Content (successful delete)                                                                             |
+| 400  | Bad Request (validation error)                                                                             |
+| 401  | Unauthorized (missing/invalid token)                                                                       |
+| 403  | Forbidden (insufficient permissions)                                                                       |
+| 404  | Not Found                                                                                                  |
+| 409  | Conflict (duplicate resource, or a blocked action such as deleting a user who still owns required content) |
+| 429  | Too Many Requests (rate limited)                                                                           |
+| 500  | Internal Server Error                                                                                      |
 
 ---
 
@@ -117,18 +117,18 @@ GET /v1/tracks?level=intermediate&published=true&page=2&limit=5
 
 ### Users
 
-| Method   | Endpoint                   | Access    | Description                                                                |
-| -------- | -------------------------- | --------- | -------------------------------------------------------------------------- |
-| `GET`    | `/v1/users/me`             | Protected | Get current user profile                                                   |
-| `PATCH`  | `/v1/users/updateMe`       | Protected | Update profile (name, email, photo, bio; email change resets verification) |
-| `DELETE` | `/v1/users/deleteMe`       | Protected | Soft-delete own account                                                    |
-| `GET`    | `/v1/users/me/enrollments` | Protected | Get enrolled track, courses, and sessions                                  |
-| `GET`    | `/v1/users`                | Admin     | List all active users (inactive accounts hidden)                           |
-| `POST`   | `/v1/users`                | Admin     | Create user with any role                                                  |
-| `GET`    | `/v1/users/:id`            | Admin     | Get user by ID                                                             |
-| `PATCH`  | `/v1/users/:id`            | Admin     | Update user (including role)                                               |
-| `DELETE` | `/v1/users/:id`            | Admin     | Hard-delete user                                                           |
-| `POST`   | `/v1/users/bulk`           | Admin     | Bulk activate / deactivate / delete                                        |
+| Method   | Endpoint                   | Access    | Description                                                                                                                                                                       |
+| -------- | -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/v1/users/me`             | Protected | Get current user profile                                                                                                                                                          |
+| `PATCH`  | `/v1/users/updateMe`       | Protected | Update profile (name, email, photo, bio; email change resets verification)                                                                                                        |
+| `DELETE` | `/v1/users/deleteMe`       | Protected | Soft-delete own account                                                                                                                                                           |
+| `GET`    | `/v1/users/me/enrollments` | Protected | Get enrolled track, courses, and sessions                                                                                                                                         |
+| `GET`    | `/v1/users`                | Admin     | List all active users (inactive accounts hidden)                                                                                                                                  |
+| `POST`   | `/v1/users`                | Admin     | Create user with any role                                                                                                                                                         |
+| `GET`    | `/v1/users/:id`            | Admin     | Get user by ID                                                                                                                                                                    |
+| `PATCH`  | `/v1/users/:id`            | Admin     | Update user (including role)                                                                                                                                                      |
+| `DELETE` | `/v1/users/:id`            | Admin     | Hard-delete user (409 if they're still the required instructor/creator of a Course, Track, Event, Announcement, Session, Assignment, or WeeklyTask — reassign that content first) |
+| `POST`   | `/v1/users/bulk`           | Admin     | Bulk activate / deactivate / delete                                                                                                                                               |
 
 ### Tracks
 

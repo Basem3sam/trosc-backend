@@ -71,7 +71,7 @@
 
 | Layer          | Technology                                      | Version  |
 | -------------- | ----------------------------------------------- | -------- |
-| **Runtime**    | Node.js                                         | ≥ 18 LTS |
+| **Runtime**    | Node.js                                         | ≥ 20 LTS |
 | **Framework**  | Express.js                                      | 4.x      |
 | **Database**   | MongoDB (Mongoose ODM)                          | 7.x+     |
 | **Auth**       | JWT (jsonwebtoken) + bcrypt                     | —        |
@@ -352,6 +352,10 @@ When a student **leaves** (or is removed), all of the above are reversed atomica
 
 Deleting a **course** or **track** also cascades to remove its assignments, reviews, and weekly tasks, so nothing is left pointing at a deleted parent.
 
+Removing a **course** or **session** from a track (without deleting the track itself) unenrolls that track's current students from it, mirroring the auto-enroll that happens when a course/session is added to a track. This is a known-good approximation rather than a fully general rule: it can't yet distinguish a student who has access *only* because of the track from one who separately, directly enrolled in that same course/session — both are unenrolled on detach, since enrollment records don't currently track *how* a student got access. A student who joins the track again, or re-enrolls directly, gets access back the normal way.
+
+> **Known limitation:** `User.enrolledCourses`/`enrolledSessions` are flat arrays with no record of enrollment provenance (track vs. direct). A student who is both a track member and separately enrolled in one of that track's courses will lose access to it if the course is ever detached from the track — even though they'd have kept independent access under a fully correct implementation. Fixing this properly needs a provenance field (or a separate `Enrollment` collection) plus a data migration; tracked as a larger follow-up, not blocking day-to-day use.
+
 > ✅ **Note:** MongoDB transactions are fully implemented in `cascade.service.js` for all critical enrollment sync operations, ensuring consistency even under race conditions.
 
 ---
@@ -360,7 +364,7 @@ Deleting a **course** or **track** also cascades to remove its assignments, revi
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) ≥ 18
+- [Node.js](https://nodejs.org/) ≥ 20
 - [MongoDB](https://www.mongodb.com/) (local or [Atlas free tier](https://www.mongodb.com/atlas))
 - (Optional) [Mailtrap](https://mailtrap.io/) account for email testing
 
@@ -418,6 +422,7 @@ open http://localhost:5000/api-docs
 | `JWT_EXPIRES_IN`            | ✅       | `30d`                             | Token lifetime (e.g., `90d`, `7d`)             |
 | `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days                          |
 | `FRONTEND_URL`              | ✅       | —                                 | For CORS and password reset links              |
+| `EXTRA_CORS_ORIGINS`        | ❌       | —                                 | Comma-separated extra allowed origins, added on top of `FRONTEND_URL` (see `src/app.js`) |
 | `BASE_URL`                  | ❌       | `http://localhost:5000`           | Server base URL                                |
 | `RATE_LIMIT_MAX`            | ❌       | `300`                             | Max requests per window per IP                 |
 | `RATE_LIMIT_WINDOW_MS`      | ❌       | `900000`                          | Rate limit window (15 min in ms)               |
@@ -431,6 +436,7 @@ open http://localhost:5000/api-docs
 | `EMAIL_FROM`                | ❌       | `Trosc Club <noreply@trosc.club>` | Sender address                                 |
 | `EMAIL_SERVICE`             | ❌       | `SendGrid`                        | Used in production instead of host/port        |
 | `ADMIN_EMAIL`               | ❌       | —                                 | Inbox notified on new contact form submissions |
+| `TEST_EMAIL`                | ❌       | —                                 | Recipient used by `testEmail.js` when no address is passed on the command line |
 
 \* Required if sending emails (password reset, welcome). Not required for basic API operation.
 
@@ -565,7 +571,7 @@ Common HTTP status codes:
 - `401` – Unauthorized (missing or invalid token)
 - `403` – Forbidden (insufficient permissions)
 - `404` – Not Found
-- `409` – Conflict (duplicate resource)
+- `409` – Conflict (duplicate resource, or a blocked action such as deleting a user who still owns required content)
 - `429` – Too Many Requests (rate limited)
 - `500` – Internal Server Error
 
@@ -613,7 +619,7 @@ Instead of S3/Cloudinary storage costs, all media is referenced by URL. The syst
 
 ### 2. Cascade Enrollment Service with Transactions
 
-Instead of scattering enrollment logic across controllers, a dedicated `cascade.service.js` handles the many-to-many synchronization between `User` and `Track`/`Course`/`Session`. This prevents bugs where a user is in a track but not its courses. Deleting a course or track similarly cascades to clean up its assignments, reviews, and weekly tasks rather than leaving them orphaned.
+Instead of scattering enrollment logic across controllers, a dedicated `cascade.service.js` handles the many-to-many synchronization between `User` and `Track`/`Course`/`Session`. This prevents bugs where a user is in a track but not its courses. Deleting a course or track similarly cascades to clean up its assignments, reviews, and weekly tasks rather than leaving them orphaned. The same guarantee holds for a narrower operation: detaching a course or session from a track (without deleting the track) unenrolls that track's current students from it too, so nobody stays enrolled in content that's no longer reachable through the track that gated it.
 
 **All critical cascade operations use MongoDB transactions** for atomicity, ensuring the system never ends up in an inconsistent state.
 
@@ -675,6 +681,7 @@ Validation schemas (Joi) are defined in `validations/` and referenced in route J
 | `npm run test:coverage`                                                         | Run tests with coverage report                                           |
 | `npm run lint`                                                                  | Run ESLint                                                               |
 | `npm run lint:fix`                                                              | Fix ESLint issues automatically                                          |
+| `npm run lint:check`                                                            | Run ESLint with `--max-warnings=0` (fails on any warning — what CI runs) |
 | `node testEmail.js <email>`                                                     | Diagnose SMTP configuration and send a test email                        |
 | `node scripts/createAdmin.js <email>`                                           | Promote a user to admin                                                  |
 | `node scripts/generateDashboardSnapshot.js <daily\|weekly\|monthly> [ISO date]` | Generate/refresh a dashboard-stats snapshot — meant to be cron-triggered |
@@ -802,7 +809,7 @@ tests/
 ├── error.controller.test.js, errorHandling.test.js, app.test.js, APIFeatures.test.js
 ```
 
-41 test files (455 tests) span auth, password recovery, every CRUD resource (tracks/courses/sessions/events/announcements), enrollment + the MongoDB transaction paths in `cascade.service.js`, reviews, assignments (incl. grading), weekly tasks, contact (public + admin), activity logs (audit-trail read/write + auth/role guards), dashboard stats (period-boundary math, snapshot generation/upsert, trends, prune), the global error handler, and `src/app.js`'s own production-vs-development configuration. See **[TESTING.md](./TESTING.md)** for the full file-by-file coverage table and the (short) list of what's still deliberately untested — mainly that email-sending is mocked everywhere rather than asserted on, and a couple of narrow model-validator edge cases.
+60 test files (600 tests) span auth, password recovery, every CRUD resource (tracks/courses/sessions/events/announcements), enrollment + the MongoDB transaction paths in `cascade.service.js`, reviews, assignments (incl. grading), weekly tasks, contact (public + admin), activity logs (audit-trail read/write + auth/role guards), dashboard stats (period-boundary math, snapshot generation/upsert, trends, prune), model-level field validators, middleware edge cases, the global error handler, and `src/app.js`'s own production-vs-development configuration. See **[TESTING.md](./TESTING.md)** for the full file-by-file coverage table and the (short) list of what's still deliberately untested — mainly that email-sending is mocked everywhere rather than asserted on, and a couple of narrow model-validator edge cases.
 
 ---
 
@@ -835,15 +842,20 @@ tests/
 
 * [x] Request Correlation IDs — full implementation with `AsyncLocalStorage`, automatic injection into every log, and `X-Request-ID` round-trip to clients
 
-- [x] Jest + Supertest test setup — in-memory MongoDB **replica set** (enabling real transaction tests), shared fixture builders, a global Email mock, and 41 test files covering auth, password recovery, every CRUD resource, enrollment + cascade transactions, reviews, assignments, weekly tasks, contact, activity logs, dashboard stats, the global error handler, and `app.js` config (see [TESTING.md](./TESTING.md) for the full breakdown)
+- [x] Jest + Supertest test setup — in-memory MongoDB **replica set** (enabling real transaction tests), shared fixture builders, a global Email mock, and 60 test files covering auth, password recovery, every CRUD resource, enrollment + cascade transactions, reviews, assignments, weekly tasks, contact, activity logs, dashboard stats, model validators, middleware edge cases, the global error handler, and `app.js` config (see [TESTING.md](./TESTING.md) for the full breakdown)
 - [x] **Activity Logs** (`activityLog.model.js` / `activityLog.service.js`) — server-written audit trail (no public create endpoint), self-service "my activity" timeline, admin listing/per-user lookup/aggregated summary, and retention pruning
 - [x] **Admin Analytics Dashboard** (`dashboardStats.model.js` / `dashboardStats.service.js`) — live on-demand stats plus persisted, upsertable daily/weekly/monthly snapshots for trend charts, a cron-friendly CLI generator (`scripts/generateDashboardSnapshot.js`), and retention pruning
+- [x] **Announcement audience filtering** — `GET /v1/announcements` now filters by `audience`/`targetTrack`/`targetCourse`: everyone sees `audience: 'all'`, plus `'track'`/`'course'`-targeted announcements for a track/course they're enrolled in; the creating instructor can also see their own targeted announcement regardless of enrollment; admins see everything
+- [x] **Track/session detach unenrollment** — removing a course or session from a track (short of deleting the track) now unenrolls that track's current students from it, mirroring the auto-enroll on add (see [Enrollment Cascade Rules](#-database-overview))
 
 ### Planned 🔮
 
-- [ ] **`logActivity` wired into the remaining domain services** — tracks, courses, sessions, events, announcements, assignments, weekly tasks, and reviews don't yet call `activityLog.service.js#logActivity`; currently only auth (signup/login/password), enrollment, and user-profile actions are logged
+- [ ] **`logActivity` coverage is uneven across domain services** — most services (tracks, courses, sessions, events, announcements, assignments, weekly tasks, reviews) already call `activityLog.service.js#logActivity` for *some* of their mutations (e.g. create/update/delete), but not consistently for every exported action — e.g. `course.service.js` has 13 exported functions but only 4 `logActivity` call sites. `cascade.service.js`, `contact.service.js`, and `dashboardStats.service.js` don't call it at all yet. Auditing every mutating function for a missing log call is the remaining work, not wiring the feature up from scratch.
 - [ ] **Email verification flow** — the `emailVerified` flag exists and resets on email change, but there's no self-service send/verify-token endpoint yet; currently only an admin can flip it
-- [ ] **Announcement audience filtering** — `audience`/`targetTrack`/`targetCourse` are stored but not yet used to filter what `GET /v1/announcements` returns
+- [ ] **Late assignment submissions are accepted, not blocked** — `submitAssignment` computes and returns a `late: submission.submittedAt > assignment.deadline` flag, but nothing currently prevents a submission after the deadline. This is a soft deadline by (undocumented) default; whether it should stay that way, become a hard block, or get a grace-period window is a product decision, not a bug.
+- [ ] **Hard-delete cascade for users blocks rather than reassigns** — `hardDeleteUserCascade` currently returns 409 if the user is the required instructor/creator of any Course, Track, Event, Announcement, Session, Assignment, or WeeklyTask, rather than reassigning or nulling those references. Safe, but inflexible — an admin can't hard-delete a former instructor without first manually reassigning their content elsewhere.
+- [ ] **Structured error codes on `AppError`** — errors currently carry only a `message` string; the frontend can't reliably branch on error *type* without string-matching messages. Adding a `code` field (e.g. `PREREQUISITE_NOT_MET`) would make that robust.
+- [ ] **`search()` uses regex instead of the `text` indexes that already exist** — `Track`/`Course` both define MongoDB `text` indexes, but `APIFeatures.js#search()` builds a `$regex` `$or` query, which can't use them. Fine at current data volume; would need attention if search performance ever becomes a problem.
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
 - [ ] **Full test coverage** — still need tests
 
