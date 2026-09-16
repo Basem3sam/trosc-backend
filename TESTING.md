@@ -121,6 +121,16 @@ The first time you run tests, it'll download the MongoDB binary — that needs a
 
 `setupAfterEnv.js` calls `jest.mock('../src/utils/Email')` once, before any test file runs. Jest resolves that to the manual mock at `tests/__mocks__/Email.js`, whose methods (`sendWelcome`, `sendPasswordReset`, `sendEnrollmentConfirmation`, `sendSessionReminder`, `send`) are all no-ops. This applies to **every** test file automatically — no individual test needs its own `jest.mock('../../src/utils/Email')` call, and no test run ever hits a real SMTP server. `tests/utils/Email.test.js` is the one place that tests the real `Email` class's behavior; it does so by mocking `Email`'s own dependencies (`mailer.config`, `logger`, `html-to-text`) instead, one level lower than the rest of the suite.
 
+### A console error you'll see and can ignore
+
+`services/track.service.test.js` and `services/weeklyTask.service.test.js` call service functions like `deleteTrack()`/`updateWeeklyTask()` directly, skipping the controller layer — which means no `req.user.id` gets passed through to the `logActivity()` call inside them. You'll see this in the test output as a result:
+
+```
+error: Failed to write activity log {"action":"updated_weekly_task","error":"ActivityLog validation failed: user: ActivityLog must belong to a user"}
+```
+
+This is expected, not a bug: `logActivity()` is documented to log-and-swallow rather than throw (see [Internal-Only Write Path for Audit Data](./README.md#-architecture)), and every real HTTP path supplies `req.user.id` since these routes all sit behind `protect`. It only shows up here because the test is exercising the service in isolation, on purpose. If you add a new service-level test and see this pattern, it's fine to leave as-is — just don't mistake it for a real failure.
+
 ## Anatomy of one test
 
 ```js
@@ -216,6 +226,8 @@ npm run test:coverage
 ```
 
 Coverage reports are generated in `coverage/lcov-report/index.html`. Open it in your browser to see which lines are covered. You can set a minimum coverage threshold by adding `coverageThreshold` to `jest.config.js`.
+
+As of the last full run (60/60 suites passing), overall coverage sat at **95%+ statements and 98%+ functions** — most individual files are at or near 100%. This number will drift as the codebase changes, so treat it as "the suite has historically been thorough," not a promise about today — run `npm run test:coverage` yourself for the current figure rather than trusting this paragraph.
 
 ### Continuous Integration
 
