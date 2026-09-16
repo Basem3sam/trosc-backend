@@ -1,0 +1,50 @@
+services:
+  app:
+    image: ${DOCKERHUB_USERNAME}/trosc_api:${IMAGE_TAG}
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    env_file:
+      - .env
+    environment:
+      DATABASE: mongodb://${DATABASE_USERNAME}:${DATABASE_PASSWORD}@db:27017/${DATABASE_NAME}?authSource=admin
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - trosc-network
+  
+
+  db:
+    image: mongo:8
+    restart: unless-stopped
+    environment:
+      MONGODB_USERNAME: ${DATABASE_USERNAME}
+      MONGODB_PASSWORD: ${DATABASE_USERNAME}
+      MONGODB_DATABASE: ${DATABASE_URL}
+    volumes:
+      - app_mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", 'mongosh --quiet --username "$${MONGO_INITDB_ROOT_USERNAME}" --password "$${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --eval "db.adminCommand(''ping'')"',]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - trosc-network
+
+volumes:
+  app_mongodb_data:
+  
+
+networks:
+  trosc-network:
+    driver: bridge
+  
