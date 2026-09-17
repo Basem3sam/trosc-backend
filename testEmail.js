@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-require('dotenv').config();
+require('./src/config/loadEnv')();
 
 // ── Color helpers ──────────────────────────────────────────
 const green = (msg) => console.log(`\x1b[32m✅ ${msg}\x1b[0m`);
@@ -52,7 +52,7 @@ function checkEnv() {
 function createTransporter() {
   if (process.env.NODE_ENV === 'production') {
     return nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'SendGrid',
+      service: process.env.EMAIL_SERVICE || 'Gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -106,11 +106,11 @@ async function sendTestEmail(transporter, toEmail) {
   console.log('To:', toEmail);
   console.log(
     'From:',
-    process.env.EMAIL_FROM || 'Trosc Club <noreply@trosc.club>',
+    process.env.EMAIL_FROM || 'Trosc Club <troscscu2@gmail.com>',
   );
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || 'Trosc Club <noreply@trosc.club>',
+    from: process.env.EMAIL_FROM || 'Trosc Club <troscscu2@gmail.com>',
     to: toEmail,
     subject: `Trosc Email Test — ${new Date().toLocaleString()}`,
     text: `Hello!\n\nThis is a test email from your Trosc backend.\n\nIf you received this, your email configuration is working correctly.\n\nTimestamp: ${new Date().toISOString()}\nEnvironment: ${process.env.NODE_ENV || 'development'}\n\nHappy coding! 🚀`,

@@ -29,4 +29,6 @@ coverage/
 
 # Test env file — dummy values, but keep the habit consistent
 # with your other .env* files
-.env.test
+.env
+.env.*
+!.env.example

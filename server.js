@@ -1,4 +1,3 @@
-const dotenv = require('dotenv');
 const { logger } = require('./src/utils/logger');
 
 // for catching synchronous errors
@@ -11,7 +10,7 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-dotenv.config();
+require('./src/config/loadEnv')();
 require('./src/config/env.config')();
 
 const app = require('./src/app');

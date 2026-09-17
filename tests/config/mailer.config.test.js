@@ -17,7 +17,7 @@ describe('mailer.config.js', () => {
 
   it('creates a transporter with service in production', () => {
     process.env.NODE_ENV = 'production';
-    process.env.EMAIL_SERVICE = 'SendGrid';
+    process.env.EMAIL_SERVICE = 'Gmail';
     process.env.EMAIL_USER = 'testuser';
     process.env.EMAIL_PASS = 'testpass';
 
@@ -27,7 +27,7 @@ describe('mailer.config.js', () => {
     createTransporter();
 
     expect(nodemailer.createTransport).toHaveBeenCalledWith({
-      service: 'SendGrid',
+      service: 'Gmail',
       auth: {
         user: 'testuser',
         pass: 'testpass',
@@ -57,7 +57,7 @@ describe('mailer.config.js', () => {
     });
   });
 
-  it('uses default EMAIL_SERVICE "SendGrid" if not set in production', () => {
+  it('uses default EMAIL_SERVICE "Gmail" if not set in production', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.EMAIL_SERVICE;
     process.env.EMAIL_USER = 'testuser';
@@ -69,7 +69,7 @@ describe('mailer.config.js', () => {
     createTransporter();
 
     expect(nodemailer.createTransport).toHaveBeenCalledWith({
-      service: 'SendGrid',
+      service: 'Gmail',
       auth: {
         user: 'testuser',
         pass: 'testpass',

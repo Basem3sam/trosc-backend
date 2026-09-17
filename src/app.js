@@ -109,10 +109,6 @@ if (!isProduction) {
   );
 }
 
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
-
 // Enable CORS
 // Shared so the preflight handler below enforces the same whitelist +
 // credentials policy as the real request — previously `app.options('*',

@@ -13,7 +13,7 @@
 // Calls the service directly rather than the HTTP API, so there's no
 // auth-token management needed in a cron context.
 
-require('dotenv').config();
+require('../src/config/loadEnv')();
 require('../src/config/env.config')();
 const mongoose = require('mongoose');
 const dashboardStatsService = require('../src/services/dashboardStats.service');

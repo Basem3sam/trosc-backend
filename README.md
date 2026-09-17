@@ -352,7 +352,7 @@ When a student **leaves** (or is removed), all of the above are reversed atomica
 
 Deleting a **course** or **track** also cascades to remove its assignments, reviews, and weekly tasks, so nothing is left pointing at a deleted parent.
 
-Removing a **course** or **session** from a track (without deleting the track itself) unenrolls that track's current students from it, mirroring the auto-enroll that happens when a course/session is added to a track. This is a known-good approximation rather than a fully general rule: it can't yet distinguish a student who has access *only* because of the track from one who separately, directly enrolled in that same course/session — both are unenrolled on detach, since enrollment records don't currently track *how* a student got access. A student who joins the track again, or re-enrolls directly, gets access back the normal way.
+Removing a **course** or **session** from a track (without deleting the track itself) unenrolls that track's current students from it, mirroring the auto-enroll that happens when a course/session is added to a track. This is a known-good approximation rather than a fully general rule: it can't yet distinguish a student who has access _only_ because of the track from one who separately, directly enrolled in that same course/session — both are unenrolled on detach, since enrollment records don't currently track _how_ a student got access. A student who joins the track again, or re-enrolls directly, gets access back the normal way.
 
 > **Known limitation:** `User.enrolledCourses`/`enrolledSessions` are flat arrays with no record of enrollment provenance (track vs. direct). A student who is both a track member and separately enrolled in one of that track's courses will lose access to it if the course is ever detached from the track — even though they'd have kept independent access under a fully correct implementation. Fixing this properly needs a provenance field (or a separate `Enrollment` collection) plus a data migration; tracked as a larger follow-up, not blocking day-to-day use.
 
@@ -411,32 +411,32 @@ open http://localhost:5000/api-docs
 
 ## 🔧 Environment Variables
 
-| Variable                    | Required | Default                           | Description                                    |
-| --------------------------- | -------- | --------------------------------- | ---------------------------------------------- |
-| `NODE_ENV`                  | ✅       | `development`                     | `development` or `production`                  |
-| `PORT`                      | ❌       | `5000`                            | Server port                                    |
-| `DATABASE_URL`              | ✅       | —                                 | MongoDB connection string                      |
-| `DATABASE_PASSWORD`         | ❌       | —                                 | If using `<PASSWORD>` placeholder in URL       |
-| `DATABASE_USERNAME`         | ❌       | —                                 | If using `<USERNAME>` placeholder in URL       |
-| `JWT_SECRET`                | ✅       | —                                 | Min 32 characters                              |
-| `JWT_EXPIRES_IN`            | ✅       | `30d`                             | Token lifetime (e.g., `90d`, `7d`)             |
-| `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days                          |
-| `FRONTEND_URL`              | ✅       | —                                 | For CORS and password reset links              |
+| Variable                    | Required | Default                           | Description                                                                              |
+| --------------------------- | -------- | --------------------------------- | ---------------------------------------------------------------------------------------- |
+| `NODE_ENV`                  | ✅       | `development`                     | `development` or `production`                                                            |
+| `PORT`                      | ❌       | `5000`                            | Server port                                                                              |
+| `DATABASE_URL`              | ✅       | —                                 | MongoDB connection string                                                                |
+| `DATABASE_PASSWORD`         | ❌       | —                                 | If using `<PASSWORD>` placeholder in URL                                                 |
+| `DATABASE_USERNAME`         | ❌       | —                                 | If using `<USERNAME>` placeholder in URL                                                 |
+| `JWT_SECRET`                | ✅       | —                                 | Min 32 characters                                                                        |
+| `JWT_EXPIRES_IN`            | ✅       | `30d`                             | Token lifetime (e.g., `90d`, `7d`)                                                       |
+| `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days                                                                    |
+| `FRONTEND_URL`              | ✅       | —                                 | For CORS and password reset links                                                        |
 | `EXTRA_CORS_ORIGINS`        | ❌       | —                                 | Comma-separated extra allowed origins, added on top of `FRONTEND_URL` (see `src/app.js`) |
-| `BASE_URL`                  | ❌       | `http://localhost:5000`           | Server base URL                                |
-| `RATE_LIMIT_MAX`            | ❌       | `300`                             | Max requests per window per IP                 |
-| `RATE_LIMIT_WINDOW_MS`      | ❌       | `900000`                          | Rate limit window (15 min in ms)               |
-| `AUTH_RATE_LIMIT_MAX`       | ❌       | `5`                               | Max auth attempts per window                   |
-| `AUTH_RATE_LIMIT_WINDOW_MS` | ❌       | `900000`                          | Auth rate limit window                         |
-| `MONGODB_POOL_SIZE`         | ❌       | `10`                              | Connection pool size                           |
-| `EMAIL_HOST`                | ✅\*     | —                                 | SMTP host (dev: Mailtrap)                      |
-| `EMAIL_PORT`                | ✅\*     | `2525`                            | SMTP port                                      |
-| `EMAIL_USER`                | ✅\*     | —                                 | SMTP username                                  |
-| `EMAIL_PASS`                | ✅\*     | —                                 | SMTP password                                  |
-| `EMAIL_FROM`                | ❌       | `Trosc Club <noreply@trosc.club>` | Sender address                                 |
-| `EMAIL_SERVICE`             | ❌       | `SendGrid`                        | Used in production instead of host/port        |
-| `ADMIN_EMAIL`               | ❌       | —                                 | Inbox notified on new contact form submissions |
-| `TEST_EMAIL`                | ❌       | —                                 | Recipient used by `testEmail.js` when no address is passed on the command line |
+| `BASE_URL`                  | ❌       | `http://localhost:5000`           | Server base URL                                                                          |
+| `RATE_LIMIT_MAX`            | ❌       | `300`                             | Max requests per window per IP                                                           |
+| `RATE_LIMIT_WINDOW_MS`      | ❌       | `900000`                          | Rate limit window (15 min in ms)                                                         |
+| `AUTH_RATE_LIMIT_MAX`       | ❌       | `5`                               | Max auth attempts per window                                                             |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | ❌       | `900000`                          | Auth rate limit window                                                                   |
+| `MONGODB_POOL_SIZE`         | ❌       | `10`                              | Connection pool size                                                                     |
+| `EMAIL_HOST`                | ✅\*     | —                                 | SMTP host (dev: Mailtrap)                                                                |
+| `EMAIL_PORT`                | ✅\*     | `2525`                            | SMTP port                                                                                |
+| `EMAIL_USER`                | ✅\*     | —                                 | SMTP username                                                                            |
+| `EMAIL_PASS`                | ✅\*     | —                                 | SMTP password                                                                            |
+| `EMAIL_FROM`                | ❌       | `Trosc Club <noreply@trosc.club>` | Sender address                                                                           |
+| `EMAIL_SERVICE`             | ❌       | `Gmail`                           | Used in production instead of host/port                                                  |
+| `ADMIN_EMAIL`               | ❌       | —                                 | Inbox notified on new contact form submissions                                           |
+| `TEST_EMAIL`                | ❌       | —                                 | Recipient used by `testEmail.js` when no address is passed on the command line           |
 
 \* Required if sending emails (password reset, welcome). Not required for basic API operation.
 
@@ -664,7 +664,7 @@ Validation schemas (Joi) are defined in `validations/` and referenced in route J
 | Images          | External URLs (Cloudinary, Imgur, etc.) | Free      |
 | Database        | MongoDB Atlas M0 (512 MB)               | Free      |
 | Backend hosting | Render / Railway / Fly.io               | Free tier |
-| Email           | Mailtrap (dev) / SendGrid (prod)        | Free tier |
+| Email           | Mailtrap (dev) / Gmail (prod)           | Free tier |
 | File storage    | None — we don't store files             | $0        |
 
 ---
@@ -750,7 +750,7 @@ The same result is also reachable on-demand via `POST /v1/dashboard-stats/snapsh
 - [ ] `JWT_SECRET` is strong and unique (≥ 32 chars)
 - [ ] `DATABASE_URL` points to production cluster
 - [ ] `FRONTEND_URL` and `BASE_URL` are set to production domains
-- [ ] `EMAIL_SERVICE` is configured (SendGrid, AWS SES, etc.)
+- [ ] `EMAIL_SERVICE` is configured (Gmail, AWS SES, etc.)
 - [ ] `JWT_COOKIE_EXPIRES_IN` matches your security policy
 - [ ] Rate limits are appropriate for your traffic
 - [ ] Database indexes are synced (Mongoose `syncIndexes()` runs on startup)
@@ -850,11 +850,11 @@ tests/
 
 ### Planned 🔮
 
-- [ ] **`logActivity` coverage is uneven across domain services** — most services (tracks, courses, sessions, events, announcements, assignments, weekly tasks, reviews) already call `activityLog.service.js#logActivity` for *some* of their mutations (e.g. create/update/delete), but not consistently for every exported action — e.g. `course.service.js` has 13 exported functions but only 4 `logActivity` call sites. `cascade.service.js`, `contact.service.js`, and `dashboardStats.service.js` don't call it at all yet. Auditing every mutating function for a missing log call is the remaining work, not wiring the feature up from scratch.
+- [ ] **`logActivity` coverage is uneven across domain services** — most services (tracks, courses, sessions, events, announcements, assignments, weekly tasks, reviews) already call `activityLog.service.js#logActivity` for _some_ of their mutations (e.g. create/update/delete), but not consistently for every exported action — e.g. `course.service.js` has 13 exported functions but only 4 `logActivity` call sites. `cascade.service.js`, `contact.service.js`, and `dashboardStats.service.js` don't call it at all yet. Auditing every mutating function for a missing log call is the remaining work, not wiring the feature up from scratch.
 - [ ] **Email verification flow** — the `emailVerified` flag exists and resets on email change, but there's no self-service send/verify-token endpoint yet; currently only an admin can flip it
 - [ ] **Late assignment submissions are accepted, not blocked** — `submitAssignment` computes and returns a `late: submission.submittedAt > assignment.deadline` flag, but nothing currently prevents a submission after the deadline. This is a soft deadline by (undocumented) default; whether it should stay that way, become a hard block, or get a grace-period window is a product decision, not a bug.
 - [ ] **Hard-delete cascade for users blocks rather than reassigns** — `hardDeleteUserCascade` currently returns 409 if the user is the required instructor/creator of any Course, Track, Event, Announcement, Session, Assignment, or WeeklyTask, rather than reassigning or nulling those references. Safe, but inflexible — an admin can't hard-delete a former instructor without first manually reassigning their content elsewhere.
-- [ ] **Structured error codes on `AppError`** — errors currently carry only a `message` string; the frontend can't reliably branch on error *type* without string-matching messages. Adding a `code` field (e.g. `PREREQUISITE_NOT_MET`) would make that robust.
+- [ ] **Structured error codes on `AppError`** — errors currently carry only a `message` string; the frontend can't reliably branch on error _type_ without string-matching messages. Adding a `code` field (e.g. `PREREQUISITE_NOT_MET`) would make that robust.
 - [ ] **`search()` uses regex instead of the `text` indexes that already exist** — `Track`/`Course` both define MongoDB `text` indexes, but `APIFeatures.js#search()` builds a `$regex` `$or` query, which can't use them. Fine at current data volume; would need attention if search performance ever becomes a problem.
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
 - [ ] **Full test coverage** — still need tests
@@ -877,7 +877,7 @@ tests/
 ### "Emails not sending"
 
 - Run `node testEmail.js your@email.com` to diagnose.
-- Check Mailtrap inbox (dev) or SendGrid dashboard (prod).
+- Check Mailtrap inbox (dev) or Gmail dashboard (prod).
 - Verify `EMAIL_USER` and `EMAIL_PASS` are correct.
 
 ### "Swagger UI not loading / YAML errors"

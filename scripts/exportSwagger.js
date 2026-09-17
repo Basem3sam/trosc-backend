@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('../src/config/loadEnv')();
 const fs = require('fs');
 const path = require('path');
 const spec = require('../src/config/swagger.config');

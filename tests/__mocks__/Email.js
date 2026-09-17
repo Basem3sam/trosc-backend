@@ -1,4 +1,4 @@
-// tests/__mocks__/../src/utils/Email.js
+// Manual mock for src/utils/Email
 module.exports = class Email {
   constructor(user, url) {
     this.user = user;
