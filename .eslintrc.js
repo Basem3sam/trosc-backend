@@ -78,7 +78,7 @@ module.exports = {
     },
     {
       // Jest manual mocks are intentionally empty no-op classes.
-      files: ['tests/__mocks__/**/*.js'],
+      files: ['src/**/__mocks__/**/*.js'],
       rules: {
         'class-methods-use-this': 'off',
         'no-unused-vars': 'off',

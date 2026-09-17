@@ -34,9 +34,6 @@ tests/
   globalTeardown.js           — runs ONCE after all tests finish: stops that instance
   setupAfterEnv.js             — runs before/after each test FILE: connects Mongoose,
                                  auto-mocks src/utils/Email, wipes collections between tests
-  __mocks__/
-    Email.js                  — manual mock for src/utils/Email, activated globally by
-                                 setupAfterEnv.js's jest.mock('../src/utils/Email')
   helpers/
     testUser.js                — creates a user + valid JWT without hitting /signup or
                                  /login, skipping the rate limiter entirely
@@ -103,6 +100,9 @@ tests/
   validateAttachments.test.js     — the Mongoose-level attachment URL validator
   weeklyTask.test.js              — course-scoped weekly task creation + completion
                                  tracking
+# Note: the Email manual mock lives at src/utils/__mocks__/Email.js — Jest's
+# convention is that a __mocks__ folder must sit next to the module being
+# mocked, not under tests/. See .eslintrc.js for the matching lint override.
 ```
 
 ### Why an in-memory MongoDB **replica set** instead of your real dev database?
@@ -119,7 +119,7 @@ The first time you run tests, it'll download the MongoDB binary — that needs a
 
 ### Email is mocked globally
 
-`setupAfterEnv.js` calls `jest.mock('../src/utils/Email')` once, before any test file runs. Jest resolves that to the manual mock at `tests/__mocks__/Email.js`, whose methods (`sendWelcome`, `sendPasswordReset`, `sendEnrollmentConfirmation`, `sendSessionReminder`, `send`) are all no-ops. This applies to **every** test file automatically — no individual test needs its own `jest.mock('../../src/utils/Email')` call, and no test run ever hits a real SMTP server. `tests/utils/Email.test.js` is the one place that tests the real `Email` class's behavior; it does so by mocking `Email`'s own dependencies (`mailer.config`, `logger`, `html-to-text`) instead, one level lower than the rest of the suite.
+`setupAfterEnv.js` calls `jest.mock('../src/utils/Email')` once, before any test file runs. Jest resolves that to the manual mock at `src/utils/__mocks__/Email.js`, whose methods (`sendWelcome`, `sendPasswordReset`, `sendEnrollmentConfirmation`, `sendSessionReminder`, `send`) are all no-ops. This applies to **every** test file automatically — no individual test needs its own `jest.mock('../../src/utils/Email')` call, and no test run ever hits a real SMTP server. `tests/utils/Email.test.js` is the one place that tests the real `Email` class's behavior; it does so by mocking `Email`'s own dependencies (`mailer.config`, `logger`, `html-to-text`) instead, one level lower than the rest of the suite.
 
 ### A console error you'll see and can ignore
 

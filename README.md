@@ -787,7 +787,6 @@ tests/
 ├── globalSetup.js        # starts the in-memory MongoDB replica set once per run
 ├── globalTeardown.js     # stops it once per run
 ├── setupAfterEnv.js      # per-file: connects Mongoose, mocks Email, clears data between tests
-├── __mocks__/Email.js    # no-op Email mock, applied globally via setupAfterEnv.js
 ├── helpers/
 │   ├── testUser.js       # creates a user + valid JWT without hitting /signup
 │   └── fixtures.js       # shared track/course/session fixture builders
