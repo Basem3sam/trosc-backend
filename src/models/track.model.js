@@ -283,6 +283,11 @@ const trackSchema = new mongoose.Schema(
 // Indexes for performance
 trackSchema.index({ instructor: 1 });
 trackSchema.index({ students: 1 });
+// For GET /users/me's pendingTrack lookup (Track.findOne({ pendingStudents: userId })
+// in user.service.js#getMe) and the "already applied elsewhere" check in
+// enrollment.service.js#enrollMeInTrack — same access pattern as the `students`
+// index above, just for the pending-approval array instead of the approved one.
+trackSchema.index({ pendingStudents: 1 });
 trackSchema.index({ published: 1, level: 1 });
 trackSchema.index({ title: 'text', description: 'text' }); // For search
 
