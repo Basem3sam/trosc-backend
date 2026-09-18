@@ -2,11 +2,17 @@ const catchAsync = require('../utils/catchAsync');
 const authService = require('../services/auth.service');
 const { logActivity } = require('../services/activityLog.service');
 
-const setAuthCookie = (res, token) => {
-  const days = parseInt(process.env.JWT_COOKIE_EXPIRES_IN, 10) || 7; // Default to 7 days if not set
+const { REMEMBER_ME_SESSION_DAYS, DEFAULT_SESSION_DAYS } = authService;
+
+const setAuthCookie = (res, token, days) => {
+  // Default to the project's normal cookie lifetime (JWT_COOKIE_EXPIRES_IN)
+  // for every flow except login's "remember me" option, which passes an
+  // explicit day count matching the token it just issued.
+  const resolvedDays =
+    days ?? (parseInt(process.env.JWT_COOKIE_EXPIRES_IN, 10) || 7); // Default to 7 days if not set
 
   const cookieOptions = {
-    expires: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+    expires: new Date(Date.now() + resolvedDays * 24 * 60 * 60 * 1000),
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // for CSRF protection
@@ -30,9 +36,14 @@ exports.signup = catchAsync(async (req, res, next) => {
 
 exports.login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;
-  const { token, user } = await authService.login(email, password);
+  const rememberMe = req.body.rememberMe === true;
+  const { token, user } = await authService.login(email, password, rememberMe);
 
-  setAuthCookie(res, token);
+  setAuthCookie(
+    res,
+    token,
+    rememberMe ? REMEMBER_ME_SESSION_DAYS : DEFAULT_SESSION_DAYS,
+  );
 
   res.status(200).json({
     status: 'success',

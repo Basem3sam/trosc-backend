@@ -236,6 +236,82 @@ describe('POST /v1/users/login', () => {
   });
 });
 
+describe('POST /v1/users/login — rememberMe', () => {
+  const credentials = {
+    email: 'remember-me-basem@example.com',
+    password: 'Password123!',
+  };
+
+  beforeEach(async () => {
+    await User.create({
+      name: 'Basem Esam',
+      email: credentials.email,
+      password: credentials.password,
+      passwordConfirm: credentials.password,
+    });
+  });
+
+  const getJwtCookie = (res) =>
+    (res.headers['set-cookie'] || []).find((c) => c.startsWith('jwt='));
+
+  const cookieMaxAgeDays = (cookie) => {
+    const match = cookie.match(/Expires=([^;]+)/i);
+    expect(match).not.toBeNull();
+    const expires = new Date(match[1]).getTime();
+    return (expires - Date.now()) / (24 * 60 * 60 * 1000);
+  };
+
+  it('sets a ~30 day cookie when rememberMe is true', async () => {
+    const res = await request(app)
+      .post('/v1/users/login')
+      .send({ ...credentials, rememberMe: true });
+
+    expect(res.status).toBe(200);
+    const cookie = getJwtCookie(res);
+    expect(cookie).toBeDefined();
+    expect(cookieMaxAgeDays(cookie)).toBeCloseTo(30, 0);
+  });
+
+  it('sets a ~1 day cookie when rememberMe is false', async () => {
+    const res = await request(app)
+      .post('/v1/users/login')
+      .send({ ...credentials, rememberMe: false });
+
+    expect(res.status).toBe(200);
+    const cookie = getJwtCookie(res);
+    expect(cookie).toBeDefined();
+    expect(cookieMaxAgeDays(cookie)).toBeCloseTo(1, 0);
+  });
+
+  it('sets a ~1 day cookie when rememberMe is omitted (short session by default)', async () => {
+    const res = await request(app).post('/v1/users/login').send(credentials);
+
+    expect(res.status).toBe(200);
+    const cookie = getJwtCookie(res);
+    expect(cookie).toBeDefined();
+    expect(cookieMaxAgeDays(cookie)).toBeCloseTo(1, 0);
+  });
+
+  it('rejects a non-boolean rememberMe value', async () => {
+    const res = await request(app)
+      .post('/v1/users/login')
+      .send({ ...credentials, rememberMe: 'yes' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('still returns the standard login response shape with rememberMe set', async () => {
+    const res = await request(app)
+      .post('/v1/users/login')
+      .send({ ...credentials, rememberMe: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('success');
+    expect(typeof res.body.token).toBe('string');
+    expect(res.body.data.user.email).toBe(credentials.email);
+  });
+});
+
 describe('POST /v1/users/logout', () => {
   let credentials;
 

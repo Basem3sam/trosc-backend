@@ -6,12 +6,28 @@ const signToken = require('../utils/generateToken');
 const { logger } = require('../utils/logger');
 const { logActivity } = require('./activityLog.service');
 
+// Long/short session durations used by login's "remember me" option.
+// Kept in one place so the JWT and the cookie (set in auth.controller.js)
+// stay in agreement without hardcoding the value in more than one spot.
+const REMEMBER_ME_JWT_EXPIRES_IN = '30d';
+const DEFAULT_SESSION_JWT_EXPIRES_IN = '1d';
+const REMEMBER_ME_SESSION_DAYS = 30;
+const DEFAULT_SESSION_DAYS = 1;
+
+// Exposed so auth.controller.js can size the `jwt` cookie's maxAge to
+// match, without redefining the 30/1 day figures in a second place.
+exports.REMEMBER_ME_SESSION_DAYS = REMEMBER_ME_SESSION_DAYS;
+exports.DEFAULT_SESSION_DAYS = DEFAULT_SESSION_DAYS;
+
 // Create and send token (with cookie)
-const createSendToken = (user) => {
+// `expiresIn` lets callers (login) override the default JWT lifetime;
+// every other flow (signup, password reset, etc.) keeps using the
+// project's normal JWT_EXPIRES_IN by omitting it.
+const createSendToken = (user, expiresIn) => {
   if (!user || !user._id) {
     throw new AppError('Invalid user for token generation', 500);
   }
-  const token = signToken(user._id);
+  const token = signToken(user._id, expiresIn);
   user.password = undefined; // Remove password from output
   return token;
 };
@@ -57,7 +73,7 @@ exports.signUp = async (data, url) => {
   return { token, user: newUser };
 };
 
-exports.login = async (email, password) => {
+exports.login = async (email, password, rememberMe = false) => {
   // Check if email and password exist
   if (!email || !password) {
     throw new AppError('Please provide email and password.', 400);
@@ -83,9 +99,17 @@ exports.login = async (email, password) => {
 
   await logActivity({ userId: user._id, action: 'login' });
 
+  // rememberMe=true -> long-lived (~30d) session; otherwise (false or
+  // omitted) -> the short (~1d) session. This intentionally does not use
+  // process.env.JWT_EXPIRES_IN, which remains the default lifetime for
+  // signup/password-reset/etc. flows untouched by this option.
+  const tokenExpiresIn = rememberMe
+    ? REMEMBER_ME_JWT_EXPIRES_IN
+    : DEFAULT_SESSION_JWT_EXPIRES_IN;
+
   // If everything ok, send token to client
-  const token = createSendToken(user);
-  return { token, user };
+  const token = createSendToken(user, tokenExpiresIn);
+  return { token, user, rememberMe: !!rememberMe };
 };
 
 exports.forgotPassword = async (email) => {

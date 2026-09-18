@@ -1,5 +1,6 @@
 const APIFeatures = require('../utils/APIFeatures');
 const User = require('../models/user.model');
+const Track = require('../models/track.model');
 const AppError = require('../utils/AppError');
 const { logActivity } = require('./activityLog.service');
 const cascade = require('./cascade.service');
@@ -117,7 +118,21 @@ exports.deleteUser = async (id, requestingUserId) => {
 exports.getMe = async (userId) => {
   const user = await User.findById(userId).select('-password');
   if (!user) throw new AppError('User not found', 404);
-  return user;
+
+  // pendingTrack: the track (if any) the user has applied to via
+  // enrollMeInTrack but isn't approved into yet. Track.pendingStudents is
+  // the existing source of truth for that (see enrollment.service.js's
+  // enrollMeInTrack/approveStudentInTrack/rejectStudentInTrack, which are
+  // the only writers of this array) — this just surfaces it on /users/me
+  // rather than introducing a second place that tracks the same state.
+  const pendingTrack = await Track.findOne({ pendingStudents: userId })
+    .select('_id')
+    .lean();
+
+  const userObj = user.toObject();
+  userObj.pendingTrack = pendingTrack ? pendingTrack._id : null;
+
+  return userObj;
 };
 
 exports.updateMe = async (userId, data) => {

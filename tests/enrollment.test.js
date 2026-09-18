@@ -52,6 +52,74 @@ describe('Enrollment (Self-enroll, Approve, Reject, Leave)', () => {
   });
 
   // ============================================================
+  // 0. GET /users/me — pendingTrack reflects the Track.pendingStudents /
+  //    students source of truth exercised by the endpoints below.
+  // ============================================================
+  describe('GET /v1/users/me — pendingTrack', () => {
+    it('is null when the student has no pending application', async () => {
+      const res = await request(app)
+        .get('/v1/users/me')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.pendingTrack).toBeNull();
+    });
+
+    it('is the track id after the student applies via enroll-me', async () => {
+      const applyRes = await request(app)
+        .post(`/v1/tracks/${trackId}/enroll-me`)
+        .set('Authorization', `Bearer ${studentToken}`);
+      expect(applyRes.status).toBe(200);
+
+      const res = await request(app)
+        .get('/v1/users/me')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.pendingTrack).toBe(trackId.toString());
+      expect(res.body.data.user.enrolledTrack).toBeNull();
+    });
+
+    it('goes back to null (with enrolledTrack set) once approved', async () => {
+      await request(app)
+        .post(`/v1/tracks/${trackId}/enroll-me`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      const approveRes = await request(app)
+        .post(`/v1/tracks/${trackId}/students/${studentId}/approve`)
+        .set('Authorization', `Bearer ${instructorToken}`);
+      expect(approveRes.status).toBe(200);
+
+      const res = await request(app)
+        .get('/v1/users/me')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.pendingTrack).toBeNull();
+      expect(res.body.data.user.enrolledTrack).toBe(trackId.toString());
+    });
+
+    it('goes back to null after the application is rejected', async () => {
+      await request(app)
+        .post(`/v1/tracks/${trackId}/enroll-me`)
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      const rejectRes = await request(app)
+        .post(`/v1/tracks/${trackId}/students/${studentId}/reject`)
+        .set('Authorization', `Bearer ${instructorToken}`);
+      expect(rejectRes.status).toBe(200);
+
+      const res = await request(app)
+        .get('/v1/users/me')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.pendingTrack).toBeNull();
+      expect(res.body.data.user.enrolledTrack).toBeNull();
+    });
+  });
+
+  // ============================================================
   // 1. ENDPOINT TESTS – self‑enroll and leave endpoints
   // ============================================================
   describe('Track Self-Enrollment (endpoint)', () => {

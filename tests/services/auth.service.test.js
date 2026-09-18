@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken');
 const authService = require('../../src/services/auth.service');
 const User = require('../../src/models/user.model');
 const Email = require('../../src/utils/Email'); // jest-mocked globally (see setupAfterEnv.js)
@@ -15,6 +16,49 @@ describe('auth.service — internal guards not reachable via the validated HTTP 
       await expect(
         authService.login('someone@example.com', undefined),
       ).rejects.toThrow('Please provide email and password.');
+    });
+  });
+
+  describe('login — rememberMe controls JWT lifetime', () => {
+    const password = 'Password123!';
+
+    it('issues a ~30 day token when rememberMe is true', async () => {
+      const { user } = await createTestUser({
+        email: 'remember-true@example.com',
+        password,
+      });
+
+      const { token } = await authService.login(user.email, password, true);
+      const decoded = jwt.decode(token);
+      const days = (decoded.exp - decoded.iat) / (24 * 60 * 60);
+
+      expect(days).toBeCloseTo(30, 0);
+    });
+
+    it('issues a ~1 day token when rememberMe is false', async () => {
+      const { user } = await createTestUser({
+        email: 'remember-false@example.com',
+        password,
+      });
+
+      const { token } = await authService.login(user.email, password, false);
+      const decoded = jwt.decode(token);
+      const days = (decoded.exp - decoded.iat) / (24 * 60 * 60);
+
+      expect(days).toBeCloseTo(1, 0);
+    });
+
+    it('defaults to the ~1 day token when rememberMe is omitted', async () => {
+      const { user } = await createTestUser({
+        email: 'remember-omitted@example.com',
+        password,
+      });
+
+      const { token } = await authService.login(user.email, password);
+      const decoded = jwt.decode(token);
+      const days = (decoded.exp - decoded.iat) / (24 * 60 * 60);
+
+      expect(days).toBeCloseTo(1, 0);
     });
   });
 

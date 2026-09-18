@@ -18,6 +18,50 @@ describe('user.service — direct calls', () => {
       const found = await userService.getMe(user._id);
       expect(found.password).toBeUndefined();
     });
+
+    it('returns pendingTrack: null when there is no pending application', async () => {
+      const { user } = await createTestUser();
+      const found = await userService.getMe(user._id);
+      expect(found.pendingTrack).toBeNull();
+    });
+
+    it('returns the track id in pendingTrack when the student has a pending application', async () => {
+      const { user: instructor } = await createTestUser({
+        role: 'instructor',
+      });
+      const { user } = await createTestUser();
+
+      const track = await Track.create({
+        title: 'Pending Track Test',
+        description: 'For pendingTrack getMe tests',
+        instructor: instructor._id,
+        published: true,
+        pendingStudents: [user._id],
+      });
+
+      const found = await userService.getMe(user._id);
+      expect(found.pendingTrack?.toString()).toBe(track._id.toString());
+    });
+
+    it('reports pendingTrack: null once the application is approved (enrolledTrack takes over)', async () => {
+      const { user: instructor } = await createTestUser({
+        role: 'instructor',
+      });
+      const { user } = await createTestUser();
+
+      const track = await Track.create({
+        title: 'Approved Track Test',
+        description: 'For pendingTrack getMe tests',
+        instructor: instructor._id,
+        published: true,
+        students: [user._id],
+      });
+      await User.findByIdAndUpdate(user._id, { enrolledTrack: track._id });
+
+      const found = await userService.getMe(user._id);
+      expect(found.pendingTrack).toBeNull();
+      expect(found.enrolledTrack?.toString()).toBe(track._id.toString());
+    });
   });
 
   describe('updateMe', () => {
