@@ -109,17 +109,36 @@ GET /v1/tracks?level=intermediate&published=true&page=2&limit=5
 | Method  | Endpoint                         | Access    | Description                                                      |
 | ------- | -------------------------------- | --------- | ---------------------------------------------------------------- |
 | `POST`  | `/v1/users/signup`               | Public    | Register a new account (rate limited: 5 attempts / 15 min)       |
-| `POST`  | `/v1/users/login`                | Public    | Authenticate and receive JWT (rate limited: 5 attempts / 15 min) |
+| `POST`  | `/v1/users/login`                | Public    | Authenticate and receive JWT (rate limited: 5 attempts / 15 min); accepts an optional `rememberMe` boolean — see below |
 | `POST`  | `/v1/users/logout`               | Protected | Clear auth cookie                                                |
 | `POST`  | `/v1/users/forgotPassword`       | Public    | Request password reset email (rate limited: 5 attempts / 15 min) |
 | `PATCH` | `/v1/users/resetPassword/:token` | Public    | Reset password with token (rate limited: 5 attempts / 15 min)    |
 | `PATCH` | `/v1/users/updateMyPassword`     | Protected | Change current password (invalidates existing tokens)            |
 
+#### `POST /v1/users/login` — `rememberMe`
+
+```json
+{
+  "email": "user@example.com",
+  "password": "password",
+  "rememberMe": true
+}
+```
+
+`rememberMe` is optional and defaults to `false`. It controls both the JWT's `expiresIn` and the `jwt` cookie's `maxAge` for that login — every other cookie/token security setting (`httpOnly`, `secure`, `sameSite`) is unchanged:
+
+| `rememberMe`      | JWT / cookie lifetime |
+| ------------------ | ---------------------- |
+| `true`              | ~30 days               |
+| `false` or omitted | ~1 day                 |
+
+This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, which still govern the token issued by signup, password reset, and password update — only `/login` reads `rememberMe`.
+
 ### Users
 
 | Method   | Endpoint                   | Access    | Description                                                                                                                                                                       |
 | -------- | -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/v1/users/me`             | Protected | Get current user profile                                                                                                                                                          |
+| `GET`    | `/v1/users/me`             | Protected | Get current user profile, including `pendingTrack`: the `_id` of a track the user has applied to but isn't approved into yet, or `null` if none                                 |
 | `PATCH`  | `/v1/users/updateMe`       | Protected | Update profile (name, email, photo, bio; email change resets verification)                                                                                                        |
 | `DELETE` | `/v1/users/deleteMe`       | Protected | Soft-delete own account                                                                                                                                                           |
 | `GET`    | `/v1/users/me/enrollments` | Protected | Get enrolled track, courses, and sessions                                                                                                                                         |

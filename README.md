@@ -48,7 +48,7 @@
 
 | Feature                   | Description                                                                                                                                                                                                        |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 🔐 **Authentication**     | JWT (bearer + httpOnly cookie), role-based access control (`student` / `instructor` / `admin`)                                                                                                                     |
+| 🔐 **Authentication**     | JWT (bearer + httpOnly cookie), role-based access control (`student` / `instructor` / `admin`), optional `rememberMe` on login for a long-lived (~30 day) vs. default (~1 day) session                            |
 | 📚 **Learning Tracks**    | Structured curricula grouping courses and sessions                                                                                                                                                                 |
 | 🎬 **Courses & Sessions** | YouTube / Google Drive integration — zero storage cost                                                                                                                                                             |
 | 📅 **Events**             | Online/offline events with RSVP and attendance tracking                                                                                                                                                            |
@@ -73,9 +73,9 @@
 | -------------- | ----------------------------------------------- | -------- |
 | **Runtime**    | Node.js                                         | ≥ 20 LTS |
 | **Framework**  | Express.js                                      | 4.x      |
-| **Database**   | MongoDB (Mongoose ODM)                          | 7.x+     |
+| **Database**   | MongoDB (Mongoose ODM)                          | 8.x+     |
 | **Auth**       | JWT (jsonwebtoken) + bcrypt                     | —        |
-| **Validation** | Joi                                             | 17.x     |
+| **Validation** | Joi                                             | 18.x     |
 | **Security**   | Helmet, express-rate-limit, mongo-sanitize, hpp | —        |
 | **Email**      | Nodemailer + html-to-text                       | —        |
 | **Docs**       | Swagger (swagger-jsdoc + swagger-ui-express)    | 3.0      |
@@ -328,7 +328,7 @@ flowchart TD
 | Collection       | Purpose                               | Key Indexes                                                                              |
 | ---------------- | ------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `users`          | Authentication, profiles, enrollments | `email` (unique), `enrolledTrack`                                                        |
-| `tracks`         | Learning paths                        | `title` (text), `instructor`, `students`, `published+level`                              |
+| `tracks`         | Learning paths                        | `title` (text), `instructor`, `students`, `pendingStudents`, `published+level`           |
 | `courses`        | Course content                        | `title` (text), `track`, `instructor`, `students`, `published+level`                     |
 | `sessions`       | Video sessions                        | `tracks`, `course`, `instructor`, `published+level`                                      |
 | `events`         | Club events & RSVP                    | `date` (for upcoming feed)                                                               |
@@ -349,6 +349,8 @@ When a student joins a **track**, the system automatically enrolls them in:
 - Updates `User.enrolledTrack`, `User.enrolledCourses`, `User.enrolledSessions`
 
 When a student **leaves** (or is removed), all of the above are reversed atomically.
+
+While a self-enroll request (`POST /tracks/:id/enroll-me`) is awaiting instructor/admin approval, the student is only in that track's `pendingStudents` array — `User.enrolledTrack` stays `null` until approved. `GET /v1/users/me` surfaces this as a computed `pendingTrack` field (the track's `_id`, or `null` if there's no pending request), read live from `Track.pendingStudents` rather than duplicated onto the `User` document.
 
 Deleting a **course** or **track** also cascades to remove its assignments, reviews, and weekly tasks, so nothing is left pointing at a deleted parent.
 
@@ -419,8 +421,8 @@ open http://localhost:5000/api-docs
 | `DATABASE_PASSWORD`         | ❌       | —                                 | If using `<PASSWORD>` placeholder in URL                                                 |
 | `DATABASE_USERNAME`         | ❌       | —                                 | If using `<USERNAME>` placeholder in URL                                                 |
 | `JWT_SECRET`                | ✅       | —                                 | Min 32 characters                                                                        |
-| `JWT_EXPIRES_IN`            | ✅       | `30d`                             | Token lifetime (e.g., `90d`, `7d`)                                                       |
-| `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days                                                                    |
+| `JWT_EXPIRES_IN`            | ✅       | `7d`                              | Token lifetime for signup / password-reset / password-update (e.g., `90d`, `30d`). **Not** used by `/login`, which sizes its own token from `rememberMe` instead — see [Authentication Flow](#-authentication-flow) |
+| `JWT_COOKIE_EXPIRES_IN`     | ❌       | `7`                               | Cookie expiry in days for every auth response except `/login` (same `rememberMe` carve-out as above)                                    |
 | `FRONTEND_URL`              | ✅       | —                                 | For CORS and password reset links                                                        |
 | `EXTRA_CORS_ORIGINS`        | ❌       | —                                 | Comma-separated extra allowed origins, added on top of `FRONTEND_URL` (see `src/app.js`) |
 | `BASE_URL`                  | ❌       | `http://localhost:5000`           | Server base URL                                                                          |
@@ -450,7 +452,7 @@ DATABASE_URL=mongodb+srv://user:pass@cluster.mongodb.net/trosc
 # Or local: mongodb://localhost:27017/trosc
 
 JWT_SECRET=your_super_secret_key_min_32_chars_here
-JWT_EXPIRES_IN=30d
+JWT_EXPIRES_IN=7d
 JWT_COOKIE_EXPIRES_IN=7
 
 FRONTEND_URL=http://localhost:3000
@@ -603,11 +605,12 @@ Common HTTP status codes:
 └──────────┘       └──────────┘      └──────────┘
 ```
 
-1. Client sends `email` + `password`.
+1. Client sends `email` + `password`, and optionally `rememberMe: true`.
 2. Server hashes password with bcrypt (cost 12) and compares.
-3. If valid, server signs a JWT with `user._id` and expiry.
-4. Server sends token in JSON body **and** sets an `httpOnly`, `Secure`, `SameSite` cookie.
+3. If valid, server signs a JWT with `user._id` and an expiry that depends on `rememberMe`: **~30 days** if `true`, **~1 day** if `false` or omitted.
+4. Server sends the token in the JSON body **and** sets an `httpOnly` cookie (`secure` + `sameSite: 'none'` in production, `sameSite: 'lax'` in development) whose `maxAge` matches the same ~30/~1 day choice.
 5. Subsequent requests send either the cookie automatically or the `Authorization: Bearer <token>` header.
+6. Signup, password reset, and password update use the same cookie settings but always the default (`JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN`-controlled) lifetime — `rememberMe` is a `/login`-only option.
 
 ---
 
@@ -635,6 +638,14 @@ Reviews and assignments both attach to three different parent types (track, cour
 
 Validation schemas (Joi) are defined in `validations/` and referenced in route JSDoc. This ensures the API docs never drift from the actual validation rules.
 
+### 6. `rememberMe` as a Login-Only Override
+
+Rather than changing the global `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars (which would also affect signup, password reset, and password update), `POST /login` computes its own token/cookie lifetime from the request's `rememberMe` boolean (~30 days if `true`, ~1 day otherwise) and passes it explicitly to `generateToken`/`setAuthCookie`. Every other cookie security setting (`httpOnly`, `secure`, `sameSite`) is untouched, and every other auth flow keeps using the env-configured default.
+
+### 7. `pendingTrack` Is Computed, Not Stored
+
+`GET /users/me` reports `pendingTrack` (the track a student has applied to but isn't approved into yet) by querying `Track.pendingStudents` for the caller's ID at request time — the same field `enrollMeInTrack`/`approveStudentInTrack`/`rejectStudentInTrack` already read and write in `enrollment.service.js`. No second, duplicate "pending" field was added to the `User` model.
+
 ---
 
 ## 🛡️ Security
@@ -647,7 +658,7 @@ Validation schemas (Joi) are defined in `validations/` and referenced in route J
 | **Parameter Pollution** | `hpp` whitelists array fields (`role`, `level`, `prerequisites`, etc.)                                                                                                                                                      |
 | **CORS**                | Whitelist-based with credentials; ngrok allowed in dev                                                                                                                                                                      |
 | **Passwords**           | bcrypt (cost 12), never returned in queries (`select: false`)                                                                                                                                                               |
-| **JWT**                 | `httpOnly` cookie + `SameSite` strict; 30-day expiry                                                                                                                                                                        |
+| **JWT**                 | `httpOnly` cookie (`secure` + `sameSite: 'none'` in production, `sameSite: 'lax'` in development); login's expiry depends on `rememberMe` (~1 day default, ~30 days if true) — see [Authentication Flow](#-authentication-flow) |
 | **Input Validation**    | Joi on all body/params/query; custom URL validators for attachments                                                                                                                                                         |
 | **Ownership**           | Instructors can only mutate their own content; review authors can only delete their own review; admins bypass both                                                                                                          |
 | **Body Spoofing**       | Controllers delete `req.body.instructor`, `req.body.students`, etc. before saving                                                                                                                                           |
@@ -808,7 +819,7 @@ tests/
 ├── error.controller.test.js, errorHandling.test.js, app.test.js, APIFeatures.test.js
 ```
 
-60 test files (600 tests) span auth, password recovery, every CRUD resource (tracks/courses/sessions/events/announcements), enrollment + the MongoDB transaction paths in `cascade.service.js`, reviews, assignments (incl. grading), weekly tasks, contact (public + admin), activity logs (audit-trail read/write + auth/role guards), dashboard stats (period-boundary math, snapshot generation/upsert, trends, prune), model-level field validators, middleware edge cases, the global error handler, and `src/app.js`'s own production-vs-development configuration. See **[TESTING.md](./TESTING.md)** for the full file-by-file coverage table and the (short) list of what's still deliberately untested — mainly that email-sending is mocked everywhere rather than asserted on, and a couple of narrow model-validator edge cases.
+60 test files (616 tests) span auth (incl. `rememberMe` session length), password recovery, every CRUD resource (tracks/courses/sessions/events/announcements), enrollment + the MongoDB transaction paths in `cascade.service.js`, reviews, assignments (incl. grading), weekly tasks, contact (public + admin), activity logs (audit-trail read/write + auth/role guards), dashboard stats (period-boundary math, snapshot generation/upsert, trends, prune), model-level field validators, middleware edge cases, the global error handler, and `src/app.js`'s own production-vs-development configuration. See **[TESTING.md](./TESTING.md)** for the full file-by-file coverage table and the (short) list of what's still deliberately untested — mainly that email-sending is mocked everywhere rather than asserted on, and a couple of narrow model-validator edge cases.
 
 ---
 
@@ -846,6 +857,8 @@ tests/
 - [x] **Admin Analytics Dashboard** (`dashboardStats.model.js` / `dashboardStats.service.js`) — live on-demand stats plus persisted, upsertable daily/weekly/monthly snapshots for trend charts, a cron-friendly CLI generator (`scripts/generateDashboardSnapshot.js`), and retention pruning
 - [x] **Announcement audience filtering** — `GET /v1/announcements` now filters by `audience`/`targetTrack`/`targetCourse`: everyone sees `audience: 'all'`, plus `'track'`/`'course'`-targeted announcements for a track/course they're enrolled in; the creating instructor can also see their own targeted announcement regardless of enrollment; admins see everything
 - [x] **Track/session detach unenrollment** — removing a course or session from a track (short of deleting the track) now unenrolls that track's current students from it, mirroring the auto-enroll on add (see [Enrollment Cascade Rules](#-database-overview))
+- [x] **`rememberMe` login sessions** — `POST /v1/users/login` accepts an optional `rememberMe` boolean that sizes both the JWT and the `jwt` cookie to ~30 days (`true`) or ~1 day (`false`/omitted), independent of the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` defaults still used by every other auth flow
+- [x] **`pendingTrack` on `/users/me`** — the authenticated user response now includes `pendingTrack` (the `_id` of a track awaiting approval, or `null`), computed from the existing `Track.pendingStudents` source of truth rather than a new stored field
 
 ### Planned 🔮
 
