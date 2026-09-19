@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const createTransporter = require('./src/config/mailer.config');
 require('./src/config/loadEnv')();
 
 // ── Color helpers ──────────────────────────────────────────
@@ -9,6 +9,8 @@ const blue = (msg) => console.log(`\x1b[36mℹ️  ${msg}\x1b[0m`);
 const divider = () => console.log(`\x1b[90m${'─'.repeat(60)}\x1b[0m`);
 
 // ── Check environment variables ──────────────────────────
+// Mirrors mailer.config.js: production uses Brevo's HTTP API,
+// everything else uses SMTP via nodemailer.
 function checkEnv() {
   divider();
   console.log('📋 ENVIRONMENT VARIABLES CHECK');
@@ -16,7 +18,7 @@ function checkEnv() {
 
   const required = {
     dev: ['EMAIL_HOST', 'EMAIL_PORT', 'EMAIL_USER', 'EMAIL_PASS', 'EMAIL_FROM'],
-    prod: ['EMAIL_SERVICE', 'EMAIL_USER', 'EMAIL_PASS', 'EMAIL_FROM'],
+    prod: ['BREVO_API_KEY', 'EMAIL_FROM'],
   };
 
   const isProd = process.env.NODE_ENV === 'production';
@@ -27,7 +29,9 @@ function checkEnv() {
     const val = process.env[key];
     if (val) {
       // Mask sensitive values
-      const display = key.includes('PASS') ? `${val.substring(0, 3)}***` : val;
+      const display = key.includes('KEY') || key.includes('PASS')
+        ? `${val.substring(0, 3)}***`
+        : val;
       green(`${key} = ${display}`);
     } else {
       red(`${key} = MISSING`);
@@ -48,33 +52,40 @@ function checkEnv() {
   return allOk;
 }
 
-// ── Create transporter (matches your mailer.config.js) ───
-function createTransporter() {
-  if (process.env.NODE_ENV === 'production') {
-    return nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'Gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-  }
-
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT, 10) || 2525,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-}
-
-// ── Verify SMTP connection ─────────────────────────────────
+// ── Verify connection / credentials ────────────────────────
+// The Brevo transport (production) has no SMTP handshake to verify,
+// so instead we do a lightweight call to Brevo's account endpoint to
+// confirm the API key is valid. In dev, we still use nodemailer's
+// real SMTP verify().
 async function verifyConnection(transporter) {
   divider();
-  console.log('🔌 SMTP CONNECTION TEST');
+  console.log('🔌 CONNECTION TEST');
   divider();
+
+  const isProd = process.env.NODE_ENV === 'production';
+
+  if (isProd) {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/account', {
+        headers: {
+          'api-key': process.env.BREVO_API_KEY,
+          Accept: 'application/json',
+        },
+      });
+      if (res.ok) {
+        green('Brevo API key is valid and account is reachable');
+        return true;
+      }
+      const body = await res.text().catch(() => '');
+      red(`Brevo API rejected the key (HTTP ${res.status})`);
+      if (body) console.error('   Response:', body);
+      return false;
+    } catch (err) {
+      red('Could not reach Brevo API');
+      console.error('   Error:', err.message);
+      return false;
+    }
+  }
 
   try {
     const verify = await transporter.verify();
@@ -134,7 +145,7 @@ async function sendTestEmail(transporter, toEmail) {
   try {
     const info = await transporter.sendMail(mailOptions);
     green('Email sent successfully!');
-    blue(`Message ID: ${info.messageId}`);
+    if (info.messageId) blue(`Message ID: ${info.messageId}`);
     if (info.accepted && info.accepted.length > 0) {
       green(`Accepted by: ${info.accepted.join(', ')}`);
     }
@@ -166,14 +177,14 @@ async function main() {
     process.exit(1);
   }
 
-  // Create transporter
+  // Create transporter — same one src/utils/Email.js uses in prod/dev
   const transporter = createTransporter();
 
-  // Verify connection
+  // Verify connection / credentials
   const connected = await verifyConnection(transporter);
   if (!connected) {
     divider();
-    red('Cannot connect to SMTP server. Check your settings.');
+    red('Cannot connect. Check your settings.');
     divider();
     process.exit(1);
   }
@@ -184,7 +195,7 @@ async function main() {
   if (!testEmail) {
     divider();
     yellow('No recipient email provided.');
-    console.log('Usage: node test-email.js <your-email@example.com>');
+    console.log('Usage: node testEmail.js <your-email@example.com>');
     console.log('Or set TEST_EMAIL in your .env file');
     divider();
     process.exit(1);
@@ -200,16 +211,13 @@ async function main() {
     green('All checks passed! Email is working correctly.');
   } else {
     red('Email sending failed. Review the errors above.');
+    process.exit(1);
   }
   divider();
-
-  // Cleanup
-  transporter.close();
-  process.exit(sent ? 0 : 1);
 }
 
 main().catch((err) => {
-  red('Unexpected error:');
+  red('Unexpected error');
   console.error(err);
   process.exit(1);
 });
