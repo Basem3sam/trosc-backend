@@ -504,10 +504,10 @@
  */
 
 const express = require('express');
-const authController = require('../controllers/auth.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
-const userController = require('../controllers/user.controller');
-const validate = require('../middlewares/validate.middleware');
+const authController = require('../../controllers/auth.controller');
+const authMiddleware = require('../../middlewares/auth.middleware');
+const userController = require('../../controllers/user.controller');
+const validate = require('../../middlewares/validate.middleware');
 
 const {
   signupSchema,
@@ -520,7 +520,7 @@ const {
   adminCreateUserSchema,
   adminUpdateUserSchema,
   bulkUserActionSchema,
-} = require('../validations/user.validation');
+} = require('../../validations/user.validation');
 
 const router = express.Router();
 

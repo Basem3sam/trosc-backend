@@ -962,18 +962,18 @@
  */
 
 const express = require('express');
-const AppError = require('../utils/AppError');
+const AppError = require('../../utils/AppError');
 const reviewRouter = require('./review.route');
 const assignmentRouter = require('./assignment.route');
 const trackWeeklyTaskRouter = require('./trackWeeklyTask.route');
-const trackController = require('../controllers/track.controller');
+const trackController = require('../../controllers/track.controller');
 const {
   protect,
   restrictTo,
   checkOwnership,
   optionalAuth,
-} = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+} = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validate.middleware');
 const {
   createTrackSchema,
   getTrackSchema,
@@ -983,9 +983,9 @@ const {
   manageCourseSchema,
   addStudentSchema,
   studentIdSchema,
-} = require('../validations/track.validation');
-const { authLimiter } = require('../middlewares/rateLimit.middleware');
-const selfApproval = require('../middlewares/selfApproval');
+} = require('../../validations/track.validation');
+const { authLimiter } = require('../../middlewares/rateLimit.middleware');
+const selfApproval = require('../../middlewares/selfApproval');
 
 const router = express.Router();
 

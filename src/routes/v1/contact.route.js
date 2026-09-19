@@ -140,15 +140,15 @@
  */
 
 const express = require('express');
-const contactController = require('../controllers/contact.controller');
-const validate = require('../middlewares/validate.middleware');
-const { createContactSchema } = require('../validations/contact.validation');
-const { authLimiter } = require('../middlewares/rateLimit.middleware');
-const { protect, restrictTo } = require('../middlewares/auth.middleware');
+const contactController = require('../../controllers/contact.controller');
+const validate = require('../../middlewares/validate.middleware');
+const { createContactSchema } = require('../../validations/contact.validation');
+const { authLimiter } = require('../../middlewares/rateLimit.middleware');
+const { protect, restrictTo } = require('../../middlewares/auth.middleware');
 const {
   contactIdSchema,
   updateContactSchema,
-} = require('../validations/contact.validation');
+} = require('../../validations/contact.validation');
 
 const router = express.Router();
 

@@ -13,21 +13,11 @@ const crypto = require('crypto');
 const swaggerSpec = require('./config/swagger.config');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./controllers/error.controller');
-const userRouter = require('./routes/user.route');
-const trackRouter = require('./routes/track.route');
-const sessionRouter = require('./routes/session.route');
-const courseRouter = require('./routes/course.route');
-const eventRouter = require('./routes/event.route');
-const announcementRouter = require('./routes/announcement.route');
-const feedRouter = require('./routes/feed.route');
-const contactRouter = require('./routes/contact.route');
-const weeklyTaskProgressRouter = require('./routes/weeklyTaskProgress.route');
-const assignmentSubmissionRouter = require('./routes/assignmentSubmission.route');
-const activityLogRouter = require('./routes/activityLog.route');
-const dashboardStatsRouter = require('./routes/dashboardStats.route');
 const { logger, asyncLocalStorage } = require('./utils/logger');
 
 const { authLimiter } = require('./middlewares/rateLimit.middleware');
+
+const v1Router = require('./routes/v1/index');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -149,13 +139,6 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-// Stricter rate limit for auth endpoints (login, signup, forgotPassword)
-
-app.use('/v1/users/login', authLimiter);
-app.use('/v1/users/signup', authLimiter);
-app.use('/v1/users/forgotPassword', authLimiter);
-app.use('/v1/users/resetPassword', authLimiter);
-
 /* BODY PARSER */
 
 // Body parser, reading data from body into req.body
@@ -195,18 +178,7 @@ app.use(
 );
 
 /* ROUTES */
-app.use('/v1/users', userRouter);
-app.use('/v1/tracks', trackRouter);
-app.use('/v1/sessions', sessionRouter);
-app.use('/v1/courses', courseRouter);
-app.use('/v1/events', eventRouter);
-app.use('/v1/announcements', announcementRouter);
-app.use('/v1/feed', feedRouter);
-app.use('/v1/contact', contactRouter);
-app.use('/v1/weekly-tasks', weeklyTaskProgressRouter);
-app.use('/v1/assignments', assignmentSubmissionRouter);
-app.use('/v1/activity-logs', activityLogRouter);
-app.use('/v1/dashboard-stats', dashboardStatsRouter);
+app.use('/v1', v1Router);
 
 // Test route
 app.get('/', (req, res) => {

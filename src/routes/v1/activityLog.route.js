@@ -206,15 +206,15 @@
  */
 
 const express = require('express');
-const activityLogController = require('../controllers/activityLog.controller');
-const { protect, restrictTo } = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+const activityLogController = require('../../controllers/activityLog.controller');
+const { protect, restrictTo } = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validate.middleware');
 const {
   activityLogIdSchema,
   userIdParamSchema,
   activitySummaryQuerySchema,
   pruneActivityLogsSchema,
-} = require('../validations/activityLog.validation');
+} = require('../../validations/activityLog.validation');
 
 const router = express.Router();
 

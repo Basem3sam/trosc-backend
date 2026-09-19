@@ -153,14 +153,17 @@
  */
 
 const express = require('express');
-const weeklyTaskController = require('../controllers/weeklyTask.controller');
-const { protect, checkOwnership } = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+const weeklyTaskController = require('../../controllers/weeklyTask.controller');
+const {
+  protect,
+  checkOwnership,
+} = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validate.middleware');
 const {
   taskIdSchema,
   taskItemIdSchema,
   updateWeeklyTaskSchema,
-} = require('../validations/weeklyTask.validation');
+} = require('../../validations/weeklyTask.validation');
 
 // Top-level, NOT nested under courses/tracks — mount at /v1/weekly-tasks
 // in app.js. Handles editing/deleting a task and per-student item

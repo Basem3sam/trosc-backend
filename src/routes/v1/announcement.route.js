@@ -146,19 +146,19 @@
  */
 
 const express = require('express');
-const announcementController = require('../controllers/announcement.controller');
+const announcementController = require('../../controllers/announcement.controller');
 const {
   protect,
   restrictTo,
   checkOwnership,
   optionalAuth,
-} = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+} = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validate.middleware');
 const {
   createAnnouncementSchema,
   updateAnnouncementSchema,
   announcementIdSchema,
-} = require('../validations/announcement.validation');
+} = require('../../validations/announcement.validation');
 
 const router = express.Router();
 

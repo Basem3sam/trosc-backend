@@ -272,19 +272,19 @@
  */
 
 const express = require('express');
-const eventController = require('../controllers/event.controller');
+const eventController = require('../../controllers/event.controller');
 const {
   protect,
   restrictTo,
   checkOwnership,
-} = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+} = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validate.middleware');
 const {
   createEventSchema,
   updateEventSchema,
   eventIdSchema,
-} = require('../validations/event.validation');
-const { authLimiter } = require('../middlewares/rateLimit.middleware');
+} = require('../../validations/event.validation');
+const { authLimiter } = require('../../middlewares/rateLimit.middleware');
 
 const router = express.Router();
 

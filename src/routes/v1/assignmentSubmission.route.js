@@ -178,24 +178,24 @@
  */
 
 const express = require('express');
-const assignmentSubmissionController = require('../controllers/assignmentSubmission.controller');
-const assignmentController = require('../controllers/assignment.controller');
+const assignmentSubmissionController = require('../../controllers/assignmentSubmission.controller');
+const assignmentController = require('../../controllers/assignment.controller');
 const {
   updateAssignmentSchema,
-} = require('../validations/assignment.validation');
+} = require('../../validations/assignment.validation');
 
 const {
   protect,
   restrictTo,
   checkOwnership,
-} = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+} = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validate.middleware');
 const {
   assignmentIdSchema,
   assignmentStudentIdSchema,
   submitAssignmentSchema,
   gradeSubmissionSchema,
-} = require('../validations/assignmentSubmission.validation');
+} = require('../../validations/assignmentSubmission.validation');
 
 // Top-level, NOT nested under courses/sessions — mount at /v1/assignments
 // in app.js. A single assignment is already globally unique by its own

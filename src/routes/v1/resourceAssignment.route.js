@@ -1,15 +1,15 @@
 const express = require('express');
-const assignmentController = require('../controllers/assignment.controller');
+const assignmentController = require('../../controllers/assignment.controller');
 const {
   protect,
   restrictTo,
   checkOwnership,
-} = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+} = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validate.middleware');
 const {
   resourceIdSchema,
   createAssignmentSchema,
-} = require('../validations/assignment.validation');
+} = require('../../validations/assignment.validation');
 
 // Maps the generic resourceType string to the Mongoose model name that
 // checkOwnership needs to look up the parent Course/Session.

@@ -589,25 +589,25 @@
  */
 
 const express = require('express');
-const AppError = require('../utils/AppError');
+const AppError = require('../../utils/AppError');
 const reviewRouter = require('./review.route');
 const resourceAssignmentRouter = require('./resourceAssignment.route');
-const sessionController = require('../controllers/session.controller');
+const sessionController = require('../../controllers/session.controller');
 const {
   protect,
   restrictTo,
   checkOwnership,
   optionalAuth,
-} = require('../middlewares/auth.middleware');
-const validateMiddleware = require('../middlewares/validate.middleware');
+} = require('../../middlewares/auth.middleware');
+const validateMiddleware = require('../../middlewares/validate.middleware');
 const {
   createSessionValidation,
   updateSessionValidation,
   sessionIdValidation,
   addStudentValidation,
   studentIdParamValidation,
-} = require('../validations/session.validation');
-const { authLimiter } = require('../middlewares/rateLimit.middleware');
+} = require('../../validations/session.validation');
+const { authLimiter } = require('../../middlewares/rateLimit.middleware');
 
 const router = express.Router();
 

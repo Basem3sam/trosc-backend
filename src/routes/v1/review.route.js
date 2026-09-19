@@ -1,12 +1,15 @@
 const express = require('express');
-const reviewController = require('../controllers/review.controller');
-const { protect, checkOwnership } = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+const reviewController = require('../../controllers/review.controller');
+const {
+  protect,
+  checkOwnership,
+} = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validate.middleware');
 const {
   resourceIdSchema,
   createReviewSchema,
   deleteReviewSchema,
-} = require('../validations/review.validation');
+} = require('../../validations/review.validation');
 
 /**
  * Factory: builds a reviews sub-router for a given resource type

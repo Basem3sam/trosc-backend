@@ -249,9 +249,9 @@
  */
 
 const express = require('express');
-const dashboardStatsController = require('../controllers/dashboardStats.controller');
-const { protect, restrictTo } = require('../middlewares/auth.middleware');
-const validate = require('../middlewares/validate.middleware');
+const dashboardStatsController = require('../../controllers/dashboardStats.controller');
+const { protect, restrictTo } = require('../../middlewares/auth.middleware');
+const validate = require('../../middlewares/validate.middleware');
 const {
   dashboardStatsIdSchema,
   generateSnapshotSchema,
@@ -259,7 +259,7 @@ const {
   trendsQuerySchema,
   listSnapshotsQuerySchema,
   pruneDashboardStatsSchema,
-} = require('../validations/dashboardStats.validation');
+} = require('../../validations/dashboardStats.validation');
 
 const router = express.Router();
 
