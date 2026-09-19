@@ -15,8 +15,6 @@ const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./controllers/error.controller');
 const { logger, asyncLocalStorage } = require('./utils/logger');
 
-const { authLimiter } = require('./middlewares/rateLimit.middleware');
-
 const v1Router = require('./routes/v1/index');
 
 const isProduction = process.env.NODE_ENV === 'production';
