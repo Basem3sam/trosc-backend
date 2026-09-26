@@ -11,7 +11,14 @@ exports.createTrackSchema = Joi.object({
   level: Joi.string().valid('beginner', 'intermediate', 'advanced', 'all'),
   coverImage: photoValidation,
   published: Joi.boolean(),
-  // instructor: REMOVED - auto-assigned by controller, never from client
+  // Admin-only in practice: the controller strips this for non-admins
+  // before it ever reaches this schema/the service. See #2.1 — an admin
+  // can assign a track to any user whose role is instructor or admin;
+  // that role check itself happens in track.service.js (needs a DB
+  // lookup, which Joi can't do).
+  instructor: objectId.optional().messages({
+    'string.pattern.base': 'Instructor must be a valid MongoDB ID',
+  }),
 });
 
 exports.getTrackSchema = Joi.object({
@@ -24,6 +31,10 @@ exports.updateTrackSchema = Joi.object({
   level: Joi.string().valid('beginner', 'intermediate', 'advanced', 'all'),
   coverImage: photoValidation,
   published: Joi.boolean(),
+  // Admin-only — see the matching comment on createTrackSchema above.
+  instructor: objectId.optional().messages({
+    'string.pattern.base': 'Instructor must be a valid MongoDB ID',
+  }),
   // M2: courses/sessions are intentionally NOT accepted here. Setting
   // them directly via track.set() would overwrite Track.courses/sessions
   // without updating the corresponding Course.track / Session.tracks

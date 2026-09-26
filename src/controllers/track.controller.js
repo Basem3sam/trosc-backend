@@ -3,14 +3,20 @@ const trackService = require('../services/track.service');
 const catchAsync = require('../utils/catchAsync');
 
 exports.createTrack = catchAsync(async (req, res, next) => {
-  // Prevent body spoofing: delete any user-provided instructor
+  // Prevent body spoofing for everything except `instructor`, which an
+  // admin is allowed to set explicitly (#2.1). A non-admin can never set
+  // it — it's overwritten with their own id below regardless of what they
+  // sent, same as before this change.
+  const { instructor: requestedInstructor } = req.body;
   delete req.body.instructor;
   delete req.body.students;
   delete req.body.courses;
   delete req.body.sessions;
 
-  // Add instructor from the logged-in user (security)
-  req.body.instructor = req.user.id;
+  req.body.instructor =
+    req.user.role === 'admin' && requestedInstructor
+      ? requestedInstructor
+      : req.user.id;
 
   const track = await trackService.createTrack(req.body, req.user.id);
 
@@ -49,9 +55,26 @@ exports.getTrack = catchAsync(async (req, res, next) => {
   });
 });
 
+// #1.2: public, no auth required — just enough for a visitor to see what
+// the track covers before enrolling.
+exports.getSessionCatalog = catchAsync(async (req, res, next) => {
+  const sessions = await trackService.getSessionCatalog(req.params.id);
+
+  res.status(200).json({
+    status: 'success',
+    results: sessions.length,
+    data: {
+      sessions,
+    },
+  });
+});
+
 exports.updateTrack = catchAsync(async (req, res, next) => {
-  // Prevent changing instructor via update (security)
-  delete req.body.instructor;
+  // Prevent changing instructor via update, EXCEPT for admins (#2.1) —
+  // an admin can reassign a track to any instructor/admin user.
+  if (req.user.role !== 'admin') {
+    delete req.body.instructor;
+  }
   delete req.body.students;
   delete req.body.courses;
   delete req.body.sessions;

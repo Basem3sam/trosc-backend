@@ -14,14 +14,33 @@ const filterObj = (obj, ...allowedFields) => {
 };
 
 exports.getAllUsers = async (query) => {
-  const features = new APIFeatures(User.find(), query, User)
-    .filter({ active: { $ne: false } })
+  // Default behavior (no `active`/`includeInactive` param) stays exactly
+  // as before: active users only. An explicit `?active=false` or
+  // `?includeInactive=true` overrides that default so admins can find and
+  // reactivate deactivated accounts, which were previously invisible to
+  // this endpoint no matter what was passed — APIFeatures.filter() merges
+  // {...queryObj, ...defaultFilter}, and the hardcoded default filter
+  // always won because it was spread last.
+  const { active, includeInactive, ...rest } = query;
+
+  let defaultFilter = { active: { $ne: false } };
+  if (includeInactive === 'true' || includeInactive === true) {
+    defaultFilter = {};
+  } else if (active !== undefined) {
+    defaultFilter = { active: active === 'true' || active === true };
+  }
+
+  const features = new APIFeatures(User.find(), rest, User)
+    .filter(defaultFilter)
+    .search(['name', 'email'])
     .sort()
     .limitFields();
 
   await features.paginate();
 
-  const users = await features.query;
+  // `active` is select:false on the schema — explicitly re-include it so
+  // admins can actually see which users in the list are deactivated.
+  const users = await features.query.select('+active');
   return {
     users: users || [],
     total: features.totalDocs || 0,

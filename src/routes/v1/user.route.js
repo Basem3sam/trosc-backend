@@ -306,10 +306,36 @@
  *   get:
  *     operationId: getAllUsers
  *     summary: Get all users (admin only)
- *     description: Retrieves list of all active users
+ *     description: |
+ *       Retrieves a list of users. By default only active users are
+ *       returned; pass `active=false` or `includeInactive=true` to see
+ *       deactivated accounts too (e.g. to reactivate one).
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - name: page
+ *         in: query
+ *         schema: { type: integer, default: 1 }
+ *       - name: limit
+ *         in: query
+ *         schema: { type: integer, default: 20 }
+ *       - name: search
+ *         in: query
+ *         schema: { type: string }
+ *         description: Case-insensitive match against name and email
+ *         example: basem
+ *       - name: role
+ *         in: query
+ *         schema: { type: string, enum: [student, instructor, admin] }
+ *       - name: active
+ *         in: query
+ *         schema: { type: string, enum: [true, false] }
+ *         description: Filter by active status. Defaults to active-only when omitted.
+ *       - name: includeInactive
+ *         in: query
+ *         schema: { type: string, enum: [true, false] }
+ *         description: Return both active and inactive users.
  *     responses:
  *       200:
  *         description: List of users retrieved
@@ -520,6 +546,7 @@ const {
   adminCreateUserSchema,
   adminUpdateUserSchema,
   bulkUserActionSchema,
+  listUsersQuerySchema,
 } = require('../../validations/user.validation');
 
 const router = express.Router();
@@ -644,7 +671,7 @@ router.post(
  */
 router
   .route('/')
-  .get(userController.getAllUsers)
+  .get(validate(listUsersQuerySchema, 'query'), userController.getAllUsers)
   /**
    * @route   POST /users
    * @desc    Create a new user (admin only)

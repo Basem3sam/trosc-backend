@@ -100,6 +100,12 @@
  *           description: Learning resources for this session
  *           items:
  *             $ref: '#/components/schemas/Resource'
+ *         myProgress:
+ *           type: object
+ *           description: Only present on GET /sessions/{id} for enrolled callers. Reflects their own watched status.
+ *           properties:
+ *             status: { type: string, enum: [not_started, watched] }
+ *             watchedAt: { type: string, format: date-time, nullable: true }
  *         published:
  *           type: boolean
  *           description: Whether session is publicly available
@@ -312,6 +318,29 @@ const resourceSchema = new mongoose.Schema({
   },
 });
 
+// #1.1: tracks whether an enrolled student has watched this session. One
+// entry per student, kept in sync by session.service.js#setSessionProgress
+// (atomic replace, mirrors weeklyTask completions).
+const progressSchema = new mongoose.Schema(
+  {
+    student: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ['not_started', 'watched'],
+      default: 'not_started',
+    },
+    watchedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: false },
+);
+
 const sessionSchema = new mongoose.Schema(
   {
     title: {
@@ -398,6 +427,7 @@ const sessionSchema = new mongoose.Schema(
       },
     },
     resources: [resourceSchema],
+    progress: [progressSchema],
     published: {
       type: Boolean,
       default: false,

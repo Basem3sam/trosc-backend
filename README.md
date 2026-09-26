@@ -49,14 +49,14 @@
 | Feature                   | Description                                                                                                                                                                                                        |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 🔐 **Authentication**     | JWT (bearer + httpOnly cookie), role-based access control (`student` / `instructor` / `admin`), optional `rememberMe` on login for a long-lived (~30 day) vs. default (~1 day) session                            |
-| 📚 **Learning Tracks**    | Structured curricula grouping courses and sessions                                                                                                                                                                 |
-| 🎬 **Courses & Sessions** | YouTube / Google Drive integration — zero storage cost                                                                                                                                                             |
+| 📚 **Learning Tracks**    | Structured curricula grouping courses and sessions; instructor can be reassigned by an admin; public session catalog (`GET /tracks/:id/session-catalog`) for pre-enrollment browsing              |
+| 🎬 **Courses & Sessions** | YouTube / Google Drive integration — zero storage cost; per-student "watched" progress tracking on sessions (`PUT /sessions/:id/progress`, `myProgress` on `GET /sessions/:id`)                   |
 | 📅 **Events**             | Online/offline events with RSVP and attendance tracking                                                                                                                                                            |
 | 📌 **Announcements**      | Pinned posts with audience targeting (`all` / `track` / `course`)                                                                                                                                                  |
 | 📊 **Dashboard Feed**     | Aggregated pinned announcements + upcoming events                                                                                                                                                                  |
 | 🛡️ **Ownership Model**    | Instructors edit only their own content; admins bypass restrictions                                                                                                                                                |
 | ⚡ **Bulk Actions**       | Admin tools for mass user activation, deactivation, or deletion                                                                                                                                                    |
-| 🔍 **Full-Text Search**   | MongoDB text indexes on tracks, courses, and sessions                                                                                                                                                              |
+| 🔍 **Full-Text Search**   | MongoDB text indexes on tracks, courses, and sessions; regex-based name/email search plus active/inactive filtering on the admin user list                                                                        |
 | 📈 **Track Analytics**    | Enrollment rates, student counts, and engagement metrics                                                                                                                                                           |
 | ✉️ **Contact Form**       | Public contact submission, stored + emailed to admin; admins can list, view, and triage submissions (`new` / `read` / `archived`)                                                                                  |
 | ⭐ **Reviews**            | Enrolled students rate & review tracks, courses, and sessions (1–5 stars, one per student per resource); review's own author or an admin can delete it                                                             |
@@ -695,6 +695,7 @@ Rather than changing the global `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env var
 | `npm run lint:check`                                                            | Run ESLint with `--max-warnings=0` (fails on any warning — what CI runs) |
 | `node testEmail.js <email>`                                                     | Diagnose SMTP configuration and send a test email                        |
 | `node scripts/createAdmin.js <email>`                                           | Promote a user to admin                                                  |
+| `node scripts/cleanupOrphanedTrackReferences.js [--dry-run]`                    | One-off/repeatable maintenance: removes references to deleted users from `Track.students`/`pendingStudents`/`pendingLeaves` |
 | `node scripts/generateDashboardSnapshot.js <daily\|weekly\|monthly> [ISO date]` | Generate/refresh a dashboard-stats snapshot — meant to be cron-triggered |
 
 ### Email Diagnostic Tool
@@ -712,6 +713,19 @@ node scripts/createAdmin.js user@example.com
 ```
 
 Promotes an existing user to admin role.
+
+### Orphaned Track Reference Cleanup
+
+```bash
+node scripts/cleanupOrphanedTrackReferences.js --dry-run   # preview
+node scripts/cleanupOrphanedTrackReferences.js              # apply
+```
+
+Scans every track's `students`, `pendingStudents`, and `pendingLeaves` arrays
+for ids that no longer resolve to an existing user (a possible leftover from
+before `cascade.service.js#hardDeleteUserCascade` was fixed to pull those
+fields on user delete) and removes them. Safe to re-run — it's a no-op once
+the data is clean.
 
 ### Dashboard Stats Snapshot Generation
 
@@ -859,6 +873,11 @@ tests/
 - [x] **Track/session detach unenrollment** — removing a course or session from a track (short of deleting the track) now unenrolls that track's current students from it, mirroring the auto-enroll on add (see [Enrollment Cascade Rules](#-database-overview))
 - [x] **`rememberMe` login sessions** — `POST /v1/users/login` accepts an optional `rememberMe` boolean that sizes both the JWT and the `jwt` cookie to ~30 days (`true`) or ~1 day (`false`/omitted), independent of the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` defaults still used by every other auth flow
 - [x] **`pendingTrack` on `/users/me`** — the authenticated user response now includes `pendingTrack` (the `_id` of a track awaiting approval, or `null`), computed from the existing `Track.pendingStudents` source of truth rather than a new stored field
+- [x] **Session "watched" progress tracking** — `PUT /v1/sessions/:id/progress` (enrolled students only) marks a session watched for the current user; `GET /v1/sessions/:id` returns `myProgress: { status, watchedAt }` for enrolled callers. Implemented as an embedded `Session.progress` array, atomically updated (mirrors the weekly-task completions pattern) so the raw per-student list is never exposed — only the caller's own status.
+- [x] **Public track session catalog** — `GET /v1/tracks/:id/session-catalog` (no auth) lets prospective students preview a track's sessions (`title`, `description`, `startDate`, `duration` only — no media/URLs) before enrolling.
+- [x] **Admin-assignable track instructor** — `POST /v1/tracks` / `PATCH /v1/tracks/:id` accept an `instructor` field for admins (validated against the target user's role), while non-admins still always default to their own id.
+- [x] **User search & active-status filtering** — `GET /v1/users?search=` matches name/email (case-insensitive); `?active=false` / `?includeInactive=true` lets admins find and reactivate deactivated accounts, which were previously permanently hidden from this endpoint regardless of query params.
+- [x] **Session title minimum length** — `POST`/`PATCH /v1/sessions` now requires a 3+ character title, matching the constraint assignment titles already had.
 
 ### Planned 🔮
 

@@ -88,6 +88,8 @@
  *       Retrieve detailed information about a session.
  *       `url`, `embedUrl`, and `resources` are stripped if the caller is
  *       not enrolled in the session, its parent track, or its parent course.
+ *       Enrolled callers also get `myProgress: { status, watchedAt }`
+ *       reflecting their own watched status (see PUT /sessions/{id}/progress).
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []
@@ -588,6 +590,57 @@
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 
+/**
+ * @swagger
+ * /sessions/{id}/progress:
+ *   put:
+ *     operationId: setSessionProgress
+ *     summary: Mark a session as watched for the current user
+ *     description: Enrolled students only (directly, via a parent track, or via a parent course).
+ *     tags: [Sessions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "507f1f77bcf86cd799439031" }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status: { type: string, enum: [watched], example: watched }
+ *     responses:
+ *       200:
+ *         description: Progress recorded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     myProgress:
+ *                       type: object
+ *                       properties:
+ *                         status: { type: string, enum: [not_started, watched] }
+ *                         watchedAt: { type: string, format: date-time, nullable: true }
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Only enrolled students can track progress on this session
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
 const express = require('express');
 const AppError = require('../../utils/AppError');
 const reviewRouter = require('./review.route');
@@ -606,6 +659,7 @@ const {
   sessionIdValidation,
   addStudentValidation,
   studentIdParamValidation,
+  setProgressValidation,
 } = require('../../validations/session.validation');
 const { authLimiter } = require('../../middlewares/rateLimit.middleware');
 
@@ -696,6 +750,13 @@ router.route('/:id/students/:studentId').delete(
     paramName: 'id',
   }),
   sessionController.removeStudent,
+);
+
+router.put(
+  '/:id/progress',
+  validateMiddleware(sessionIdValidation, 'params'),
+  validateMiddleware(setProgressValidation),
+  sessionController.setSessionProgress,
 );
 
 router.get(

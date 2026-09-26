@@ -60,6 +60,7 @@ exports.getAllSessions = async (query, requestingUser = null) => {
       delete obj.resources;
     }
     delete obj.students; // was only populated for the gating check above
+    delete obj.progress; // internal — never expose the full watched-list here
     return obj;
   });
 
@@ -101,30 +102,38 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
   const isAdmin = requestingUser?.role === 'admin';
   const isOwner = !!userId && sessionObj.instructor?._id?.toString() === userId;
 
-  // GATE: strip url/embedUrl/resources unless the requester is the
-  // session's own instructor, an admin, or enrolled — directly, via a
-  // parent track, or via a parent course.
-  let canSeeContent = isAdmin || isOwner;
+  // Enrollment status is computed whenever there's a requester, regardless
+  // of admin/owner status — it's used both for the content gate below and
+  // for `myProgress`, which reflects *this user's own* watched status and
+  // should show up whenever they're actually enrolled, even if they're
+  // also the instructor or an admin previewing their own progress.
+  let isDirectStudent = false;
+  let isTrackStudent = false;
+  let isCourseStudent = false;
 
-  if (!canSeeContent && userId) {
-    const isDirectStudent = sessionObj.students?.some(
+  if (userId) {
+    isDirectStudent = sessionObj.students?.some(
       (s) => s._id?.toString() === userId || s.toString() === userId,
     );
 
-    const isTrackStudent = sessionObj.tracks?.some((t) =>
+    isTrackStudent = sessionObj.tracks?.some((t) =>
       t.students?.some((s) => s.toString() === userId),
     );
 
-    let isCourseStudent = false;
     if (!isDirectStudent && !isTrackStudent && sessionObj.course) {
       const course = await Course.findById(sessionObj.course).select(
         'students',
       );
       isCourseStudent = !!course?.students.some((s) => s.toString() === userId);
     }
-
-    canSeeContent = isDirectStudent || isTrackStudent || isCourseStudent;
   }
+
+  const isEnrolled = isDirectStudent || isTrackStudent || isCourseStudent;
+
+  // GATE: strip url/embedUrl/resources unless the requester is the
+  // session's own instructor, an admin, or enrolled — directly, via a
+  // parent track, or via a parent course.
+  const canSeeContent = isAdmin || isOwner || isEnrolled;
 
   if (!canSeeContent) {
     delete sessionObj.url;
@@ -139,6 +148,20 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
       sessionObj.students = sessionObj.students.map((s) => s._id ?? s);
     }
   }
+
+  // #1.1: myProgress reflects the requesting user's own watched status.
+  // Only present for enrolled users — an instructor/admin previewing a
+  // session they're not enrolled in has no "progress" of their own to
+  // report.
+  if (isEnrolled) {
+    const myEntry = (sessionObj.progress || []).find(
+      (p) => p.student?.toString() === userId,
+    );
+    sessionObj.myProgress = myEntry
+      ? { status: myEntry.status, watchedAt: myEntry.watchedAt }
+      : { status: 'not_started', watchedAt: null };
+  }
+  delete sessionObj.progress; // internal — never expose the full list here
 
   return sessionObj;
 };
@@ -317,6 +340,84 @@ exports.getSessionsByTrack = async (trackId, query) => {
  * @param {Object} query - Filtering options
  * @returns {Promise<{sessions: Array, total: Number}>}
  */
+exports.setSessionProgress = async (sessionId, requestingUser, status) => {
+  const session = await Session.findById(sessionId).select(
+    'students tracks course',
+  );
+  if (!session) {
+    throw new AppError('Session not found', 404);
+  }
+
+  const userId = requestingUser.id;
+  const isDirectStudent = session.students.some(
+    (id) => id.toString() === userId,
+  );
+  let isEnrolled = isDirectStudent;
+
+  if (!isEnrolled && session.tracks?.length) {
+    const track = await Track.findOne({
+      _id: { $in: session.tracks },
+      students: userId,
+    }).select('_id');
+    isEnrolled = !!track;
+  }
+
+  if (!isEnrolled && session.course) {
+    const course = await Course.findOne({
+      _id: session.course,
+      students: userId,
+    }).select('_id');
+    isEnrolled = !!course;
+  }
+
+  if (!isEnrolled) {
+    throw new AppError(
+      'Only enrolled students can track progress on this session',
+      403,
+    );
+  }
+
+  // Same atomic replace-in-place pattern as
+  // weeklyTask.service.js#setItemCompletion (see the T16 comment there):
+  // filter out any existing entry for this student, then append the new
+  // one, in a single update so a crash mid-write can't leave duplicate
+  // or missing progress entries.
+  await Session.updateOne({ _id: sessionId }, [
+    {
+      $set: {
+        progress: {
+          $concatArrays: [
+            {
+              $filter: {
+                input: { $ifNull: ['$progress', []] },
+                cond: { $ne: [{ $toString: '$$this.student' }, userId] },
+              },
+            },
+            [
+              {
+                student: { $toObjectId: userId },
+                status,
+                watchedAt: '$$NOW',
+              },
+            ],
+          ],
+        },
+      },
+    },
+  ]);
+
+  await logActivity({
+    userId,
+    action: 'marked_session_watched',
+    targetModel: 'Session',
+    targetId: sessionId,
+  });
+
+  const updated = await Session.findById(sessionId).select('progress');
+  const myEntry = updated.progress.find((p) => p.student.toString() === userId);
+  return { status: myEntry.status, watchedAt: myEntry.watchedAt };
+};
+
 exports.getSessionsByStudent = async (studentId, query) => {
   const features = new APIFeatures(Session.find(), query, Session)
     .filter({ students: studentId })

@@ -122,6 +122,10 @@
  *         published:
  *           type: boolean
  *           example: true
+ *         instructor:
+ *           type: string
+ *           description: Admin only. Assigns a specific instructor (must have role instructor or admin). Ignored/overwritten with the requester's own id for non-admins.
+ *           example: "507f1f77bcf86cd799439011"
  *
  *     TrackUpdate:
  *       type: object
@@ -143,6 +147,10 @@
  *         published:
  *           type: boolean
  *           example: false
+ *         instructor:
+ *           type: string
+ *           description: Admin only. Reassigns the track to a different instructor (must have role instructor or admin). Rejected/stripped for non-admins.
+ *           example: "507f1f77bcf86cd799439011"
  *
  *     TrackResponse:
  *       type: object

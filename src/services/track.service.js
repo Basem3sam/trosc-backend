@@ -12,12 +12,36 @@ const { logActivity } = require('./activityLog.service');
 // ===================================================================
 
 /**
+ * Confirms `instructorId` refers to an existing user whose role is
+ * 'instructor' or 'admin'. Only reached when an admin explicitly set
+ * `instructor` in the request body (see track.controller.js) — the
+ * default case (no instructor in the body) skips this entirely.
+ * @throws {AppError} 400 if the user doesn't exist or has the wrong role
+ */
+async function assertValidInstructor(instructorId) {
+  const user = await User.findById(instructorId).select('role');
+  if (!user) {
+    throw new AppError('No user found with that instructor ID', 400);
+  }
+  if (!['instructor', 'admin'].includes(user.role)) {
+    throw new AppError(
+      'Instructor must be a user with role "instructor" or "admin"',
+      400,
+    );
+  }
+}
+
+/**
  * Create a new track
  * @param {Object} trackBody - Track data including title, description, instructor
  * @returns {Promise<Track>} Newly created track
  * @throws {AppError} 400 if validation fails, 409 if title exists
  */
 exports.createTrack = async (trackBody, requestingUserId) => {
+  if (trackBody.instructor && trackBody.instructor !== requestingUserId) {
+    await assertValidInstructor(trackBody.instructor);
+  }
+
   const track = await Track.create(trackBody);
   await logActivity({
     userId: requestingUserId,
@@ -128,7 +152,31 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
  * @returns {Promise<Track>} Updated track document
  * @throws {AppError} 404 if track not found, 400 if validation fails
  */
+/**
+ * #1.2: public catalog of a track's sessions, no media/URLs — just enough
+ * for a visitor to see what the track covers before enrolling.
+ * @param {string} trackId
+ * @returns {Promise<Object[]>} sessions: [{ _id, title, description, startDate, duration }]
+ * @throws {AppError} 404 if the track doesn't exist
+ */
+exports.getSessionCatalog = async (trackId) => {
+  const track = await Track.findById(trackId).select('_id');
+  if (!track) {
+    throw new AppError('No track found with that ID', 404);
+  }
+
+  const sessions = await Session.find({ tracks: trackId }).select(
+    'title description startDate duration',
+  );
+
+  return sessions;
+};
+
 exports.updateTrack = async (trackId, updateBody, requestingUserId) => {
+  if (updateBody.instructor) {
+    await assertValidInstructor(updateBody.instructor);
+  }
+
   // If the update touches courses or sessions, validate BEFORE saving
   if (updateBody.courses !== undefined || updateBody.sessions !== undefined) {
     const existing = await Track.findById(trackId);

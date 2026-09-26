@@ -153,6 +153,19 @@ exports.adminUpdateUserSchema = Joi.object({
     'object.min': 'At least one field must be provided for update',
   });
 
+exports.listUsersQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).optional(),
+  limit: Joi.number().integer().min(1).max(100).optional(),
+  sort: Joi.string().optional(),
+  fields: Joi.string().optional(),
+  search: Joi.string().trim().min(1).max(100).optional(),
+  role: Joi.string().valid('student', 'instructor', 'admin').optional(),
+  active: Joi.string().valid('true', 'false').optional(),
+  includeInactive: Joi.string().valid('true', 'false').optional(),
+}).unknown(true); // APIFeatures also supports ad-hoc field filters (e.g. ?role=admin
+// is already covered above, but generic MongoDB-style operators like
+// createdAt[gte] shouldn't require a matching Joi key for every field).
+
 exports.bulkUserActionSchema = Joi.object({
   userIds: Joi.array()
     .items(Joi.string().hex().length(24).required())

@@ -434,6 +434,51 @@
 
 /**
  * @swagger
+ * /tracks/{id}/session-catalog:
+ *   get:
+ *     operationId: getTrackSessionCatalog
+ *     summary: Public catalog of a track's sessions
+ *     description: |
+ *       Public endpoint, no authentication required. Returns just enough
+ *       for a visitor to see what the track covers before enrolling —
+ *       no `url`, `embedUrl`, or `resources`.
+ *     tags: [Tracks]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439021"
+ *     responses:
+ *       200:
+ *         description: Session catalog retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 results: { type: integer, example: 4 }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     sessions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           _id: { type: string, example: "507f1f77bcf86cd799439031" }
+ *                           title: { type: string, example: "Intro to JavaScript" }
+ *                           description: { type: string, example: "Variables, control flow, and functions." }
+ *                           startDate: { type: string, format: date-time }
+ *                           duration: { type: integer, description: Minutes, example: 90 }
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
  * /tracks/{id}/enroll-me:
  *   post:
  *     operationId: enrollMeInTrack
@@ -934,31 +979,30 @@
  *         $ref: '#/components/responses/NotFound'
  */
 
-/*
+/**
  * @swagger
  * /tracks/{id}/reviews/{reviewId}:
- *  delete:
- *    operationId: deleteTrackReview
- *    summary: Delete a track review
- *    description: The review's own author, or an admin, may delete it.
- *    tags: [Reviews]
- *    security:
- *      - bearerAuth: []
- *    parameters:
- *      - name: id
- *        in: path
- *        required: true
- *        schema: {type: string, example: "507f1f77bcf86cd799439021"}
- *      - name: reviewId
- *        in: path
- *        required: true
- *        schema: {type: string, example: "507f1f77bcf86cd799439031"}
- *    responses:
- *      204: { description: Deleted successfully }
- *      401: { $ref: '#/components/responses/Unauthorized' }
- *      403: { $ref: '#/components/responses/Forbidden' }
- *      404: { $ref: '#/components/responses/NotFound' }
- *
+ *   delete:
+ *     operationId: deleteTrackReview
+ *     summary: Delete a track review
+ *     description: The review's own author, or an admin, may delete it.
+ *     tags: [Reviews]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "507f1f77bcf86cd799439021" }
+ *       - name: reviewId
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "507f1f77bcf86cd799439031" }
+ *     responses:
+ *       204: { description: Deleted successfully }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
  */
 
 const express = require('express');
@@ -1079,6 +1123,12 @@ router.get(
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
   trackController.getTrackAnalytics,
+);
+
+router.get(
+  '/:id/session-catalog',
+  validate(getTrackSchema, 'params'),
+  trackController.getSessionCatalog,
 );
 
 router

@@ -188,3 +188,19 @@ exports.getSessionsByStudent = catchAsync(async (req, res, next) => {
     },
   });
 });
+
+// #1.1: PUT /sessions/:id/progress — marks the session as watched for the
+// current user. Enrolled students only, enforced in the service (403 if
+// not enrolled).
+exports.setSessionProgress = catchAsync(async (req, res, next) => {
+  const myProgress = await sessionService.setSessionProgress(
+    req.params.id,
+    req.user,
+    req.body.status,
+  );
+
+  res.status(200).json({
+    status: 'success',
+    data: { myProgress },
+  });
+});

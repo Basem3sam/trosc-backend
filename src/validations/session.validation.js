@@ -13,8 +13,9 @@ const resourceValidation = Joi.object({
 });
 
 const createSessionValidation = Joi.object({
-  title: Joi.string().trim().required().messages({
+  title: Joi.string().trim().min(3).required().messages({
     'string.empty': 'Session title is required.',
+    'string.min': 'Session title must be at least 3 characters.',
     'any.required': 'Session title is required.',
   }),
   description: Joi.string().trim().optional().allow(''),
@@ -46,7 +47,9 @@ const createSessionValidation = Joi.object({
 });
 
 const updateSessionValidation = Joi.object({
-  title: Joi.string().trim().optional(),
+  title: Joi.string().trim().min(3).optional().messages({
+    'string.min': 'Session title must be at least 3 characters.',
+  }),
   description: Joi.string().trim().optional().allow(''),
   url: Joi.string().uri().optional().allow('').messages({
     'string.uri': 'Session URL must be a valid URL.',
@@ -95,10 +98,18 @@ const studentIdParamValidation = Joi.object({
   }),
 });
 
+const setProgressValidation = Joi.object({
+  status: Joi.string().valid('watched').required().messages({
+    'any.only': 'status must be "watched".',
+    'any.required': 'status is required.',
+  }),
+});
+
 module.exports = {
   createSessionValidation,
   updateSessionValidation,
   sessionIdValidation,
   addStudentValidation,
   studentIdParamValidation,
+  setProgressValidation,
 };
