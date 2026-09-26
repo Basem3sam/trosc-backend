@@ -18,6 +18,10 @@
  *         grade:
  *           type: number
  *           example: 85
+ *         feedback:
+ *           type: string
+ *           maxLength: 2000
+ *           example: "Solid work overall — watch your edge cases in the last function."
  *     Assignment:
  *       type: object
  *       required:
@@ -141,6 +145,11 @@ const submissionSchema = new mongoose.Schema({
     type: Number,
     min: [0, 'Grade cannot be negative'],
     max: [100, 'Grade cannot exceed 100'],
+  },
+  feedback: {
+    type: String,
+    trim: true,
+    maxlength: [2000, 'Feedback cannot exceed 2000 characters'],
   },
 });
 

@@ -63,4 +63,7 @@ exports.gradeSubmissionSchema = Joi.object({
     'number.max': 'Grade must be at most 100',
     'any.required': 'Grade is required',
   }),
+  feedback: Joi.string().trim().max(2000).allow('').optional().messages({
+    'string.max': 'Feedback cannot exceed 2000 characters',
+  }),
 });

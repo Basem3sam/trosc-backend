@@ -66,7 +66,10 @@ exports.createReview = async (resourceType, resourceId, userId, data) => {
     targetId: review._id,
   });
 
-  return review;
+  // #2.6: getReviews already populates `user` (name/photo) — do the same
+  // here so create and list responses have the same shape. populate()
+  // always includes _id, matching the request doc's { _id, name, photo }.
+  return review.populate('user', 'name photo');
 };
 
 /**

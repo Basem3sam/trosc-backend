@@ -278,7 +278,16 @@ exports.getLiveStats = async () => {
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const stats = await computeStats(now, oneDayAgo);
-  return { ...stats, computedAt: now };
+
+  // #2.7: computeStats() returns a bare ObjectId (or null) — that's what
+  // generateSnapshot needs to write DashboardStats.mostActiveTrack, but
+  // this read-only path should match getAllSnapshots/getSnapshotById/
+  // getLatestSnapshot, which all populate it to { _id, title }.
+  const mostActiveTrack = stats.mostActiveTrack
+    ? await Track.findById(stats.mostActiveTrack).select('title')
+    : null;
+
+  return { ...stats, mostActiveTrack, computedAt: now };
 };
 
 /**

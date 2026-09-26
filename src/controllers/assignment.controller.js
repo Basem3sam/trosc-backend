@@ -54,6 +54,17 @@ exports.createAssignment = (resourceType) =>
     });
   });
 
+// #1.5: staff only (checkOwnership at the route level). Single assignment
+// with its submissions attached.
+exports.getAssignment = catchAsync(async (req, res, next) => {
+  const assignment = await assignmentService.getAssignmentById(req.params.id);
+
+  res.status(200).json({
+    status: 'success',
+    data: { assignment },
+  });
+});
+
 exports.updateAssignment = catchAsync(async (req, res, next) => {
   const assignment = await assignmentService.updateAssignment(
     req.params.id,

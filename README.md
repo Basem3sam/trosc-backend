@@ -60,7 +60,7 @@
 | 📈 **Track Analytics**    | Enrollment rates, student counts, and engagement metrics                                                                                                                                                           |
 | ✉️ **Contact Form**       | Public contact submission, stored + emailed to admin; admins can list, view, and triage submissions (`new` / `read` / `archived`)                                                                                  |
 | ⭐ **Reviews**            | Enrolled students rate & review tracks, courses, and sessions (1–5 stars, one per student per resource); review's own author or an admin can delete it                                                             |
-| 📝 **Assignments**        | Full CRUD (owner instructor / admin) at the course and standalone-session level, plus track-aggregated listing; student submission/resubmission with a computed `late` flag, and instructor/admin grading          |
+| 📝 **Assignments**        | Full CRUD (owner instructor / admin) at the course and standalone-session level, plus track-aggregated listing; student submission/resubmission with a computed `late` flag; instructor/admin grading with optional written feedback; gated staff access to open a student's submitted file          |
 | 📅 **Weekly Tasks**       | Per-course weekly task buckets with typed items (reading/quiz/video) and per-student completion tracking                                                                                                           |
 | 🧾 **Activity Logs**      | Server-written audit trail (signup, login, enrollment, profile changes, admin bulk actions, …); self-service "my activity" timeline plus admin listing, per-user lookup, aggregated summary, and retention pruning |
 | 📈 **Dashboard Stats**    | Admin-only analytics: live platform stats computed on demand, plus persisted daily/weekly/monthly snapshots for trend charts (upsertable, cron-friendly, retention pruning)                                        |
@@ -878,6 +878,10 @@ tests/
 - [x] **Admin-assignable track instructor** — `POST /v1/tracks` / `PATCH /v1/tracks/:id` accept an `instructor` field for admins (validated against the target user's role), while non-admins still always default to their own id.
 - [x] **User search & active-status filtering** — `GET /v1/users?search=` matches name/email (case-insensitive); `?active=false` / `?includeInactive=true` lets admins find and reactivate deactivated accounts, which were previously permanently hidden from this endpoint regardless of query params.
 - [x] **Session title minimum length** — `POST`/`PATCH /v1/sessions` now requires a 3+ character title, matching the constraint assignment titles already had.
+- [x] **Staff access to submitted work** — `GET /v1/assignments/:id` (owner instructor/admin) returns the assignment with its submissions attached (`hasFile` instead of the raw URL), and `GET /v1/assignments/:id/submissions/:studentId/file` redirects to the actual file — the one path that ever exposes it. Previously staff had no way to open a student's submitted work at all.
+- [x] **Grading feedback** — `PATCH /v1/assignments/:id/submissions/:studentId/grade` accepts an optional `feedback` string (up to 2000 characters) alongside the grade; both are returned in the student's `mySubmission`. Resubmitting clears prior grade *and* feedback, since both were written against the old file.
+- [x] **Review author populated on create** — `POST /tracks|courses|sessions/:id/reviews` now returns `user` populated (`_id`, `name`, `photo`), matching the shape the list (`GET .../reviews`) endpoints already returned.
+- [x] **`mostActiveTrack` populated on live stats** — `GET /v1/dashboard-stats/live` now returns `mostActiveTrack: { _id, title }` like every stored-snapshot endpoint already did, instead of a bare ObjectId.
 
 ### Planned 🔮
 

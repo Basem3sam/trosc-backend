@@ -86,6 +86,10 @@
  *                 minimum: 0
  *                 maximum: 100
  *                 example: 85
+ *               feedback:
+ *                 type: string
+ *                 maxLength: 2000
+ *                 example: "Solid work overall — watch your edge cases in the last function."
  *     responses:
  *       200:
  *         description: Submission graded
@@ -102,6 +106,78 @@
  *                       $ref: '#/components/schemas/Submission'
  *       400:
  *         description: Validation error
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         description: Assignment not found, or this student hasn't submitted yet
+ */
+
+/**
+ * @swagger
+ * /assignments/{id}:
+ *   get:
+ *     operationId: getAssignment
+ *     summary: Get a single assignment with its submissions
+ *     description: Owner instructor (the assignment's own instructor) or admin only. Each submission's `file` is stripped in favor of a `hasFile` boolean — use the dedicated file endpoint below to actually access it.
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "6713b5ac12ef4567890a7777" }
+ *     responses:
+ *       200:
+ *         description: Assignment retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     assignment:
+ *                       $ref: '#/components/schemas/Assignment'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * /assignments/{id}/submissions/{studentId}/file:
+ *   get:
+ *     operationId: getSubmissionFile
+ *     summary: Open a student's submitted file
+ *     description: >
+ *       Owner instructor (the assignment's own instructor) or admin only.
+ *       Redirects (302) to the submission's file. This is the only path
+ *       that ever exposes the raw file URL — students never receive it
+ *       for anyone but themselves, and GET /assignments/{id} strips it
+ *       from the submissions list.
+ *     tags: [Assignments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "6713b5ac12ef4567890a7777" }
+ *       - name: studentId
+ *         in: path
+ *         required: true
+ *         schema: { type: string, example: "67123abc12ef4567890a1234" }
+ *     responses:
+ *       302:
+ *         description: Redirects to the submitted file
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
@@ -201,6 +277,32 @@ const {
 // in app.js. A single assignment is already globally unique by its own
 // ID, so nesting under a parent course/session/track adds nothing here.
 const router = express.Router();
+
+router.get(
+  '/:id',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(assignmentIdSchema, 'params'),
+  checkOwnership({
+    model: 'Assignment',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  assignmentController.getAssignment,
+);
+
+router.get(
+  '/:id/submissions/:studentId/file',
+  protect,
+  restrictTo('admin', 'instructor'),
+  validate(assignmentStudentIdSchema, 'params'),
+  checkOwnership({
+    model: 'Assignment',
+    ownerField: 'instructor',
+    paramName: 'id',
+  }),
+  assignmentSubmissionController.getSubmissionFile,
+);
 
 router.post(
   '/:id/submissions',

@@ -60,6 +60,7 @@ exports.submitAssignment = async (assignmentId, studentId, data) => {
     existing.file = data.file;
     existing.submittedAt = new Date();
     existing.grade = undefined;
+    existing.feedback = undefined;
   } else {
     assignment.submissions.push({ student: studentId, file: data.file });
   }
@@ -84,12 +85,47 @@ exports.submitAssignment = async (assignmentId, studentId, data) => {
 };
 
 /**
+ * #1.3: resolves a student's submitted file URL for staff access.
+ * checkOwnership (route-level) already restricts this to the assignment's
+ * own instructor or an admin — students never reach this function, so the
+ * raw URL returned here is safe to redirect to. This is also why
+ * GET /assignments/:id (assignment.service.js#getAssignmentById) strips
+ * `file` from the submissions it returns: the raw Drive/YouTube link is
+ * only ever handed out through this one gated path, never in a list.
+ * @param {string} assignmentId
+ * @param {string} studentId
+ * @returns {Promise<string>} the submission's file URL
+ * @throws {AppError} 404 if the assignment or the student's submission doesn't exist
+ */
+exports.getSubmissionFile = async (assignmentId, studentId) => {
+  const assignment =
+    await Assignment.findById(assignmentId).select('submissions');
+  if (!assignment) {
+    throw new AppError('No assignment found with that ID', 404);
+  }
+
+  const submission = assignment.submissions.find(
+    (s) => s.student.toString() === studentId,
+  );
+  if (!submission) {
+    throw new AppError(
+      'This student has not submitted this assignment yet',
+      404,
+    );
+  }
+
+  return submission.file;
+};
+
+/**
  * Grade a student's submission for an assignment. Ownership (instructor
  * === requester, or admin) is enforced by the checkOwnership middleware
  * before this runs.
  * @param {string} assignmentId
  * @param {string} studentId
  * @param {number} grade
+ * @param {string} requestingUserId
+ * @param {string} [feedback] - optional, up to 2000 characters (#2.4)
  * @returns {Promise<Object>} the updated submission
  */
 exports.gradeSubmission = async (
@@ -97,6 +133,7 @@ exports.gradeSubmission = async (
   studentId,
   grade,
   requestingUserId,
+  feedback,
 ) => {
   const assignment = await Assignment.findById(assignmentId);
   if (!assignment) {
@@ -121,6 +158,9 @@ exports.gradeSubmission = async (
   }
 
   submission.grade = grade;
+  if (feedback !== undefined) {
+    submission.feedback = feedback;
+  }
   await assignment.save();
 
   await logActivity({

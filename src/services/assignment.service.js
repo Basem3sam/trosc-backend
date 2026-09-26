@@ -155,6 +155,37 @@ exports.createAssignment = async (
 };
 
 /**
+ * #1.5: single assignment with its submissions, for staff. Ownership
+ * (instructor === requester, or admin) is enforced by the checkOwnership
+ * middleware before this runs — students never reach this.
+ * @param {string} assignmentId
+ * @returns {Promise<Object>} the assignment, submissions populated (student
+ *   name/email/photo), with each submission's raw `file` URL stripped —
+ *   see assignmentSubmission.service.js#getSubmissionFile (#1.3) for the
+ *   one path that's allowed to expose it.
+ * @throws {AppError} 404 if the assignment doesn't exist
+ */
+exports.getAssignmentById = async (assignmentId) => {
+  const assignment = await Assignment.findById(assignmentId)
+    .populate('course', 'title')
+    .populate('session', 'title')
+    .populate('instructor', 'name photo')
+    .populate('submissions.student', 'name email photo');
+
+  if (!assignment) {
+    throw new AppError('No assignment found with that ID', 404);
+  }
+
+  const plain = assignment.toObject();
+  plain.submissions = plain.submissions.map(({ file, ...rest }) => ({
+    ...rest,
+    hasFile: !!file,
+  }));
+
+  return plain;
+};
+
+/**
  * Update an assignment's title, description, deadline, and/or attachments.
  * Ownership (instructor === requester, or admin) is enforced by the
  * checkOwnership middleware before this runs.

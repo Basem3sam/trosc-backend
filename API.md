@@ -176,7 +176,7 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `DELETE` | `/v1/tracks/:trackId/courses/:courseId`      | Admin / Instructor                                    | Remove course from track                                                                            |
 | `PATCH`  | `/v1/tracks/:trackId/sessions/:sessionId`    | Admin / Instructor                                    | Add session to track                                                                                |
 | `DELETE` | `/v1/tracks/:trackId/sessions/:sessionId`    | Admin / Instructor                                    | Remove session from track                                                                           |
-| `POST`   | `/v1/tracks/:id/reviews`                     | Protected (enrolled student)                          | Submit a rating + review for a track (one per student)                                              |
+| `POST`   | `/v1/tracks/:id/reviews`                     | Protected (enrolled student)                          | Submit a rating + review for a track (one per student). Response's `user` is populated (`_id`, `name`, `photo`) |
 | `GET`    | `/v1/tracks/:id/reviews`                     | Public                                                | List reviews for a track (paginated)                                                                |
 | `DELETE` | `/v1/tracks/:id/reviews/:reviewId`           | Author / Admin                                        | Delete a track review (review's own author, or admin bypass)                                        |
 | `GET`    | `/v1/tracks/:id/assignments`                 | Protected (enrolled student / any instructor / admin) | All assignments across every course + standalone session in the track, with `mySubmission` attached |
@@ -200,7 +200,7 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `DELETE` | `/v1/courses/:id/students/:studentId`       | Admin / Instructor                                    | Remove student from course                                                                   |
 | `PATCH`  | `/v1/courses/:courseId/sessions/:sessionId` | Admin / Instructor                                    | Add session to course                                                                        |
 | `DELETE` | `/v1/courses/:courseId/sessions/:sessionId` | Admin / Instructor                                    | Remove session from course                                                                   |
-| `POST`   | `/v1/courses/:id/reviews`                   | Protected (enrolled student)                          | Submit a rating + review for a course (one per student)                                      |
+| `POST`   | `/v1/courses/:id/reviews`                   | Protected (enrolled student)                          | Submit a rating + review for a course (one per student). Response's `user` is populated (`_id`, `name`, `photo`) |
 | `GET`    | `/v1/courses/:id/reviews`                   | Public                                                | List reviews for a course (paginated)                                                        |
 | `DELETE` | `/v1/courses/:id/reviews/:reviewId`         | Author / Admin                                        | Delete a course review (review's own author, or admin bypass)                                |
 | `POST`   | `/v1/courses/:id/assignments`               | Admin / owner instructor                              | Create an assignment for this course                                                         |
@@ -225,7 +225,7 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `PUT`    | `/v1/sessions/:id/progress`             | Protected (enrolled student)                          | Mark the session as watched for the current user (`{ "status": "watched" }`)     |
 | `POST`   | `/v1/sessions/:id/students`             | Admin / Instructor                                    | Manually enroll student                                                         |
 | `DELETE` | `/v1/sessions/:id/students/:studentId`  | Admin / Instructor                                    | Remove student from session                                                     |
-| `POST`   | `/v1/sessions/:id/reviews`              | Protected (enrolled student)                          | Submit a rating + review for a session (one per student)                        |
+| `POST`   | `/v1/sessions/:id/reviews`              | Protected (enrolled student)                          | Submit a rating + review for a session (one per student). Response's `user` is populated (`_id`, `name`, `photo`) |
 | `GET`    | `/v1/sessions/:id/reviews`              | Public                                                | List reviews for a session (paginated)                                          |
 | `DELETE` | `/v1/sessions/:id/reviews/:reviewId`    | Author / Admin                                        | Delete a session review (review's own author, or admin bypass)                  |
 | `POST`   | `/v1/sessions/:id/assignments`          | Admin / owner instructor                              | Create an assignment for this standalone session                                |
@@ -280,10 +280,12 @@ Creation lives under `/v1/courses/:id/assignments` and `/v1/sessions/:id/assignm
 
 | Method   | Endpoint                                           | Access                       | Description                                                             |
 | -------- | -------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
+| `GET`    | `/v1/assignments/:id`                              | Admin / owner instructor     | Single assignment with its submissions. Each submission's `file` is stripped in favor of a `hasFile` boolean — use the file endpoint below to actually open it |
 | `PATCH`  | `/v1/assignments/:id`                              | Admin / owner instructor     | Update an assignment's title, description, deadline, and/or attachments |
 | `DELETE` | `/v1/assignments/:id`                              | Admin / owner instructor     | Delete an assignment (and its submissions with it)                      |
-| `POST`   | `/v1/assignments/:id/submissions`                  | Protected (enrolled student) | Submit or resubmit your work (resubmitting clears any existing grade)   |
-| `PATCH`  | `/v1/assignments/:id/submissions/:studentId/grade` | Admin / owner instructor     | Grade a student's submission (0–100)                                    |
+| `POST`   | `/v1/assignments/:id/submissions`                  | Protected (enrolled student) | Submit or resubmit your work (resubmitting clears any existing grade and feedback) |
+| `GET`    | `/v1/assignments/:id/submissions/:studentId/file`  | Admin / owner instructor     | Redirects (302) to the student's submitted file — the only path that ever exposes the raw URL |
+| `PATCH`  | `/v1/assignments/:id/submissions/:studentId/grade` | Admin / owner instructor     | Grade a student's submission (0–100), with optional `feedback` (up to 2000 characters) |
 
 ### Activity Logs
 
@@ -315,6 +317,8 @@ Admin-only platform analytics. `live` is computed on the fly and never persisted
 | `DELETE` | `/v1/dashboard-stats?olderThanDays=N` | Admin  | Bulk-delete snapshots older than N days (retention cleanup; `N` must be ≥ 30)                    |
 
 > `avgCompletionRate` in a snapshot = average, across all assignments, of (submissions ÷ that assignment's course/session roster size) as a percentage. Roster size is always the _current_ roster (MongoDB doesn't retain historical rosters), so this is most accurate for the latest snapshot and only approximate for older ones.
+
+> `mostActiveTrack` is `{ _id, title }` (or `null`) everywhere it appears — including `/live`, which previously returned a bare ObjectId while every stored-snapshot endpoint already populated it.
 
 ### Feed & Health
 
