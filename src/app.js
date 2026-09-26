@@ -8,8 +8,8 @@ const hpp = require('hpp');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
-
 const crypto = require('crypto');
+
 const swaggerSpec = require('./config/swagger.config');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./controllers/error.controller');
@@ -19,61 +19,88 @@ const v1Router = require('./routes/v1/index');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Initialize Express app
 const app = express();
 
-// Development logging with Morgan
+// ---------------------------------------------------------------------------
+//    Request ID + AsyncLocalStorage — MUST be first so every subsequent
+//    log line has an ID. Runs before cookieParser, morgan, rate limiter.
+// ---------------------------------------------------------------------------
+const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{1,128}$/;
+
+app.use((req, res, next) => {
+  const incoming = req.headers['x-request-id'];
+  // Header can be a string (normal) or an array (client sent it twice).
+  // Only accept a string matching a safe charset; otherwise mint a new one.
+  const requestId =
+    typeof incoming === 'string' && SAFE_REQUEST_ID.test(incoming)
+      ? incoming
+      : crypto.randomUUID();
+
+  req.requestId = requestId;
+  res.setHeader('X-Request-ID', requestId);
+
+  asyncLocalStorage.run({ requestId }, () => next());
+});
+
+// ---------------------------------------------------------------------------
+//    HTTP request logging
+// ---------------------------------------------------------------------------
 if (!isProduction) {
   app.use(morgan('dev'));
-}
-
-// Production logging with Winston
-if (isProduction) {
-  // Structured request logging
+} else {
   app.use((req, res, next) => {
     const start = Date.now();
+    let logged = false;
 
-    res.on('finish', () => {
-      logger.info('Request completed', {
+    // `close` fires on both normal completion AND client abort. `finish`
+    // fires only on completion. Register both and guard with `logged`.
+    const logRequest = (aborted) => {
+      if (logged) return;
+      logged = true;
+      logger.info(aborted ? 'Request aborted' : 'Request completed', {
         method: req.method,
         url: req.originalUrl,
         status: res.statusCode,
         duration: `${Date.now() - start}ms`,
         ip: req.ip,
         userAgent: req.get('user-agent'),
+        // NOTE: by the time this callback runs, auth middleware has
+        // populated req.user. Do NOT move this read to middleware scope —
+        // it will always be 'anonymous' there.
         userId: req.user?.id || 'anonymous',
+        aborted: aborted || undefined,
       });
-    });
+    };
+
+    res.on('finish', () => logRequest(false));
+    res.on('close', () => logRequest(!res.writableEnded));
 
     next();
   });
 }
 
-/* GLOBAL MIDDLEWARES */
-
-// Set 'trust proxy' if behind a reverse proxy (e.g., Heroku, Nginx)
+// ---------------------------------------------------------------------------
+//    Trust proxy — only meaningful behind a reverse proxy (Render, etc.).
+//    express-rate-limit@8 requires this to be correct, otherwise it warns
+//    that req.ip may not reflect the real client.
+// ---------------------------------------------------------------------------
 if (isProduction) {
   app.set('trust proxy', 1);
 }
 
-// Parse cookies
+// ---------------------------------------------------------------------------
+//    Parsers
+// ---------------------------------------------------------------------------
 app.use(cookieParser());
 
-// Set up Async Local Storage for request context
-app.use((req, res, next) => {
-  const requestId = req.headers['x-request-id'] || crypto.randomUUID();
-  req.requestId = requestId;
-  res.setHeader('X-Request-ID', requestId);
-
-  // Run the rest of the request in the ALS context
-  asyncLocalStorage.run({ requestId }, () => {
-    next();
-  });
-});
-
-// Set security HTTP headers
+// ---------------------------------------------------------------------------
+//    Security headers (global defaults)
+// ---------------------------------------------------------------------------
 app.use(helmet());
 
+// ---------------------------------------------------------------------------
+//    CORS
+// ---------------------------------------------------------------------------
 const allowedOrigins = [];
 
 if (process.env.FRONTEND_URL) {
@@ -87,7 +114,6 @@ if (process.env.EXTRA_CORS_ORIGINS) {
     .forEach((o) => allowedOrigins.push(o));
 }
 
-// Only add localhost/ngrok origins in development
 if (!isProduction) {
   allowedOrigins.push(
     'http://localhost:3000',
@@ -97,14 +123,9 @@ if (!isProduction) {
   );
 }
 
-// Enable CORS
-// Shared so the preflight handler below enforces the same whitelist +
-// credentials policy as the real request — previously `app.options('*',
-// cors())` ran with the library defaults (origin: '*', no credentials),
-// so browsers rejected credentialed preflights even for allowed origins.
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
+    // No Origin header = non-browser client (curl, mobile app). Allow.
     if (!origin) return callback(null, true);
 
     if (
@@ -119,47 +140,63 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  // X-Request-ID must be here so browsers preflight it successfully.
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
 };
 
+// `cors(corsOptions)` already responds to preflight OPTIONS requests.
+// A separate `app.options('*', ...)` is redundant — and on Express 5 it
+// would throw (wildcard syntax changed). Leave it out.
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle preflight requests
 
-// Limit request from same IP
+// ---------------------------------------------------------------------------
+// Rate limiting
+// ---------------------------------------------------------------------------
+// NOTE: express-rate-limit@8 removed the `max` option (deprecated in v7).
+// Using `max` here silently falls back to the library default limit (5),
+// which is far stricter than intended. Use `limit` instead.
+const parsePositiveInt = (value, fallback) => {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
 const limiter = rateLimit({
-  max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 300,
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 Minutes
+  limit: parsePositiveInt(process.env.RATE_LIMIT_MAX, 300),
+  windowMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
   message: 'Too many requests from this IP, please try again in 15 minutes',
-  // Monitoring tools poll /health frequently (e.g. every 30s) — without
-  // this it eventually trips the same global limit as real traffic.
-  skip: (req) => req.path === '/health' || req.path === '/v1/health',
+  // Hosts poll /health frequently; Swagger UI loads many assets per view.
+  // Neither is real traffic, so don't count them against the limit.
+  skip: (req) =>
+    req.path === '/health' ||
+    req.path === '/v1/health' ||
+    req.path.startsWith('/api-docs'),
 });
 
 app.use(limiter);
 
-/* BODY PARSER */
-
-// Body parser, reading data from body into req.body
+// ---------------------------------------------------------------------------
+//    Body parsing
+// ---------------------------------------------------------------------------
 // 1mb accommodates base64-encoded photo uploads (typically 200-500kb as
-// base64, which is ~33% larger than the binary they encode) — 100kb was
-// rejecting real uploads with 413 even though the Mongoose photo
-// validator and the updateMe tests both assume base64 works. Rate
-// limiting (below) is still the primary defense against abuse of a
-// larger body limit.
+// base64, ~33% larger than the binary). Rate limiting is the primary
+// defense against abuse of a larger body limit.
 app.use(express.json({ limit: '1mb' }));
-
-// Handle form data
 app.use(
   express.urlencoded({ extended: true, limit: '1mb', parameterLimit: 5000 }),
 );
 
-/* DATA SANITIZATION */
-
-// Data sanitization against NoSQL query injection
+// ---------------------------------------------------------------------------
+//    Data sanitization
+// ---------------------------------------------------------------------------
+// NOTE: express-mongo-sanitize@2.x mutates req.query, which is writable on
+// Express 4 but read-only on Express 5. If you upgrade Express, switch to
+// @exortek/express-mongo-sanitize (maintained fork with Express 5 support).
 app.use(mongoSanitize());
 
-// prevent parameter pollution (its always use the last one)
-// [note:] make sure to focus on what can be arrayed in the params and whitelist it
+// hpp: "last one wins" for any param NOT in the whitelist. Whitelisted
+// params are ones where clients legitimately send an array (e.g. filtering
+// by multiple roles). Everything else is collapsed to a single value to
+// defend against parameter-pollution attacks.
 app.use(
   hpp({
     whitelist: [
@@ -170,15 +207,15 @@ app.use(
       'sessions',
       'locationType',
       'audience',
-      // Add any parameters that should allow multiple values
     ],
   }),
 );
 
-/* ROUTES */
+// ---------------------------------------------------------------------------
+//    Routes
+// ---------------------------------------------------------------------------
 app.use('/v1', v1Router);
 
-// Test route
 app.get('/', (req, res) => {
   res.status(200).json({
     status: 'success',
@@ -213,7 +250,6 @@ app.get('/', (req, res) => {
  *       503:
  *         description: Database connection unavailable
  */
-
 const healthHandler = (req, res) => {
   const dbState = mongoose.connection.readyState;
   if (dbState !== 1) {
@@ -229,18 +265,16 @@ const healthHandler = (req, res) => {
   });
 };
 
-// For hosting platforms
 app.get('/health', healthHandler);
-
-// For Swagger consistency
 app.get('/v1/health', healthHandler);
 
-// Swagger UI is intentionally served in every environment (including
-// production) for now, so the frontend team can consume/explore the API.
-// helmet()'s default CSP blocks the inline scripts/styles Swagger UI
-// needs to render in a browser, so disable CSP just for this route
-// rather than weakening the app-wide helmet() config above.
-// TODO: gate this behind an env var or basic auth before it's a concern.
+// ---------------------------------------------------------------------------
+//    Swagger UI
+// ---------------------------------------------------------------------------
+// helmet runs a second time here on purpose: the global helmet() above sets
+// a default CSP that blocks the inline scripts/styles Swagger UI needs.
+// This per-route helmet disables CSP only for /api-docs.
+// TODO: gate behind an env var or basic auth before this is a concern.
 app.use(
   '/api-docs',
   helmet({ contentSecurityPolicy: false }),
@@ -248,12 +282,13 @@ app.use(
   swaggerUi.setup(swaggerSpec),
 );
 
-// Handle undefined routes
+// ---------------------------------------------------------------------------
+//    404 + global error handler
+// ---------------------------------------------------------------------------
 app.use((req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
-// GLOBAL ERROR HANDLER
 app.use(globalErrorHandler);
 
 module.exports = app;

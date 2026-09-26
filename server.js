@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { logger } = require('./src/utils/logger');
 
 // ---------------------------------------------------------------------------
@@ -21,7 +22,6 @@ process.on('uncaughtException', (err) => {
 require('./src/config/loadEnv')();
 require('./src/config/env.config')();
 
-const mongoose = require('mongoose');
 const app = require('./src/app');
 const connectDB = require('./src/config/db.config');
 
@@ -65,7 +65,9 @@ const shutdown = async (server, reason, exitCode = 0) => {
   forceExit.unref(); // don't keep the event loop alive just for the timer
 
   try {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise((resolve) => {
+      server.close(resolve);
+    });
     logger.info('HTTP server closed.');
 
     await mongoose.disconnect();
