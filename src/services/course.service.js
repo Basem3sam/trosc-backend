@@ -29,13 +29,13 @@ const { logActivity } = require('./activityLog.service');
  * @throws {AppError} 404 if the track doesn't exist, 403 if not permitted
  */
 async function assertTrackOwnership(trackId, requestingUser) {
-  if (requestingUser.role === 'admin') return;
+  if (requestingUser?.role === 'admin') return;
 
   const track = await Track.findById(trackId).select('instructor');
   if (!track) {
     throw new AppError('No track found with that ID', 404);
   }
-  if (track.instructor.toString() !== requestingUser.id) {
+  if (track.instructor.toString() !== requestingUser?.id) {
     throw new AppError(
       'You can only link a course to, or unlink it from, a track you own',
       403,
@@ -49,7 +49,7 @@ async function assertTrackOwnership(trackId, requestingUser) {
  * @returns {Promise<Course>} Newly created course
  * @throws {AppError} 400 if validation fails, 409 if title exists
  */
-exports.createCourse = async (courseBody, requestingUser) => {
+exports.createCourse = async (courseBody, requestingUser = null) => {
   // #3.3: don't let `track` reach Course.create() directly — that would
   // set course.track without ever touching Track.courses, which is
   // exactly how the two sides desynced before this fix. Create the
@@ -75,7 +75,7 @@ exports.createCourse = async (courseBody, requestingUser) => {
   }
 
   await logActivity({
-    userId: requestingUser.id,
+    userId: requestingUser?.id,
     action: 'created_course',
     targetModel: 'Course',
     targetId: course._id,
@@ -176,7 +176,7 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
  * @returns {Promise<Course>} Updated course document
  * @throws {AppError} 404 if course not found
  */
-exports.updateCourse = async (courseId, updateBody, requestingUser) => {
+exports.updateCourse = async (courseId, updateBody, requestingUser = null) => {
   // Self-reference can only happen on update (a client can't know a
   // course's own ID before it's created to list it as its own
   // prerequisite at creation time). Once set, the course's own
@@ -247,7 +247,7 @@ exports.updateCourse = async (courseId, updateBody, requestingUser) => {
   ]);
 
   await logActivity({
-    userId: requestingUser.id,
+    userId: requestingUser?.id,
     action: 'updated_course',
     targetModel: 'Course',
     targetId: courseId,
