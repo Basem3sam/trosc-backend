@@ -5,7 +5,6 @@
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
-    "prestart": "npm run swagger:export",
     "start": "node server.js",
     "start:prod": "cross-env NODE_ENV=production node server.js",
     "dev": "cross-env NODE_ENV=development nodemon server.js",
@@ -17,14 +16,15 @@
     "admin:create:prod": "cross-env NODE_ENV=production node scripts/createAdmin.js",
     "snapshot": "cross-env NODE_ENV=development node scripts/generateDashboardSnapshot.js",
     "snapshot:prod": "cross-env NODE_ENV=production node scripts/generateDashboardSnapshot.js",
-    "test:email": "cross-env NODE_ENV=development node testEmail.js",
-    "test:email:prod": "cross-env NODE_ENV=production node testEmail.js",
+    "test:email": "cross-env NODE_ENV=development node scripts/testEmail.js",
+    "test:email:prod": "cross-env NODE_ENV=production node scripts/testEmail.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:check": "eslint . --max-warnings=0",
     "test": "cross-env NODE_ENV=test jest --runInBand --detectOpenHandles",
     "test:watch": "cross-env NODE_ENV=test jest --watch --runInBand",
-    "test:coverage": "cross-env NODE_ENV=test jest --runInBand --coverage"
+    "test:coverage": "cross-env NODE_ENV=test jest --runInBand --coverage",
+    "test:ci": "cross-env NODE_ENV=test jest --runInBand --ci --coverage"
   },
   "keywords": [
     "trosc",
@@ -41,7 +41,6 @@
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "cross-env": "^10.1.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-mongo-sanitize": "^2.2.0",
@@ -61,6 +60,7 @@
     "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "eslint": "^8.57.0",
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-prettier": "^10.1.8",

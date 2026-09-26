@@ -7,15 +7,47 @@ const requiredEnvVars = [
   'FRONTEND_URL',
 ];
 
-const validateEnv = () => {
-  const missing = requiredEnvVars.filter((key) => !process.env[key]);
+const PLACEHOLDER_RE = /<[A-Z_]+>|your-|example\.com|changeme|placeholder/i;
 
+const validateEnv = () => {
+  // Build DATABASE_URL from parts if given as a template.
+  if (
+    process.env.DATABASE_URL &&
+    process.env.DATABASE_USERNAME &&
+    process.env.DATABASE_PASSWORD
+  ) {
+    process.env.DATABASE_URL = process.env.DATABASE_URL.replace(
+      '<USERNAME>',
+      encodeURIComponent(process.env.DATABASE_USERNAME),
+    ).replace('<PASSWORD>', encodeURIComponent(process.env.DATABASE_PASSWORD));
+  }
+
+  const missing = requiredEnvVars.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     logger.error(
       `Missing required environment variables: ${missing.join(', ')}`,
     );
     logger.error(
       'The server cannot start without these. Check your .env file.',
+    );
+    process.exit(1);
+  }
+
+  // Reject placeholder values in any required var.
+  const placeholders = requiredEnvVars.filter((key) =>
+    PLACEHOLDER_RE.test(process.env[key]),
+  );
+  if (placeholders.length > 0) {
+    logger.error(
+      `Environment variables still contain placeholder values: ${placeholders.join(', ')}`,
+    );
+    process.exit(1);
+  }
+
+  // Basic shape check on DATABASE_URL.
+  if (!/^mongodb(\+srv)?:\/\/[^:]+:[^@]+@.+/.test(process.env.DATABASE_URL)) {
+    logger.error(
+      'DATABASE_URL is not a valid MongoDB connection string (expected mongodb:// or mongodb+srv:// with credentials).',
     );
     process.exit(1);
   }
