@@ -1,0 +1,67 @@
+# .github/workflows/dashboard-snapshots.yml
+#
+# BACKEND-REQUESTS.md #3.4: GET /dashboard-stats/trends was always empty
+# because nothing ever called scripts/generateDashboardSnapshot.js on a
+# schedule — the script itself already worked standalone. This wires it
+# up using the same cron approach keep-alive.yml already uses in this
+# repo, rather than relying on the free-tier Render web service's uptime
+# for an internal job.
+#
+# Required repo secret:
+#   DATABASE_URL - the production MongoDB connection string
+#
+# env.config() also requires JWT_SECRET/JWT_EXPIRES_IN/FRONTEND_URL to be
+# present (it validates every required var up front regardless of which
+# script is running), even though this script never uses them — so
+# they're supplied as harmless placeholder values below rather than real
+# secrets.
+name: dashboard-snapshots
+
+on:
+  schedule:
+    # Daily at 00:05 UTC
+    - cron: '5 0 * * *'
+    # Weekly, Monday at 00:10 UTC
+    - cron: '10 0 * * 1'
+    # Monthly, 1st of the month at 00:15 UTC
+    - cron: '15 0 1 * *'
+  workflow_dispatch:
+    inputs:
+      period:
+        description: 'Snapshot period to generate (leave blank when triggered by cron)'
+        required: false
+        type: choice
+        options: ['daily', 'weekly', 'monthly']
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci --omit=dev
+      - name: Determine period
+        id: period
+        run: |
+          if [ -n "${{ inputs.period }}" ]; then
+            echo "value=${{ inputs.period }}" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.event.schedule }}" in
+              '5 0 * * *') echo "value=daily" >> "$GITHUB_OUTPUT" ;;
+              '10 0 * * 1') echo "value=weekly" >> "$GITHUB_OUTPUT" ;;
+              '15 0 1 * *') echo "value=monthly" >> "$GITHUB_OUTPUT" ;;
+              *) echo "Unrecognized schedule: ${{ github.event.schedule }}" && exit 1 ;;
+            esac
+          fi
+      - name: Generate snapshot
+        run: node scripts/generateDashboardSnapshot.js ${{ steps.period.outputs.value }}
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: unused-in-this-script-but-required-by-env-config-32chars
+          JWT_EXPIRES_IN: 1h
+          FRONTEND_URL: http://localhost

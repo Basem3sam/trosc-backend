@@ -744,6 +744,14 @@ Computes and **upserts** a `DashboardStats` snapshot for the given period (re-ru
 15 0 1 * *   cd /path/to/app && node scripts/generateDashboardSnapshot.js monthly
 ```
 
+**In this repo, that cron trigger is `.github/workflows/dashboard-snapshots.yml`** rather than an OS-level cron — the production deployment (Render free tier) has no persistent cron of its own, so a scheduled GitHub Actions workflow runs the same three commands on the same schedule shown above, connecting directly to the production database. It needs one repo secret:
+
+| Secret         | Value                                |
+| -------------- | ------------------------------------- |
+| `DATABASE_URL` | The production MongoDB connection string |
+
+It can also be triggered manually from the Actions tab (`workflow_dispatch`) with a chosen period, e.g. to backfill after downtime.
+
 The same result is also reachable on-demand via `POST /v1/dashboard-stats/snapshot` (admin only), for a manual "refresh now" action from an admin UI.
 
 ---
@@ -882,6 +890,7 @@ tests/
 - [x] **Grading feedback** — `PATCH /v1/assignments/:id/submissions/:studentId/grade` accepts an optional `feedback` string (up to 2000 characters) alongside the grade; both are returned in the student's `mySubmission`. Resubmitting clears prior grade *and* feedback, since both were written against the old file.
 - [x] **Review author populated on create** — `POST /tracks|courses|sessions/:id/reviews` now returns `user` populated (`_id`, `name`, `photo`), matching the shape the list (`GET .../reviews`) endpoints already returned.
 - [x] **`mostActiveTrack` populated on live stats** — `GET /v1/dashboard-stats/live` now returns `mostActiveTrack: { _id, title }` like every stored-snapshot endpoint already did, instead of a bare ObjectId.
+- [x] **Scheduled dashboard-stats snapshots** — `.github/workflows/dashboard-snapshots.yml` runs `scripts/generateDashboardSnapshot.js` on the daily/weekly/monthly cadence the script already documented; previously nothing called it on a schedule, so `GET /v1/dashboard-stats/trends` was always empty. Needs a `DATABASE_URL` repo secret; also triggerable manually via `workflow_dispatch`.
 
 ### Planned 🔮
 
