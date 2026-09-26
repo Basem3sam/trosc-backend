@@ -10,6 +10,7 @@ const Announcement = require('../models/announcement.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
+const trackService = require('./track.service');
 const { logActivity } = require('./activityLog.service');
 
 // ===================================================================
@@ -17,20 +18,72 @@ const { logActivity } = require('./activityLog.service');
 // ===================================================================
 
 /**
+ * Confirms `requestingUser` may link/unlink a course to/from `trackId` —
+ * admins always can; otherwise the requester must be that track's own
+ * instructor. Mirrors the checkOwnership({ model: 'Track', ... }) gate
+ * the dedicated PATCH/DELETE /tracks/:trackId/courses/:courseId
+ * endpoints already enforce — needed here because addCourseToTrack/
+ * removeCourseFromTrack don't check ownership themselves (that was
+ * always the route middleware's job, and this call path doesn't go
+ * through it).
+ * @throws {AppError} 404 if the track doesn't exist, 403 if not permitted
+ */
+async function assertTrackOwnership(trackId, requestingUser) {
+  if (requestingUser.role === 'admin') return;
+
+  const track = await Track.findById(trackId).select('instructor');
+  if (!track) {
+    throw new AppError('No track found with that ID', 404);
+  }
+  if (track.instructor.toString() !== requestingUser.id) {
+    throw new AppError(
+      'You can only link a course to, or unlink it from, a track you own',
+      403,
+    );
+  }
+}
+
+/**
  * Create a new course
  * @param {Object} courseBody - Course data
  * @returns {Promise<Course>} Newly created course
  * @throws {AppError} 400 if validation fails, 409 if title exists
  */
-exports.createCourse = async (courseBody, requestingUserId) => {
-  const course = await Course.create(courseBody);
+exports.createCourse = async (courseBody, requestingUser) => {
+  // #3.3: don't let `track` reach Course.create() directly — that would
+  // set course.track without ever touching Track.courses, which is
+  // exactly how the two sides desynced before this fix. Create the
+  // course without it, then let addCourseToTrack own both sides of the
+  // relationship (it also validates the track exists and enrolls the
+  // track's existing students into the new course).
+  const { track: trackId, ...courseData } = courseBody;
+
+  const course = await Course.create(courseData);
+
+  if (trackId) {
+    try {
+      await assertTrackOwnership(trackId, requestingUser);
+      await trackService.addCourseToTrack(trackId, course._id);
+    } catch (err) {
+      // Don't leave an orphan course behind if the requested track
+      // turned out to be invalid/not owned by this requester — the
+      // create as a whole should fail, not silently succeed without
+      // the track.
+      await Course.findByIdAndDelete(course._id);
+      throw err;
+    }
+  }
+
   await logActivity({
-    userId: requestingUserId,
+    userId: requestingUser.id,
     action: 'created_course',
     targetModel: 'Course',
     targetId: course._id,
   });
-  return course;
+
+  // Re-fetch: addCourseToTrack saved `track` on its own Course instance,
+  // not this one.
+  return trackId ? Course.findById(course._id) : course;
 };
 
 /**
@@ -123,7 +176,7 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
  * @returns {Promise<Course>} Updated course document
  * @throws {AppError} 404 if course not found
  */
-exports.updateCourse = async (courseId, updateBody, requestingUserId) => {
+exports.updateCourse = async (courseId, updateBody, requestingUser) => {
   // Self-reference can only happen on update (a client can't know a
   // course's own ID before it's created to list it as its own
   // prerequisite at creation time). Once set, the course's own
@@ -140,7 +193,46 @@ exports.updateCourse = async (courseId, updateBody, requestingUserId) => {
     );
   }
 
-  const course = await Course.findByIdAndUpdate(courseId, updateBody, {
+  // #3.3: `track` is handled separately from the rest of the update —
+  // writing it via Course.findByIdAndUpdate() directly (the old
+  // behavior) never touched Track.courses on either the old or new
+  // track, which is exactly how course/track desyncs like the one
+  // described in #3.3 happened. Route it through the same
+  // addCourseToTrack/removeCourseFromTrack functions the track-side
+  // endpoints already use, so both sides always agree.
+  const hasTrackChange = Object.prototype.hasOwnProperty.call(
+    updateBody,
+    'track',
+  );
+  const { track: newTrackId, ...restOfUpdate } = updateBody;
+
+  if (hasTrackChange) {
+    const current = await Course.findById(courseId).select('track');
+    if (!current) {
+      throw new AppError('No course found with that ID', 404);
+    }
+    const currentTrackId = current.track ? current.track.toString() : null;
+
+    if (currentTrackId !== (newTrackId || null)) {
+      // Detach from the old track first (if any) — enforces the same
+      // "track must keep at least one course or session" guard
+      // DELETE /tracks/:id/courses/:courseId already has, and the same
+      // track-ownership gate that endpoint enforces too.
+      if (currentTrackId) {
+        await assertTrackOwnership(currentTrackId, requestingUser);
+        await trackService.removeCourseFromTrack(currentTrackId, courseId);
+      }
+      // Then attach to the new one (if any) — validates it exists,
+      // confirms the requester owns it (or is admin), and enrolls its
+      // current students into this course.
+      if (newTrackId) {
+        await assertTrackOwnership(newTrackId, requestingUser);
+        await trackService.addCourseToTrack(newTrackId, courseId);
+      }
+    }
+  }
+
+  const course = await Course.findByIdAndUpdate(courseId, restOfUpdate, {
     new: true,
     runValidators: true,
   });
@@ -155,7 +247,7 @@ exports.updateCourse = async (courseId, updateBody, requestingUserId) => {
   ]);
 
   await logActivity({
-    userId: requestingUserId,
+    userId: requestingUser.id,
     action: 'updated_course',
     targetModel: 'Course',
     targetId: courseId,

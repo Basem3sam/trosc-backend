@@ -696,6 +696,7 @@ Rather than changing the global `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env var
 | `node testEmail.js <email>`                                                     | Diagnose SMTP configuration and send a test email                        |
 | `node scripts/createAdmin.js <email>`                                           | Promote a user to admin                                                  |
 | `node scripts/cleanupOrphanedTrackReferences.js [--dry-run]`                    | One-off/repeatable maintenance: removes references to deleted users from `Track.students`/`pendingStudents`/`pendingLeaves` |
+| `node scripts/reconcileTrackCourses.js [--dry-run]`                              | One-off/repeatable maintenance: recomputes each track's `courses` array from the courses that actually point at it (`Course.track` is the source of truth) |
 | `node scripts/generateDashboardSnapshot.js <daily\|weekly\|monthly> [ISO date]` | Generate/refresh a dashboard-stats snapshot — meant to be cron-triggered |
 
 ### Email Diagnostic Tool
@@ -726,6 +727,19 @@ for ids that no longer resolve to an existing user (a possible leftover from
 before `cascade.service.js#hardDeleteUserCascade` was fixed to pull those
 fields on user delete) and removes them. Safe to re-run — it's a no-op once
 the data is clean.
+
+### Track/Course Sync Reconciliation
+
+```bash
+node scripts/reconcileTrackCourses.js --dry-run   # preview
+node scripts/reconcileTrackCourses.js              # apply
+```
+
+Recomputes every track's `courses` array from the courses that actually have
+`track` set to it — `Course.track` is treated as the source of truth, since
+that's the field `course.service.js` used to write directly before it was
+fixed to keep both sides in sync (see the Roadmap entry below). Fixes any
+track left out of sync from before that fix. Safe to re-run.
 
 ### Dashboard Stats Snapshot Generation
 
@@ -893,6 +907,7 @@ tests/
 - [x] **Scheduled dashboard-stats snapshots** — `.github/workflows/dashboard-snapshots.yml` runs `scripts/generateDashboardSnapshot.js` on the daily/weekly/monthly cadence the script already documented; previously nothing called it on a schedule, so `GET /v1/dashboard-stats/trends` was always empty. Needs a `DATABASE_URL` repo secret; also triggerable manually via `workflow_dispatch`.
 - [x] **Full cascade cleanup on user delete** — `cascade.service.js#hardDeleteUserCascade` now also pulls a deleted user from `Track.pendingStudents` and `Track.pendingLeaves` (previously only `Track.students` was cleaned up, which is exactly how stale pending entries could accumulate — see `scripts/cleanupOrphanedTrackReferences.js`), plus their own `Session.progress` entry.
 - [x] **`GET /tracks/:id/pending` includes leave requests** — now returns `pendingStudents` *and* `pendingLeaves` together, so the frontend doesn't need a second call to `GET /tracks/:id/leaves` (which still works standalone) just to show both in one view.
+- [x] **Course/track sync on create and update** — `POST /courses` and `PATCH /courses/:id` now route a `track` field through the same `trackService.addCourseToTrack`/`removeCourseFromTrack` functions the dedicated `/tracks/:trackId/courses/:courseId` endpoints already used, instead of writing `course.track` directly. Previously `Track.courses` could silently fall out of sync with which courses actually point at it. Detaching (`track: null`) enforces the same "a track needs at least one course or session" guard the dedicated `DELETE` endpoint has; attaching/detaching either way requires owning the target track (or being admin) — closing an authorization gap the old direct-write path didn't check either. `scripts/reconcileTrackCourses.js` backfills any tracks already desynced from before this fix.
 
 ### Planned 🔮
 

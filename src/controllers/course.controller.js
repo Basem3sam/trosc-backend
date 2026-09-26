@@ -10,7 +10,7 @@ exports.createCourse = catchAsync(async (req, res, next) => {
   delete req.body.students;
   req.body.instructor = req.user.id;
 
-  const course = await courseService.createCourse(req.body, req.user.id);
+  const course = await courseService.createCourse(req.body, req.user);
 
   res.status(201).json({
     status: 'success',
@@ -56,7 +56,7 @@ exports.updateCourse = catchAsync(async (req, res, next) => {
   const course = await courseService.updateCourse(
     req.params.id,
     req.body,
-    req.user.id,
+    req.user,
   );
 
   res.status(200).json({

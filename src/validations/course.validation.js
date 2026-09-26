@@ -50,7 +50,10 @@ exports.getCourseSchema = Joi.object({
 exports.updateCourseSchema = Joi.object({
   title: Joi.string().min(3).max(100),
   description: Joi.string().min(10),
-  track: objectId,
+  // .allow(null) supports explicitly detaching a course from its track
+  // (see course.service.js#updateCourse and #3.3) — omitting the field
+  // entirely leaves the track relationship untouched, same as before.
+  track: objectId.allow(null),
   level: Joi.string().valid('beginner', 'intermediate', 'advanced'),
   access: Joi.string().valid('public', 'track-only', 'private'),
   coverImage: photoValidation,
