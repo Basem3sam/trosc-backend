@@ -1,15 +1,43 @@
 name: Test
-on: push
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    env:
+      NODE_ENV: test
+      # Non-secret test-only values. If any of these need to be secret,
+      # source them from GitHub Secrets instead of hardcoding.
+      JWT_SECRET: test-only-secret-not-for-real-use-32chars
+      JWT_EXPIRES_IN: 1h
+      JWT_COOKIE_EXPIRES_IN: 1
+      FRONTEND_URL: http://localhost:3000
+      AUTH_RATE_LIMIT_MAX: 100000
+      AUTH_RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX: 100000
+      RATE_LIMIT_WINDOW_MS: 60000
+      # env.config.js requires DATABASE_URL at load time. Tests replace
+      # this with the mongodb-memory-server URI at runtime, but the
+      # placeholder is needed so validation doesn't exit(1) first.
+      DATABASE_URL: mongodb://127.0.0.1:27017/test-placeholder
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
+
       - name: Cache mongodb-memory-server binaries
         uses: actions/cache@v4
         with:
@@ -17,16 +45,17 @@ jobs:
           key: ${{ runner.os }}-mongodb-binaries-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-mongodb-binaries-
+
       - run: npm ci
+
       - run: npm run lint:check
-      - run: npm test
-        env:
-          NODE_ENV: test
-          JWT_SECRET: test-only-secret-not-for-real-use
-          JWT_EXPIRES_IN: 1h
-          JWT_COOKIE_EXPIRES_IN: 1
-          FRONTEND_URL: http://localhost:3000
-          AUTH_RATE_LIMIT_MAX: 100000
-          AUTH_RATE_LIMIT_WINDOW_MS: 60000
-          RATE_LIMIT_MAX: 100000
-          RATE_LIMIT_WINDOW_MS: 60000
+
+      - run: npm run test:ci
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
