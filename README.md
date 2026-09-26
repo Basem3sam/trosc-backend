@@ -891,6 +891,8 @@ tests/
 - [x] **Review author populated on create** — `POST /tracks|courses|sessions/:id/reviews` now returns `user` populated (`_id`, `name`, `photo`), matching the shape the list (`GET .../reviews`) endpoints already returned.
 - [x] **`mostActiveTrack` populated on live stats** — `GET /v1/dashboard-stats/live` now returns `mostActiveTrack: { _id, title }` like every stored-snapshot endpoint already did, instead of a bare ObjectId.
 - [x] **Scheduled dashboard-stats snapshots** — `.github/workflows/dashboard-snapshots.yml` runs `scripts/generateDashboardSnapshot.js` on the daily/weekly/monthly cadence the script already documented; previously nothing called it on a schedule, so `GET /v1/dashboard-stats/trends` was always empty. Needs a `DATABASE_URL` repo secret; also triggerable manually via `workflow_dispatch`.
+- [x] **Full cascade cleanup on user delete** — `cascade.service.js#hardDeleteUserCascade` now also pulls a deleted user from `Track.pendingStudents` and `Track.pendingLeaves` (previously only `Track.students` was cleaned up, which is exactly how stale pending entries could accumulate — see `scripts/cleanupOrphanedTrackReferences.js`), plus their own `Session.progress` entry.
+- [x] **`GET /tracks/:id/pending` includes leave requests** — now returns `pendingStudents` *and* `pendingLeaves` together, so the frontend doesn't need a second call to `GET /tracks/:id/leaves` (which still works standalone) just to show both in one view.
 
 ### Planned 🔮
 

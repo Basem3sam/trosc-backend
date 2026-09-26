@@ -338,6 +338,8 @@ npm test -- --inspect-brk
 - **Grading feedback** (`feedback` on `PATCH /v1/assignments/:id/submissions/:studentId/grade`) — no test coverage yet. Worth covering: grading without `feedback` still works (optional), a 2001-character string is rejected, `feedback` shows up in the student's `mySubmission`, and resubmitting clears a previously-set `feedback` along with the grade.
 - **Review author populated on create** (`POST /tracks|courses|sessions/:id/reviews`) — no test coverage yet. Worth covering: the response's `user` is an object with `_id`/`name`/`photo`, not a bare id.
 - **`mostActiveTrack` populated on live stats** (`GET /v1/dashboard-stats/live`) — no test coverage yet. Worth covering: the field is `{ _id, title }` (or `null`), not a bare ObjectId — this diverged from the already-tested stored-snapshot endpoints before the fix.
+- **Full cascade cleanup on user delete** (`cascade.service.js#hardDeleteUserCascade`) — the existing `students`-array pulls are covered by `cascade.test.js` (per the coverage list above), but the new `pendingStudents`/`pendingLeaves`/`Session.progress` pulls are not. Worth covering: delete a user who has a pending track enrollment, a pending leave request, and a session progress entry, then confirm all three are gone from the track/session documents afterward.
+- **`GET /tracks/:id/pending` includes leave requests** — no test coverage yet. Worth covering: response has both `pendingStudents` and `pendingLeaves` populated correctly, and that `GET /tracks/:id/leaves` still works standalone and returns the same `pendingLeaves` data.
 
 ## A good next test to write yourself
 

@@ -640,8 +640,8 @@
  * /tracks/{id}/pending:
  *   get:
  *     operationId: getPendingStudents
- *     summary: Get pending enrollment requests
- *     description: Retrieve students awaiting approval for a track
+ *     summary: Get pending enrollment and leave requests
+ *     description: Retrieve students awaiting enrollment approval (`pendingStudents`) and students awaiting leave approval (`pendingLeaves`) for a track, in one call. `GET /tracks/{id}/leaves` still exists separately and returns pendingLeaves alone.
  *     tags: [Tracks]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -652,7 +652,7 @@
  *         example: "507f1f77bcf86cd799439021"
  *     responses:
  *       200:
- *         description: List of pending students
+ *         description: Pending students and pending leave requests
  *         content:
  *           application/json:
  *             schema:

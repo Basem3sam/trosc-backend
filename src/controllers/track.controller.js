@@ -177,11 +177,20 @@ exports.enrollMe = catchAsync(async (req, res, next) => {
 });
 
 exports.getPendingStudents = catchAsync(async (req, res, next) => {
-  const pending = await enrollmentService.getPendingStudents(req.params.id);
+  // #2.8: previously this only returned pendingStudents, forcing the
+  // frontend to make a second call to GET /tracks/:id/leaves just to
+  // show both pending enrollments and pending leave requests together.
+  // That endpoint still exists and still works standalone — this just
+  // makes /pending self-sufficient too.
+  const [pendingStudents, pendingLeaves] = await Promise.all([
+    enrollmentService.getPendingStudents(req.params.id),
+    enrollmentService.getPendingLeaves(req.params.id),
+  ]);
+
   res.status(200).json({
     status: 'success',
-    results: pending.length,
-    data: { pendingStudents: pending },
+    results: pendingStudents.length + pendingLeaves.length,
+    data: { pendingStudents, pendingLeaves },
   });
 });
 

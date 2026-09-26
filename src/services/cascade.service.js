@@ -333,13 +333,37 @@ exports.hardDeleteUserCascade = async (userId) => {
       { students: userId },
       { $pull: { students: userId } },
     ).session(session);
+    // #3.2: previously only `students` was pulled here, leaving the user
+    // behind in `pendingStudents`/`pendingLeaves` if they were deleted
+    // while an enrollment or leave request was still pending — exactly
+    // how the orphaned entry in #3.1 was created. All three are pulled
+    // together in one update now.
     await Track.updateMany(
-      { students: userId },
-      { $pull: { students: userId } },
+      {
+        $or: [
+          { students: userId },
+          { pendingStudents: userId },
+          { pendingLeaves: userId },
+        ],
+      },
+      {
+        $pull: {
+          students: userId,
+          pendingStudents: userId,
+          pendingLeaves: userId,
+        },
+      },
     ).session(session);
     await Session.updateMany(
       { students: userId },
       { $pull: { students: userId } },
+    ).session(session);
+    // #1.1 follow-up: a deleted student's own watched-progress entry has
+    // no meaning without them — same rationale as submissions/completions
+    // below.
+    await Session.updateMany(
+      { 'progress.student': userId },
+      { $pull: { progress: { student: userId } } },
     ).session(session);
     await Assignment.updateMany(
       { 'submissions.student': userId },
