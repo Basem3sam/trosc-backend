@@ -469,11 +469,7 @@ exports.setSessionProgress = async (sessionId, requestingUser, status) => {
   return { status: myEntry.status, watchedAt: myEntry.watchedAt };
 };
 
-exports.getSessionsByStudent = async (
-  studentId,
-  query,
-  requestingUser = null,
-) => {
+exports.getSessionsByStudent = async (studentId, query) => {
   // Route-level guard (session.route.js) already restricts the caller to
   // the student themselves or an admin, so `students: studentId` alone
   // already implies the caller is authorized to see this session's own
