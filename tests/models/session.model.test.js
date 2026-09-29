@@ -37,6 +37,53 @@ describe('Session model — field validators', () => {
         }),
       ).rejects.toThrow('Session URL must be a valid');
     });
+
+    // Q8: youtube.com/youtu.be/youtube-nocookie.com are now part of the
+    // single trusted-host source of truth (src/utils/trustedHosts.js),
+    // and the old hardcoded youtube/drive fast-path regex is gone —
+    // everything routes through isTrustedHost() the same way
+    // resources[].url already did.
+    it('accepts a youtube.com watch URL', async () => {
+      const session = await Session.create({
+        title: 'YouTube Watch Session',
+        instructor: instructor._id,
+        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      });
+      expect(session.url).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    });
+
+    it('accepts a youtu.be short URL', async () => {
+      const session = await Session.create({
+        title: 'YouTube Short Link Session',
+        instructor: instructor._id,
+        url: 'https://youtu.be/dQw4w9WgXcQ',
+      });
+      expect(session.url).toBe('https://youtu.be/dQw4w9WgXcQ');
+    });
+
+    it('accepts a youtube-nocookie.com embed URL', async () => {
+      const session = await Session.create({
+        title: 'YouTube No-Cookie Session',
+        instructor: instructor._id,
+        url: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+      });
+      expect(session.url).toBe(
+        'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+      );
+    });
+
+    // Previously the youtubeRegex fast-path accepted this (it made the
+    // protocol optional); consolidating onto isTrustedHost() closes that
+    // gap — every trusted-host URL must now be https, YouTube included.
+    it('rejects a non-https YouTube URL now that the fast-path regex is gone', async () => {
+      await expect(
+        Session.create({
+          title: 'Insecure YouTube Session',
+          instructor: instructor._id,
+          url: 'http://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        }),
+      ).rejects.toThrow('Session URL must be a valid');
+    });
   });
 
   describe('resources[].url', () => {
@@ -60,7 +107,9 @@ describe('Session model — field validators', () => {
           instructor: instructor._id,
           resources: [{ title: 'Broken', url: 'not-a-valid-url' }],
         }),
-      ).rejects.toThrow('Resource URL must be from a trusted host');
+      ).rejects.toThrow(
+        'Resource URL must be a valid HTTPS URL from a trusted host',
+      );
     });
   });
 

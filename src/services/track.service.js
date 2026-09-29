@@ -5,6 +5,7 @@ const Session = require('../models/session.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
+const policy = require('./policy.service');
 const { logActivity } = require('./activityLog.service');
 
 // ===================================================================
@@ -57,10 +58,13 @@ exports.createTrack = async (trackBody, requestingUserId) => {
  * @param {Object} query - Express query object with filters, sort, page, limit
  * @returns {Promise<{tracks: Array, total: Number}>} Paginated tracks and total count
  */
-exports.getAllTracks = async (query) => {
-  // Create features instance with the Track model
+exports.getAllTracks = async (query, requestingUser = null) => {
+  // Q5/Q2: previously returned every track regardless of `published`,
+  // to any caller including anonymous — a draft "[TEST]" track's title
+  // was fully public. Admins see everything; everyone else sees
+  // published tracks plus any drafts they themselves own.
   const features = new APIFeatures(Track.find(), query, Track)
-    .filter()
+    .filter(policy.publishedListFilter(requestingUser))
     .search(['title', 'description'])
     .sort()
     .limitFields();

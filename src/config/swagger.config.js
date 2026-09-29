@@ -90,6 +90,11 @@ const options = {
         description: 'Dashboard announcements + upcoming events',
       },
       { name: 'Health', description: 'Server & database health checks' },
+      {
+        name: 'Config',
+        description:
+          'Public, read-only configuration values the frontend needs (e.g. the trusted-host allowlist)',
+      },
     ],
   },
   apis: [

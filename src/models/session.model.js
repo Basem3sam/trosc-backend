@@ -313,7 +313,7 @@ const resourceSchema = new mongoose.Schema({
         }
       },
       message:
-        'Resource URL must be from a trusted host (YouTube, Drive, GitHub, Cloudinary, etc.)',
+        'Resource URL must be a valid HTTPS URL from a trusted host (YouTube, Drive, GitHub, Cloudinary, etc.) — see GET /v1/config/trusted-hosts',
     },
   },
 });
@@ -358,15 +358,14 @@ const sessionSchema = new mongoose.Schema(
       validate: {
         validator(v) {
           if (!v) return true;
-          const youtubeRegex =
-            /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-          const driveRegex =
-            /^(https?:\/\/)?(drive\.google\.com|docs\.google\.com)\/.+/i;
-          if (youtubeRegex.test(v) || driveRegex.test(v)) return true;
-          // Same trusted-host allowlist as resourceSchema.url below —
-          // this fallback used to accept ANY https?:// URL
-          // (validator.isURL), which let session.url bypass the
-          // allowlist that resources[].url enforces.
+          // #3.3/Q8: this used to have its own youtubeRegex/driveRegex
+          // fast-path (which also accepted bare/http URLs, bypassing the
+          // https-only rule below) ahead of the trusted-host check —
+          // exactly the "conflicting list in a different file" Q8 says
+          // not to have. isTrustedHost() (backed by trustedHosts.js,
+          // which now includes youtube.com/youtu.be/youtube-nocookie.com)
+          // is the ONE validator for every URL field in this schema, same
+          // as resourceSchema.url right above.
           try {
             const parsed = new URL(v);
             return (
@@ -377,7 +376,7 @@ const sessionSchema = new mongoose.Schema(
           }
         },
         message:
-          'Session URL must be a valid YouTube, Google Drive, or other valid URL',
+          'Session URL must be a valid HTTPS URL from a trusted host (YouTube, Google Drive, GitHub, etc.) — see GET /v1/config/trusted-hosts',
       },
     },
     instructor: {

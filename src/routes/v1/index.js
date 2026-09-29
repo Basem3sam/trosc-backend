@@ -21,5 +21,6 @@ router.use('/weekly-tasks', require('./weeklyTaskProgress.route'));
 router.use('/assignments', require('./assignmentSubmission.route'));
 router.use('/activity-logs', require('./activityLog.route'));
 router.use('/dashboard-stats', require('./dashboardStats.route'));
+router.use('/config', require('./config.route'));
 
 module.exports = router;

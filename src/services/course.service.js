@@ -10,6 +10,7 @@ const Announcement = require('../models/announcement.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
+const policy = require('./policy.service');
 const trackService = require('./track.service');
 const { logActivity } = require('./activityLog.service');
 
@@ -91,9 +92,11 @@ exports.createCourse = async (courseBody, requestingUser = null) => {
  * @param {Object} query - Express query object
  * @returns {Promise<{courses: Array, total: Number}>} Paginated courses
  */
-exports.getAllCourses = async (query) => {
+exports.getAllCourses = async (query, requestingUser = null) => {
+  // Q5/Q2: same fix as track.service.js#getAllTracks — previously
+  // returned every course regardless of `published` to any caller.
   const features = new APIFeatures(Course.find(), query, Course)
-    .filter()
+    .filter(policy.publishedListFilter(requestingUser))
     .search(['title', 'description'])
     .sort()
     .limitFields();

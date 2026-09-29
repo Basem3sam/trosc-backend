@@ -8,6 +8,7 @@ node_modules/
 # Logs
 logs
 *.log
+STAGE_PLAN.md
 
 # OS and IDE files
 .DS_Store

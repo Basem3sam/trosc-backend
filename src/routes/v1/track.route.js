@@ -1047,7 +1047,7 @@ router
     validate(createTrackSchema),
     trackController.createTrack,
   )
-  .get(trackController.getAllTracks);
+  .get(optionalAuth, trackController.getAllTracks);
 
 router.get(
   '/student/:studentId',

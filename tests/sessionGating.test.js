@@ -26,6 +26,7 @@ describe('Session URL Gating', () => {
       instructor: fixture.instructor._id,
       course: course._id,
       students: [fixture.student._id],
+      published: true,
     });
   });
 

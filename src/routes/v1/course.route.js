@@ -859,7 +859,7 @@ router
     validate(createCourseSchema),
     courseController.createCourse,
   )
-  .get(courseController.getAllCourses);
+  .get(optionalAuth, courseController.getAllCourses);
 
 // ===================================================================
 // 🔍 FILTERING ROUTES

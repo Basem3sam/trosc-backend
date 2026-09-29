@@ -153,7 +153,7 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 
 | Method   | Endpoint                                     | Access                                                | Description                                                                                         |
 | -------- | -------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `GET`    | `/v1/tracks`                                 | Public                                                | List all tracks (filter, sort, paginate)                                                            |
+| `GET`    | `/v1/tracks`                                 | Public                                                | List all tracks (filter, sort, paginate). Excludes drafts (`published: false`) you're not authorized for — you only see your own drafts, or all of them as admin |
 | `GET`    | `/v1/tracks/popular`                         | Public                                                | Most enrolled tracks                                                                                |
 | `GET`    | `/v1/tracks/:id`                             | Public                                                | Get track details (404 if unpublished and caller is not owner/admin)                                |
 | `POST`   | `/v1/tracks`                                 | Admin / Instructor                                    | Create track. `instructor` (admin only) assigns it to any instructor/admin user; non-admins always get their own id |
@@ -186,7 +186,7 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 
 | Method   | Endpoint                                    | Access                                                | Description                                                                                  |
 | -------- | ------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `GET`    | `/v1/courses`                               | Public                                                | List all courses (filter, sort, paginate)                                                    |
+| `GET`    | `/v1/courses`                               | Public                                                | List all courses (filter, sort, paginate). Excludes drafts (`published: false`) you're not authorized for — same rule as `/v1/tracks` |
 | `GET`    | `/v1/courses/:id`                           | Public                                                | Get course details (404 if unpublished and caller is not owner/admin)                        |
 | `POST`   | `/v1/courses`                               | Admin / Instructor                                    | Create course. Optional `track` attaches it immediately — requester must own that track (or be admin); keeps `Track.courses` in sync |
 | `PATCH`  | `/v1/courses/:id`                           | Admin / Instructor                                    | Update course (owner only; admin bypass). `track` can be reassigned or set to `null` to detach — each side requires owning that track (or admin), and detaching enforces the same "track needs ≥1 course or session" rule `DELETE /tracks/:id/courses/:courseId` has |
@@ -212,13 +212,13 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 
 | Method   | Endpoint                                | Access                                                | Description                                                                     |
 | -------- | --------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `GET`    | `/v1/sessions`                          | Protected                                             | List all sessions (`url`, `embedUrl`, `resources` omitted in list view)         |
-| `GET`    | `/v1/sessions/:id`                      | Protected                                             | Get session details (`url`, `embedUrl`, `resources` stripped if not enrolled); enrolled callers also get `myProgress: { status, watchedAt }` |
+| `GET`    | `/v1/sessions`                          | Protected                                             | List all sessions. Excludes drafts you're not authorized for (same rule as tracks/courses); `url`/`embedUrl`/`resources`/`progress` omitted in list view unless you're the owner/admin/enrolled |
+| `GET`    | `/v1/sessions/:id`                      | Protected                                             | Get session details — **404 if the session is a draft and you're not its owner or an admin** (not content-redacted, invisible); `url`/`embedUrl`/`resources` stripped if not enrolled; enrolled callers also get `myProgress: { status, watchedAt }` |
 | `POST`   | `/v1/sessions`                          | Admin / Instructor                                    | Create session                                                                  |
 | `PATCH`  | `/v1/sessions/:id`                      | Admin / Instructor                                    | Update session (owner only; admin bypass)                                       |
 | `DELETE` | `/v1/sessions/:id`                      | Admin / Instructor                                    | Delete session (owner only; admin bypass)                                       |
-| `GET`    | `/v1/sessions/instructor/:instructorId` | Protected                                             | Sessions by instructor                                                          |
-| `GET`    | `/v1/sessions/track/:trackId`           | Protected                                             | Sessions in a track                                                             |
+| `GET`    | `/v1/sessions/instructor/:instructorId` | Protected                                             | Sessions by instructor. Same draft-exclusion + field redaction as `GET /v1/sessions` |
+| `GET`    | `/v1/sessions/track/:trackId`           | Protected                                             | Sessions in a track. Same draft-exclusion + field redaction as `GET /v1/sessions` |
 | `GET`    | `/v1/sessions/student/:studentId`       | Self / Admin                                          | Sessions a student is enrolled in                                               |
 | `POST`   | `/v1/sessions/:id/enroll-me`            | Protected                                             | Self-enroll in session (track-only/private access rules enforced; rate limited) |
 | `DELETE` | `/v1/sessions/:id/leave-me`             | Protected                                             | Leave session (rate limited)                                                    |
@@ -319,6 +319,12 @@ Admin-only platform analytics. `live` is computed on the fly and never persisted
 > `avgCompletionRate` in a snapshot = average, across all assignments, of (submissions ÷ that assignment's course/session roster size) as a percentage. Roster size is always the _current_ roster (MongoDB doesn't retain historical rosters), so this is most accurate for the latest snapshot and only approximate for older ones.
 
 > `mostActiveTrack` is `{ _id, title }` (or `null`) everywhere it appears — including `/live`, which previously returned a bare ObjectId while every stored-snapshot endpoint already populated it.
+
+### Config
+
+| Method | Endpoint                    | Access | Description                                                                                     |
+| ------ | ---------------------------- | ------ | ------------------------------------------------------------------------------------------------ |
+| `GET`  | `/v1/config/trusted-hosts`  | Public | The exact hostname allowlist every session/resource/attachment/submission URL is validated against (`src/utils/trustedHosts.js`) — includes YouTube, Google Drive, GitHub, Cloudinary, Imgur, Dropbox, Discord CDN, etc. Use this to warn about an untrusted host client-side before submitting. |
 
 ### Feed & Health
 

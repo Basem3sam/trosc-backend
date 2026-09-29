@@ -618,7 +618,7 @@ Common HTTP status codes:
 
 ### 1. No File Uploads
 
-Instead of S3/Cloudinary storage costs, all media is referenced by URL. The system validates URLs against a single, shared whitelist of trusted hosts (`src/utils/trustedHosts.js` — YouTube, Drive, Dropbox, GitHub, Cloudinary, Imgur, Discord CDN), used consistently by both the Mongoose-level and Joi-level attachment validators. This makes the backend stateless and free to host.
+Instead of S3/Cloudinary storage costs, all media is referenced by URL. The system validates URLs against a single, shared whitelist of trusted hosts (`src/utils/trustedHosts.js` — YouTube, Drive, Dropbox, GitHub, Cloudinary, Imgur, Discord CDN), used consistently by both the Mongoose-level and Joi-level attachment validators, and served as-is at `GET /v1/config/trusted-hosts` so a form can warn about an untrusted host before submitting. Cloudinary is documented here as a possible **future, optional** enhancement (authenticated/private delivery + backend-generated signed URLs, never a permanent public URL, and the API secret never reaches the frontend) — it is not implemented and nothing in the current stages requires it. Google Drive/other trusted-host links remain the free, always-available fallback.
 
 ### 2. Cascade Enrollment Service with Transactions
 
@@ -646,6 +646,10 @@ Rather than changing the global `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env var
 
 `GET /users/me` reports `pendingTrack` (the track a student has applied to but isn't approved into yet) by querying `Track.pendingStudents` for the caller's ID at request time — the same field `enrollMeInTrack`/`approveStudentInTrack`/`rejectStudentInTrack` already read and write in `enrollment.service.js`. No second, duplicate "pending" field was added to the `User` model.
 
+### 8. Centralized Read/Visibility Policy (`policy.service.js`)
+
+Draft (`published: false`) visibility rules — "an admin or the resource's current owner can see it, nobody else, and it doesn't even appear in a list for anyone else" — used to be re-derived inline in each service, which is how `session.service.js`'s list endpoints (`getSessionsByTrack` in particular) ended up with no draft filtering and no content redaction at all, even though `getSessionById` had a version of it and `track`/`course` detail endpoints had another. `src/services/policy.service.js` is now the one place that logic lives (`isAdmin`, `isOwnerOf`, `canViewDraft`, `canViewResource`, `publishedListFilter`), used by every session/track/course read path. It is scoped to **read/visibility only** for now; management-permission checks (create/edit/delete/grade) still go through `checkOwnership`. A later stage extends this same layer to cover current-role/current-staff-membership-based management authorization (never historical `createdBy`) once co-instructor support lands.
+
 ---
 
 ## 🛡️ Security
@@ -663,6 +667,7 @@ Rather than changing the global `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env var
 | **Ownership**           | Instructors can only mutate their own content; review authors can only delete their own review; admins bypass both                                                                                                          |
 | **Body Spoofing**       | Controllers delete `req.body.instructor`, `req.body.students`, etc. before saving                                                                                                                                           |
 | **Data Exposure**       | Enrolled-student lists (name/email/photo) on public track/course detail pages are only populated for the owner, an admin, or an enrolled caller — never shown to anonymous or unrelated visitors                            |
+| **Draft Visibility**    | `published: false` tracks/courses/sessions are invisible (404, not content-redacted) to anyone but their current owner or an admin, on both single-item and list endpoints (`src/services/policy.service.js`)             |
 | **Audit Trail**         | `activityLog.service.js` writes are internal-only (no public `POST` endpoint) — a client can never forge its own history; a failed audit write is logged and swallowed, never allowed to fail the request that triggered it |
 
 ---
@@ -855,7 +860,7 @@ tests/
 ├── error.controller.test.js, errorHandling.test.js, app.test.js, APIFeatures.test.js
 ```
 
-60 test files (616 tests) span auth (incl. `rememberMe` session length), password recovery, every CRUD resource (tracks/courses/sessions/events/announcements), enrollment + the MongoDB transaction paths in `cascade.service.js`, reviews, assignments (incl. grading), weekly tasks, contact (public + admin), activity logs (audit-trail read/write + auth/role guards), dashboard stats (period-boundary math, snapshot generation/upsert, trends, prune), model-level field validators, middleware edge cases, the global error handler, and `src/app.js`'s own production-vs-development configuration. See **[TESTING.md](./TESTING.md)** for the full file-by-file coverage table and the (short) list of what's still deliberately untested — mainly that email-sending is mocked everywhere rather than asserted on, and a couple of narrow model-validator edge cases.
+64 test files span auth (incl. `rememberMe` session length), password recovery, every CRUD resource (tracks/courses/sessions/events/announcements), enrollment + the MongoDB transaction paths in `cascade.service.js`, reviews, assignments (incl. grading), weekly tasks, contact (public + admin), activity logs (audit-trail read/write + auth/role guards), dashboard stats (period-boundary math, snapshot generation/upsert, trends, prune), model-level field validators, middleware edge cases, the global error handler, and `src/app.js`'s own production-vs-development configuration. See **[TESTING.md](./TESTING.md)** for the full file-by-file coverage table and the (short) list of what's still deliberately untested — mainly that email-sending is mocked everywhere rather than asserted on, and a couple of narrow model-validator edge cases.
 
 ---
 
@@ -888,7 +893,7 @@ tests/
 
 * [x] Request Correlation IDs — full implementation with `AsyncLocalStorage`, automatic injection into every log, and `X-Request-ID` round-trip to clients
 
-- [x] Jest + Supertest test setup — in-memory MongoDB **replica set** (enabling real transaction tests), shared fixture builders, a global Email mock, and 60 test files covering auth, password recovery, every CRUD resource, enrollment + cascade transactions, reviews, assignments, weekly tasks, contact, activity logs, dashboard stats, model validators, middleware edge cases, the global error handler, and `app.js` config (see [TESTING.md](./TESTING.md) for the full breakdown)
+- [x] Jest + Supertest test setup — in-memory MongoDB **replica set** (enabling real transaction tests), shared fixture builders, a global Email mock, and 64 test files covering auth, password recovery, every CRUD resource, enrollment + cascade transactions, reviews, assignments, weekly tasks, contact, activity logs, dashboard stats, model validators, middleware edge cases, the global error handler, and `app.js` config (see [TESTING.md](./TESTING.md) for the full breakdown)
 - [x] **Activity Logs** (`activityLog.model.js` / `activityLog.service.js`) — server-written audit trail (no public create endpoint), self-service "my activity" timeline, admin listing/per-user lookup/aggregated summary, and retention pruning
 - [x] **Admin Analytics Dashboard** (`dashboardStats.model.js` / `dashboardStats.service.js`) — live on-demand stats plus persisted, upsertable daily/weekly/monthly snapshots for trend charts, a cron-friendly CLI generator (`scripts/generateDashboardSnapshot.js`), and retention pruning
 - [x] **Announcement audience filtering** — `GET /v1/announcements` now filters by `audience`/`targetTrack`/`targetCourse`: everyone sees `audience: 'all'`, plus `'track'`/`'course'`-targeted announcements for a track/course they're enrolled in; the creating instructor can also see their own targeted announcement regardless of enrollment; admins see everything
@@ -908,6 +913,8 @@ tests/
 - [x] **Full cascade cleanup on user delete** — `cascade.service.js#hardDeleteUserCascade` now also pulls a deleted user from `Track.pendingStudents` and `Track.pendingLeaves` (previously only `Track.students` was cleaned up, which is exactly how stale pending entries could accumulate — see `scripts/cleanupOrphanedTrackReferences.js`), plus their own `Session.progress` entry.
 - [x] **`GET /tracks/:id/pending` includes leave requests** — now returns `pendingStudents` *and* `pendingLeaves` together, so the frontend doesn't need a second call to `GET /tracks/:id/leaves` (which still works standalone) just to show both in one view.
 - [x] **Course/track sync on create and update** — `POST /courses` and `PATCH /courses/:id` now route a `track` field through the same `trackService.addCourseToTrack`/`removeCourseFromTrack` functions the dedicated `/tracks/:trackId/courses/:courseId` endpoints already used, instead of writing `course.track` directly. Previously `Track.courses` could silently fall out of sync with which courses actually point at it. Detaching (`track: null`) enforces the same "a track needs at least one course or session" guard the dedicated `DELETE` endpoint has; attaching/detaching either way requires owning the target track (or being admin) — closing an authorization gap the old direct-write path didn't check either. `scripts/reconcileTrackCourses.js` backfills any tracks already desynced from before this fix.
+- [x] **Draft visibility, everywhere (BACKEND-REQUESTS-2 stage 1)** — a new `src/services/policy.service.js` is now the one place "can this caller see this draft?" is decided. Closes the gap where `GET /sessions/track/:trackId` (and `/sessions/instructor/:id`, `/sessions/student/:id`) applied **no** draft filtering or content redaction at all — a `published: false` session's `url`, `embedUrl`, `resources`, and even the raw per-student `progress` array could reach a student through those endpoints even though `GET /sessions/:id` was already gated. `GET /sessions/:id` itself gained the same "404, not redacted" rule `GET /tracks/:id` and `GET /courses/:id` already had, and the bare list endpoints (`GET /sessions`, `GET /tracks`, `GET /courses`) now exclude drafts the caller isn't authorized for instead of returning every record regardless of `published`. An admin or the resource's current `instructor` always sees their own drafts.
+- [x] **YouTube added to the trusted-host allowlist, one list to rule them all** — `src/utils/trustedHosts.js` now includes `youtube.com` / `youtu.be` / `youtube-nocookie.com` (subdomains like `www.`/`m.` are covered automatically). `Session.url`'s old hardcoded youtube/drive regex fast-path (which also quietly allowed non-`https` URLs) is gone — every URL field in the app, Mongoose- or Joi-validated, now goes through the exact same `isTrustedHost()` check. The list is also served at `GET /v1/config/trusted-hosts` so a form can warn about an untrusted host before submitting instead of only finding out from a 400.
 
 ### Planned 🔮
 
@@ -919,6 +926,8 @@ tests/
 - [ ] **`search()` uses regex instead of the `text` indexes that already exist** — `Track`/`Course` both define MongoDB `text` indexes, but `APIFeatures.js#search()` builds a `$regex` `$or` query, which can't use them. Fine at current data volume; would need attention if search performance ever becomes a problem.
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
 - [ ] **Full test coverage** — still need tests
+- [ ] **BACKEND-REQUESTS-2 stages 2–6** — public membership-array reduction (`students`/`pendingStudents`/`pendingLeaves` → `studentCount`/`isEnrolled`/`isPending`), `createdBy` attribution field + idempotent backfill script, the co-instructor/per-course-instructor permission model (multiple instructors per track, per-course instructor, current-role-based authorization instead of "only the creator"), staff submission/ungraded counts, and the `Track.sessions`/`courseCount` sync + repair pass. See the stage plan in this response's chat history / commit messages for the full breakdown.
+- [ ] **Session list routes require authentication even for public content** — `session.route.js` applies `router.use(protect)` before every route, including `GET /sessions` (which also has `optionalAuth`, currently unreachable dead code since `protect` already ran). `track.route.js`/`course.route.js` don't have this restriction. Worth a decision: should published, `access: 'public'` sessions be anonymously browsable the way tracks/courses are, given self-enrollment implies previewing before enrolling?
 
 ---
 

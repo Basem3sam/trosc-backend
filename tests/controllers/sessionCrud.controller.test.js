@@ -7,7 +7,8 @@ const { buildStandaloneSessionFixture } = require('../helpers/fixtures');
 describe('Session Controller – list / update / delete / leaveMe', () => {
   describe('GET /v1/sessions', () => {
     it('returns all sessions with pagination info', async () => {
-      const { studentToken } = await buildStandaloneSessionFixture();
+      const { studentToken, session } = await buildStandaloneSessionFixture();
+      await Session.findByIdAndUpdate(session._id, { published: true });
 
       const res = await request(app)
         .get('/v1/sessions')

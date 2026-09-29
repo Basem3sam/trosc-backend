@@ -39,8 +39,18 @@ describe('Course Service', () => {
   describe('getAllCourses', () => {
     it('returns paginated courses', async () => {
       await Course.create([
-        { title: 'AAA', description: '1', instructor: instructor._id },
-        { title: 'BBB', description: '2', instructor: instructor._id },
+        {
+          title: 'AAA',
+          description: '1',
+          instructor: instructor._id,
+          published: true,
+        },
+        {
+          title: 'BBB',
+          description: '2',
+          instructor: instructor._id,
+          published: true,
+        },
       ]);
       const result = await courseService.getAllCourses({ limit: 1, page: 1 });
       expect(result.courses).toHaveLength(1);

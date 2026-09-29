@@ -7,7 +7,46 @@ const Review = require('../models/review.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
+const policy = require('./policy.service');
 const { logActivity } = require('./activityLog.service');
+
+// #1.1/#1.2/Q2: the ONE place every session LIST endpoint (getAllSessions,
+// getSessionsByInstructor, getSessionsByTrack, getSessionsByStudent) runs
+// its results through before responding, so the url/embedUrl/resources
+// gate and the "never expose the raw progress array" rule can't drift
+// between endpoints the way they had — getSessionsByTrack in particular
+// previously applied neither, which is exactly how a draft session's
+// url reached a student via that endpoint.
+//
+// NOTE: this only redacts fields per-document; it does NOT decide which
+// documents are in the list at all. Callers are responsible for applying
+// `policy.publishedListFilter()` to their query so draft sessions the
+// caller isn't authorized for never reach this function in the first
+// place (Q5's "draft listing behavior" contract).
+function sanitizeSessionList(sessions, requestingUser) {
+  const userId = requestingUser?.id;
+  const isAdmin = policy.isAdmin(requestingUser);
+
+  return sessions.map((s) => {
+    const obj = typeof s.toObject === 'function' ? s.toObject() : { ...s };
+
+    const isOwner = policy.isOwnerOf(obj, requestingUser, 'instructor');
+    const isDirectStudent =
+      !!userId &&
+      obj.students?.some(
+        (student) => (student._id ?? student)?.toString() === userId,
+      );
+
+    if (!isAdmin && !isOwner && !isDirectStudent) {
+      delete obj.url;
+      delete obj.embedUrl;
+      delete obj.resources;
+    }
+    delete obj.students; // was only populated for the gating check above
+    delete obj.progress; // internal — never expose the full watched-list here
+    return obj;
+  });
+}
 
 exports.createSession = async (sessionData, requestingUserId) => {
   const session = await Session.create(sessionData);
@@ -24,8 +63,15 @@ exports.createSession = async (sessionData, requestingUserId) => {
 };
 
 exports.getAllSessions = async (query, requestingUser = null) => {
+  // #1.1/Q5: draft sessions the caller isn't authorized for are excluded
+  // from the list entirely (not just content-redacted) — admins see
+  // everything, everyone else sees published sessions plus any drafts
+  // they themselves own. Passed as APIFeatures' defaultFilter (merged
+  // into `conditions`, which also drives the pagination count) rather
+  // than pre-filtering Session.find() directly, so `total`/`totalPages`
+  // stay accurate for whichever documents the caller can actually see.
   const features = new APIFeatures(Session.find(), query, Session)
-    .filter()
+    .filter(policy.publishedListFilter(requestingUser))
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -36,33 +82,9 @@ exports.getAllSessions = async (query, requestingUser = null) => {
     .populate('instructor', 'name email role')
     .populate('students', 'role');
 
-  const userId = requestingUser?.id;
-  const isAdmin = requestingUser?.role === 'admin';
-
-  // M16: previously stripped url/embedUrl/resources unconditionally, even
-  // for the session's own instructor or an admin — meaning an instructor
-  // couldn't audit their own session URLs via the list view. Apply the
-  // same owner/admin/direct-student gate getSessionById uses. Track- or
-  // course-only enrollment is intentionally NOT checked here (that would
-  // mean an extra query per session in a paginated list) — those viewers
-  // still get the gated (safe) view, same as before this fix.
-  const sanitized = sessions.map((s) => {
-    const obj = s.toObject();
-
-    const isOwner = !!userId && obj.instructor?._id?.toString() === userId;
-    const isDirectStudent =
-      !!userId &&
-      obj.students?.some((student) => student._id?.toString() === userId);
-
-    if (!isAdmin && !isOwner && !isDirectStudent) {
-      delete obj.url;
-      delete obj.embedUrl;
-      delete obj.resources;
-    }
-    delete obj.students; // was only populated for the gating check above
-    delete obj.progress; // internal — never expose the full watched-list here
-    return obj;
-  });
+  // M16/#1.1/#1.2: field-level redaction (url/embedUrl/resources/progress)
+  // for whichever documents made it past the visibility filter above.
+  const sanitized = sanitizeSessionList(sessions, requestingUser);
 
   return {
     sessions: sanitized || [],
@@ -99,8 +121,19 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
   }
 
   const userId = requestingUser?.id;
-  const isAdmin = requestingUser?.role === 'admin';
-  const isOwner = !!userId && sessionObj.instructor?._id?.toString() === userId;
+  const isAdmin = policy.isAdmin(requestingUser);
+  const isOwner = policy.isOwnerOf(sessionObj, requestingUser, 'instructor');
+
+  // #1.1/Q2: same "draft is invisible, not just content-redacted" rule
+  // track.service.js#getTrackDetails and course.service.js#getCourseDetails
+  // already enforce for their own detail endpoints — this endpoint was
+  // missing it, which is exactly how an unpublished `[TEST]` session (and
+  // its `url`) reached a student directly. Reuses the "session not found"
+  // message so a draft's existence isn't distinguishable from it truly
+  // not existing.
+  if (!policy.canViewResource(sessionObj, requestingUser, 'instructor')) {
+    throw new AppError('Session not found', 404);
+  }
 
   // Enrollment status is computed whenever there's a requester, regardless
   // of admin/owner status — it's used both for the content gate below and
@@ -294,41 +327,59 @@ exports.removeStudentFromSession = async (sessionId, studentId) => {
   return updatedSession;
 };
 
-exports.getSessionsByInstructor = async (instructorId, query) => {
+exports.getSessionsByInstructor = async (
+  instructorId,
+  query,
+  requestingUser = null,
+) => {
+  // #1.1/#1.2: this endpoint previously applied neither the draft filter
+  // nor the url/embedUrl/resources/progress redaction getAllSessions
+  // already had — same fix as getSessionsByTrack below, applied here too
+  // for consistency (Q2: "apply the same privacy principle consistently
+  // across all session read endpoints").
   const features = new APIFeatures(Session.find(), query, Session)
-    .filter({ instructor: instructorId })
+    .filter({
+      instructor: instructorId,
+      ...policy.publishedListFilter(requestingUser),
+    })
     .search(['title', 'description'])
     .sort()
     .limitFields();
 
   await features.paginate();
 
-  const sessions = await features.query.populate(
-    'instructor',
-    'name email role',
-  );
+  const sessions = await features.query
+    .populate('instructor', 'name email role')
+    .populate('students', 'role');
+
   return {
-    sessions: sessions || [],
+    sessions: sanitizeSessionList(sessions, requestingUser) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
 };
 
-exports.getSessionsByTrack = async (trackId, query) => {
+exports.getSessionsByTrack = async (trackId, query, requestingUser = null) => {
+  // #1.1/#1.2: previously the one endpoint with NO sanitization at all —
+  // a draft session's `url` (and the full per-student `progress` array)
+  // reached any caller, including students, via this exact path.
   const features = new APIFeatures(Session.find(), query, Session)
-    .filter({ tracks: trackId })
+    .filter({
+      tracks: trackId,
+      ...policy.publishedListFilter(requestingUser),
+    })
     .search(['title', 'description'])
     .sort()
     .limitFields();
 
   await features.paginate();
 
-  const sessions = await features.query.populate(
-    'instructor',
-    'name email role',
-  );
+  const sessions = await features.query
+    .populate('instructor', 'name email role')
+    .populate('students', 'role');
+
   return {
-    sessions: sessions || [],
+    sessions: sanitizeSessionList(sessions, requestingUser) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -418,7 +469,17 @@ exports.setSessionProgress = async (sessionId, requestingUser, status) => {
   return { status: myEntry.status, watchedAt: myEntry.watchedAt };
 };
 
-exports.getSessionsByStudent = async (studentId, query) => {
+exports.getSessionsByStudent = async (
+  studentId,
+  query,
+  requestingUser = null,
+) => {
+  // Route-level guard (session.route.js) already restricts the caller to
+  // the student themselves or an admin, so `students: studentId` alone
+  // already implies enrollment — no separate visibility filter is needed
+  // here the way the instructor/track listings above need one. Still runs
+  // through the shared sanitizer for consistency (Q2) and so the raw
+  // `progress` array never leaks even here.
   const features = new APIFeatures(Session.find(), query, Session)
     .filter({ students: studentId })
     .sort()
@@ -426,13 +487,12 @@ exports.getSessionsByStudent = async (studentId, query) => {
 
   await features.paginate();
 
-  const sessions = await features.query.populate(
-    'instructor',
-    'name email role',
-  );
+  const sessions = await features.query
+    .populate('instructor', 'name email role')
+    .populate('students', 'role');
 
   return {
-    sessions: sessions || [],
+    sessions: sanitizeSessionList(sessions, requestingUser) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };

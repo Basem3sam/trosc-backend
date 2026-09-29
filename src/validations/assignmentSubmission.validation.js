@@ -47,7 +47,7 @@ const fileUrlSchema = Joi.string()
   }, 'Submission file URL validation')
   .messages({
     'any.invalid':
-      'Submission file must be a valid URL from a trusted host (Google Drive, Dropbox, GitHub, Cloudinary, Imgur)',
+      'Submission file must be a valid HTTPS URL from a trusted host (YouTube, Google Drive, Dropbox, GitHub, Cloudinary, Imgur) — see GET /v1/config/trusted-hosts for the full list',
     'attachment.dangerous': 'Executable files are not allowed as submissions',
     'string.empty': 'Submission file URL is required',
   });

@@ -23,6 +23,7 @@ exports.createCourse = catchAsync(async (req, res, next) => {
 exports.getAllCourses = catchAsync(async (req, res, next) => {
   const { courses, total, pagination } = await courseService.getAllCourses(
     req.query,
+    req.user,
   );
 
   res.status(200).json({
