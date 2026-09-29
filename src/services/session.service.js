@@ -476,10 +476,15 @@ exports.getSessionsByStudent = async (
 ) => {
   // Route-level guard (session.route.js) already restricts the caller to
   // the student themselves or an admin, so `students: studentId` alone
-  // already implies enrollment — no separate visibility filter is needed
-  // here the way the instructor/track listings above need one. Still runs
-  // through the shared sanitizer for consistency (Q2) and so the raw
-  // `progress` array never leaks even here.
+  // already implies the caller is authorized to see this session's own
+  // content in full — unlike getAllSessions/getSessionsByTrack/
+  // getSessionsByInstructor, url/embedUrl/resources/students are NOT
+  // redacted here (the shared sanitizeSessionList() would incorrectly
+  // strip `students`, which the frontend legitimately reads off this
+  // endpoint to confirm the caller's own enrollment). The one thing still
+  // stripped is the raw `progress` array — a session can have several
+  // enrolled students, and that array would otherwise leak every other
+  // student's watch status to this caller (#1.2).
   const features = new APIFeatures(Session.find(), query, Session)
     .filter({ students: studentId })
     .sort()
@@ -487,12 +492,19 @@ exports.getSessionsByStudent = async (
 
   await features.paginate();
 
-  const sessions = await features.query
-    .populate('instructor', 'name email role')
-    .populate('students', 'role');
+  const sessions = await features.query.populate(
+    'instructor',
+    'name email role',
+  );
+
+  const sanitized = sessions.map((s) => {
+    const obj = s.toObject();
+    delete obj.progress;
+    return obj;
+  });
 
   return {
-    sessions: sanitizeSessionList(sessions, requestingUser) || [],
+    sessions: sanitized || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
