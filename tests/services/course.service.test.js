@@ -119,7 +119,12 @@ describe('Course Service', () => {
       expect(resultAdmin.students).toBeDefined();
     });
 
-    it('returns students as ObjectId instances (not populated) for outsiders', async () => {
+    // Q7: previously this left the raw `students` array in place (just
+    // unpopulated ObjectIds instead of names) for anyone who wasn't
+    // owner/admin/enrolled — still an internal-membership-array leak,
+    // just without the PII attached. Now it's removed entirely and
+    // replaced with the count + the caller's own enrollment status.
+    it('replaces students with studentCount/isEnrolled for outsiders', async () => {
       const course = await Course.create({
         title: 'Public Course',
         description: 'test',
@@ -132,13 +137,23 @@ describe('Course Service', () => {
         id: sId(outsider),
         role: 'student',
       });
-      // The students field should be an array of ObjectId instances (not populated)
-      expect(result.students).toBeDefined();
-      expect(Array.isArray(result.students)).toBe(true);
-      // Check that the first element is an ObjectId (instance of mongoose.Types.ObjectId)
-      expect(result.students[0]).toBeInstanceOf(mongoose.Types.ObjectId);
-      // Or check that it does NOT have a 'name' property (populated would have name)
-      expect(result.students[0].name).toBeUndefined();
+      expect(result.students).toBeUndefined();
+      expect(result.studentCount).toBe(1);
+      expect(result.isEnrolled).toBe(false);
+    });
+
+    it('replaces students with studentCount/isEnrolled for an anonymous caller too', async () => {
+      const course = await Course.create({
+        title: 'Public Course 2',
+        description: 'test',
+        instructor: instructor._id,
+        students: [student._id],
+        published: true,
+      });
+      const result = await courseService.getCourseDetails(course._id, null);
+      expect(result.students).toBeUndefined();
+      expect(result.studentCount).toBe(1);
+      expect(result.isEnrolled).toBe(false);
     });
   });
 

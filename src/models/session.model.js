@@ -56,10 +56,22 @@
  *           example: "507f1f77bcf86cd799439011"
  *         students:
  *           type: array
- *           description: List of enrolled students
+ *           description: >
+ *             List of enrolled students. Only present in the API response
+ *             when the requester can see the session's content (its
+ *             instructor, an admin, or someone enrolled directly or via a
+ *             parent track/course). Everyone else gets `studentCount` +
+ *             `isEnrolled` instead.
  *           items:
  *             type: string
  *             example: "507f1f77bcf86cd799439012"
+ *         studentCount:
+ *           type: integer
+ *           description: Number of directly-enrolled students (always present, for everyone)
+ *           example: 30
+ *         isEnrolled:
+ *           type: boolean
+ *           description: Whether the requesting user is enrolled in this session — directly, via a parent track, or via a parent course (always present when authenticated)
  *         tracks:
  *           type: array
  *           description: Parent track IDs this session belongs to
@@ -458,6 +470,14 @@ sessionSchema.index({ course: 1 });
 sessionSchema.index({ instructor: 1 });
 // For published + level filtering
 sessionSchema.index({ published: 1, level: 1 });
+
+// Q7: matches Track/Course's existing studentCount virtual — lets list/
+// detail responses report how many students are enrolled without ever
+// exposing the raw `students` array to a caller who isn't authorized to
+// see it (src/services/policy.service.js#redactMembership).
+sessionSchema.virtual('studentCount').get(function studentCount() {
+  return this.students ? this.students.length : 0;
+});
 
 sessionSchema.pre('save', function setIsStandalone(next) {
   // Auto-set isStandalone based on relationships

@@ -75,8 +75,25 @@ exports.getAllTracks = async (query, requestingUser = null) => {
   // Execute the query and get results
   const tracks = await features.query;
 
+  // Q7: previously returned every track's raw `students`/`pendingStudents`/
+  // `pendingLeaves` ID arrays to literally any caller, including
+  // anonymous — replaced with `studentCount` (already a schema virtual)
+  // plus `isEnrolled`/`isPending`/`isPendingLeave` for the requester.
+  // Each track's own instructor (or an admin) still gets the full arrays.
+  const sanitized = tracks.map((t) => {
+    const obj = t.toObject();
+    const isStaff =
+      policy.isAdmin(requestingUser) ||
+      policy.isOwnerOf(obj, requestingUser, 'instructor');
+    return policy.redactMembership(obj, requestingUser, isStaff, {
+      isEnrolled: 'students',
+      isPending: 'pendingStudents',
+      isPendingLeave: 'pendingLeaves',
+    });
+  });
+
   return {
-    tracks: tracks || [], // Ensure it's always an array
+    tracks: sanitized || [], // Ensure it's always an array
     total: features.totalDocs || 0,
     pagination: features.pagination, // Include pagination info
   };
@@ -130,13 +147,9 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
     throw new AppError('No track found with that ID', 404);
   }
 
-  const isOwner = requestingUser?.id === track.instructor?._id?.toString();
-  const isAdmin = requestingUser?.role === 'admin';
-  const isEnrolled =
-    requestingUser &&
-    track.students?.some(
-      (studentId) => studentId.toString() === requestingUser.id,
-    );
+  const isOwner = policy.isOwnerOf(track, requestingUser, 'instructor');
+  const isAdmin = policy.isAdmin(requestingUser);
+  const isEnrolled = policy.isMemberOf(track.students, requestingUser);
 
   if (!track.published && !isOwner && !isAdmin) {
     throw new AppError('No track found with that ID', 404);
@@ -146,7 +159,27 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
     await track.populate({ path: 'students', select: 'name email photo' });
   }
 
-  return track;
+  // Q7: `pendingStudents`/`pendingLeaves` had NO gate at all before this —
+  // anyone who could see the track (including an enrolled-but-not-staff
+  // student) got the raw applicant/leave-request ID lists. Only the
+  // track's own instructor or an admin is "staff" for these two fields —
+  // being merely enrolled doesn't qualify, unlike for `students` above.
+  // Everyone else gets `isPending`/`isPendingLeave` for their own status
+  // instead. `students`, when NOT populated above (i.e. the caller is
+  // none of owner/admin/enrolled), still needs the same raw-ID-array fix
+  // `getAllTracks` already got — replaced with `studentCount` (schema
+  // virtual, already present) + `isEnrolled: false`.
+  const trackObj = track.toObject();
+  trackObj.isEnrolled = isEnrolled;
+  policy.redactMembership(trackObj, requestingUser, isOwner || isAdmin, {
+    isPending: 'pendingStudents',
+    isPendingLeave: 'pendingLeaves',
+  });
+  if (!(isOwner || isAdmin || isEnrolled)) {
+    delete trackObj.students;
+  }
+
+  return trackObj;
 };
 
 /**
@@ -519,6 +552,18 @@ exports.getPopularTracks = async (limit = 10) => {
         'instructor.passwordChangedAt': 0,
         'instructor.passwordResetToken': 0,
         'instructor.passwordResetExpires': 0,
+        // Q7: this endpoint is fully public (no auth on the route, no
+        // requestingUser param here to compute isEnrolled/isPending
+        // against) — an aggregation pipeline also bypasses Mongoose's
+        // toObject()/virtuals machinery entirely, so `policy.
+        // redactMembership()` doesn't apply here the way it does for
+        // getAllTracks/getTrackDetails. studentCount was already added
+        // above via $addFields; the raw arrays are unconditionally
+        // excluded since there's no legitimate "staff" viewer of a
+        // public leaderboard endpoint.
+        students: 0,
+        pendingStudents: 0,
+        pendingLeaves: 0,
       },
     },
   ]);

@@ -21,7 +21,8 @@ describe('Track/Course list draft visibility (Q5)', () => {
     const ownerPair = await createTestUser({ role: 'instructor' });
     owner = ownerPair.user;
     ownerToken = ownerPair.token;
-    otherInstructorToken = (await createTestUser({ role: 'instructor' })).token;
+    otherInstructorToken = (await createTestUser({ role: 'instructor' }))
+      .token;
     studentToken = (await createTestUser({ role: 'student' })).token;
     adminToken = (await createTestUser({ role: 'admin' })).token;
 

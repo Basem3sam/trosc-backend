@@ -30,7 +30,9 @@ describe('policy.service', () => {
     it('supports a custom ownerField', () => {
       const resource = { createdBy: 'inst1' };
       expect(policy.isOwnerOf(resource, instructor, 'createdBy')).toBe(true);
-      expect(policy.isOwnerOf(resource, instructor, 'instructor')).toBe(false);
+      expect(policy.isOwnerOf(resource, instructor, 'instructor')).toBe(
+        false,
+      );
     });
 
     it('is false with no user or no resource', () => {
@@ -70,6 +72,68 @@ describe('policy.service', () => {
       expect(policy.canViewResource(resource, instructor)).toBe(true);
       expect(policy.canViewResource(resource, otherInstructor)).toBe(false);
       expect(policy.canViewResource(resource, null)).toBe(false);
+    });
+  });
+
+  describe('isMemberOf', () => {
+    it('matches a bare ObjectId-like string in the list', () => {
+      expect(policy.isMemberOf(['stu1', 'stu2'], student)).toBe(true);
+      expect(policy.isMemberOf(['stu2'], student)).toBe(false);
+    });
+
+    it('matches a populated sub-document via _id', () => {
+      expect(
+        policy.isMemberOf([{ _id: 'stu1', name: 'Alice' }], student),
+      ).toBe(true);
+    });
+
+    it('is false with no user, an empty list, or a non-array', () => {
+      expect(policy.isMemberOf(['stu1'], null)).toBe(false);
+      expect(policy.isMemberOf([], student)).toBe(false);
+      expect(policy.isMemberOf(undefined, student)).toBe(false);
+    });
+  });
+
+  describe('redactMembership', () => {
+    it('returns the object untouched when isStaff is true', () => {
+      const obj = { students: ['stu1'], pendingStudents: ['stu2'] };
+      const result = policy.redactMembership(obj, student, true, {
+        isEnrolled: 'students',
+        isPending: 'pendingStudents',
+      });
+      expect(result).toBe(obj); // same reference, nothing removed
+      expect(result.students).toEqual(['stu1']);
+      expect(result.pendingStudents).toEqual(['stu2']);
+    });
+
+    it('replaces each mapped array with a boolean flag and deletes the array, for non-staff', () => {
+      const obj = {
+        students: ['stu1', 'other'],
+        pendingStudents: ['someone-else'],
+      };
+      const result = policy.redactMembership(obj, student, false, {
+        isEnrolled: 'students',
+        isPending: 'pendingStudents',
+      });
+      expect(result.students).toBeUndefined();
+      expect(result.pendingStudents).toBeUndefined();
+      expect(result.isEnrolled).toBe(true);
+      expect(result.isPending).toBe(false);
+    });
+
+    it('leaves a field alone if it is not present on the object at all', () => {
+      const obj = { students: ['stu1'] };
+      const result = policy.redactMembership(obj, student, false, {
+        isEnrolled: 'students',
+        isPendingLeave: 'pendingLeaves', // not present on obj
+      });
+      expect(result.isEnrolled).toBe(true);
+      expect('isPendingLeave' in result).toBe(false);
+      expect('pendingLeaves' in result).toBe(false);
+    });
+
+    it('is a no-op on a null/undefined object', () => {
+      expect(policy.redactMembership(null, student, false, {})).toBeNull();
     });
   });
 

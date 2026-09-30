@@ -111,10 +111,71 @@ function canViewResource(resource, user, ownerField = 'instructor') {
   return canViewDraft(resource, user, ownerField);
 }
 
+// ---------------------------------------------------------------------
+// Membership-array redaction (BACKEND-REQUESTS-2 Q7, stage 2)
+//
+// Track/Course/Session all store membership as raw ObjectId arrays
+// (`students`, and on Track only, `pendingStudents`/`pendingLeaves`).
+// Detail endpoints already gated the *populated* (name/email/photo)
+// version of `students` behind owner/admin/enrolled — but the raw,
+// un-populated array underneath was never actually removed for anyone
+// else, so an outsider (or even an anonymous caller, on list endpoints)
+// still received bare IDs. `pendingStudents`/`pendingLeaves` had no gate
+// at all: literally anyone could see who has an application or a leave
+// request pending. `isMemberOf`/`redactMembership` below are the one
+// place that gets fixed.
+
+/**
+ * @param {Array|undefined} list - raw ObjectIds, populated sub-documents,
+ *   or a mix; also safely handles `undefined` (field not selected/loaded)
+ * @param {{ id?: string } | null | undefined} user
+ * @returns {boolean} true if `user.id` appears anywhere in `list`
+ */
+function isMemberOf(list, user) {
+  if (!user || !Array.isArray(list)) return false;
+  return list.some((item) => (item?._id ?? item)?.toString() === user.id);
+}
+
+/**
+ * Mutates and returns a plain object (already `.toObject()`'d, NOT a live
+ * Mongoose document — deleting schema paths on a document doesn't
+ * reliably stick) so that a caller who isn't staff for this resource
+ * never sees its raw membership arrays, only booleans about their own
+ * status. Staff (per `isStaffFields`, since different arrays can have
+ * different "who's staff for this" answers — see the pendingStudents/
+ * pendingLeaves note below) get the object back completely untouched.
+ *
+ * Each entry in `fields` maps an output flag name to the array field it's
+ * derived from, e.g. `{ isEnrolled: 'students', isPending: 'pendingStudents' }`.
+ * `studentCount` is deliberately NOT produced here — it's already a
+ * schema virtual on Track/Course/Session (`toObject({ virtuals: true })`
+ * puts it on `obj` before this function ever runs), so there's nothing
+ * for this function to add for it.
+ *
+ * @param {Object} obj - plain object to redact in place
+ * @param {{ id?: string } | null | undefined} user
+ * @param {boolean} isStaff - true skips redaction entirely (owner/admin)
+ * @param {Object<string,string>} fields - { outputFlagName: arrayFieldName }
+ * @returns {Object} `obj`, mutated
+ */
+function redactMembership(obj, user, isStaff, fields) {
+  if (isStaff || !obj) return obj;
+
+  Object.entries(fields).forEach(([flagName, arrayField]) => {
+    if (obj[arrayField] === undefined) return;
+    obj[flagName] = isMemberOf(obj[arrayField], user);
+    delete obj[arrayField];
+  });
+
+  return obj;
+}
+
 module.exports = {
   isAdmin,
   isOwnerOf,
   canViewDraft,
   canViewResource,
   publishedListFilter,
+  isMemberOf,
+  redactMembership,
 };

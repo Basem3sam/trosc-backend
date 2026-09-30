@@ -36,18 +36,43 @@
  *             example: "507f1f77bcf86cd799439041"
  *         students:
  *           type: array
- *           description: List of enrolled students
+ *           description: >
+ *             List of enrolled students. Only present in the API response
+ *             for the track's current instructor or an admin, or (with
+ *             name/email/photo populated) for the requester themself when
+ *             they're enrolled. Everyone else gets `studentCount` +
+ *             `isEnrolled` instead — this field is simply absent from
+ *             their response, not emptied.
  *           items:
  *             type: string
  *             example: "507f1f77bcf86cd799439012"
  *         pendingStudents:
  *           type: array
  *           items: { type: string }
- *           description: Students awaiting enrollment approval
+ *           description: >
+ *             Students awaiting enrollment approval. Only present for the
+ *             track's current instructor or an admin — being merely
+ *             enrolled doesn't qualify. Everyone else gets `isPending`
+ *             (their own status) instead.
  *         pendingLeaves:
  *           type: array
  *           items: { type: string }
- *           description: Students awaiting leave approval
+ *           description: >
+ *             Students awaiting leave approval. Same staff-only rule as
+ *             `pendingStudents`; everyone else gets `isPendingLeave`.
+ *         studentCount:
+ *           type: integer
+ *           description: Number of enrolled students (always present, for everyone)
+ *           example: 42
+ *         isEnrolled:
+ *           type: boolean
+ *           description: Whether the requesting user is enrolled in this track (always present when authenticated)
+ *         isPending:
+ *           type: boolean
+ *           description: Whether the requesting user has a pending enrollment application (only present when `pendingStudents` is absent from the response)
+ *         isPendingLeave:
+ *           type: boolean
+ *           description: Whether the requesting user has a pending leave request (only present when `pendingLeaves` is absent from the response)
  *         sessions:
  *           type: array
  *           description: List of sessions belonging to this track

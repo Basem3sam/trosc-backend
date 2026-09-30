@@ -42,6 +42,11 @@ function sanitizeSessionList(sessions, requestingUser) {
       delete obj.embedUrl;
       delete obj.resources;
     }
+    // Q7: studentCount is already on `obj` (schema virtual, computed off
+    // the live document before `students` is deleted below); isEnrolled
+    // reuses the direct-enrollment check above so list views get the
+    // same studentCount/isEnrolled shape the detail endpoints do.
+    obj.isEnrolled = !!isDirectStudent;
     delete obj.students; // was only populated for the gating check above
     delete obj.progress; // internal — never expose the full watched-list here
     return obj;
@@ -168,18 +173,21 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
   // parent track, or via a parent course.
   const canSeeContent = isAdmin || isOwner || isEnrolled;
 
+  sessionObj.isEnrolled = isEnrolled;
+
   if (!canSeeContent) {
     delete sessionObj.url;
     delete sessionObj.embedUrl;
     delete sessionObj.resources;
-    // M3: students were populated with name/email/role above regardless
-    // of viewer — course.service.js#getCourseDetails and
+    // M3/Q7: students were populated with name/email/role above
+    // regardless of viewer — course.service.js#getCourseDetails and
     // track.service.js#getTrackDetails only populate that for
-    // owner/admin/enrolled. Collapse to bare IDs for everyone else so an
-    // outsider can't read classmates' emails off a session detail call.
-    if (sessionObj.students) {
-      sessionObj.students = sessionObj.students.map((s) => s._id ?? s);
-    }
+    // owner/admin/enrolled. Previously this collapsed to bare IDs for
+    // everyone else, which was still an unnecessary internal-array
+    // exposure (Q7) even without the names attached — replaced with
+    // `studentCount` (schema virtual, already present on sessionObj)
+    // + the `isEnrolled` flag set above.
+    delete sessionObj.students;
   }
 
   // #1.1: myProgress reflects the requesting user's own watched status.
@@ -359,7 +367,11 @@ exports.getSessionsByInstructor = async (
   };
 };
 
-exports.getSessionsByTrack = async (trackId, query, requestingUser = null) => {
+exports.getSessionsByTrack = async (
+  trackId,
+  query,
+  requestingUser = null,
+) => {
   // #1.1/#1.2: previously the one endpoint with NO sanitization at all —
   // a draft session's `url` (and the full per-student `progress` array)
   // reached any caller, including students, via this exact path.
