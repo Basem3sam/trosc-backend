@@ -30,9 +30,7 @@ describe('policy.service', () => {
     it('supports a custom ownerField', () => {
       const resource = { createdBy: 'inst1' };
       expect(policy.isOwnerOf(resource, instructor, 'createdBy')).toBe(true);
-      expect(policy.isOwnerOf(resource, instructor, 'instructor')).toBe(
-        false,
-      );
+      expect(policy.isOwnerOf(resource, instructor, 'instructor')).toBe(false);
     });
 
     it('is false with no user or no resource', () => {
@@ -82,9 +80,9 @@ describe('policy.service', () => {
     });
 
     it('matches a populated sub-document via _id', () => {
-      expect(
-        policy.isMemberOf([{ _id: 'stu1', name: 'Alice' }], student),
-      ).toBe(true);
+      expect(policy.isMemberOf([{ _id: 'stu1', name: 'Alice' }], student)).toBe(
+        true,
+      );
     });
 
     it('is false with no user, an empty list, or a non-array', () => {

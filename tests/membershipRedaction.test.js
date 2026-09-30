@@ -64,7 +64,7 @@ describe('Membership-array redaction (Q7)', () => {
         expect(t.isPendingLeave).toBe(false);
       });
 
-      it('reflects the caller\'s own pending-join status', async () => {
+      it("reflects the caller's own pending-join status", async () => {
         const applicantToken = generateToken(pendingApplicant._id);
         const res = await request(app)
           .get(`/v1/tracks/${track._id}`)

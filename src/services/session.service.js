@@ -367,11 +367,7 @@ exports.getSessionsByInstructor = async (
   };
 };
 
-exports.getSessionsByTrack = async (
-  trackId,
-  query,
-  requestingUser = null,
-) => {
+exports.getSessionsByTrack = async (trackId, query, requestingUser = null) => {
   // #1.1/#1.2: previously the one endpoint with NO sanitization at all —
   // a draft session's `url` (and the full per-student `progress` array)
   // reached any caller, including students, via this exact path.

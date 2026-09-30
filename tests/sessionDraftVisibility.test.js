@@ -30,7 +30,11 @@ describe('Session draft visibility and progress privacy', () => {
       students: [fixture.student._id],
       published: false,
       progress: [
-        { student: fixture.student._id, status: 'watched', watchedAt: new Date() },
+        {
+          student: fixture.student._id,
+          status: 'watched',
+          watchedAt: new Date(),
+        },
       ],
     });
   });

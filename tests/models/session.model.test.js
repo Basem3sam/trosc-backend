@@ -107,7 +107,9 @@ describe('Session model — field validators', () => {
           instructor: instructor._id,
           resources: [{ title: 'Broken', url: 'not-a-valid-url' }],
         }),
-      ).rejects.toThrow('Resource URL must be a valid HTTPS URL from a trusted host');
+      ).rejects.toThrow(
+        'Resource URL must be a valid HTTPS URL from a trusted host',
+      );
     });
   });
 

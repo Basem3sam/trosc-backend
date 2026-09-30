@@ -23,14 +23,18 @@ describe('attachmentValidation', () => {
     const urls = ['http://drive.google.com/file/d/abc'];
     const { error } = attachmentValidation.validate(urls);
     expect(error).toBeDefined();
-    expect(error.message).toMatch(/must be a valid HTTPS URL from a trusted host/);
+    expect(error.message).toMatch(
+      /must be a valid HTTPS URL from a trusted host/,
+    );
   });
 
   it('should reject a URL from an untrusted host', () => {
     const urls = ['https://evil.com/file.pdf'];
     const { error } = attachmentValidation.validate(urls);
     expect(error).toBeDefined();
-    expect(error.message).toMatch(/must be a valid HTTPS URL from a trusted host/);
+    expect(error.message).toMatch(
+      /must be a valid HTTPS URL from a trusted host/,
+    );
   });
 
   it('should reject a URL with a dangerous file extension', () => {
