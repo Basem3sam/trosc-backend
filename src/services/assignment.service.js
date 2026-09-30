@@ -142,6 +142,10 @@ exports.createAssignment = async (
     ...data,
     [field]: resourceId,
     instructor: instructorId,
+    // Q6: set once, at creation, and never touched again by any update
+    // path — pure historical attribution, distinct from `instructor`
+    // (the current-authority field) even though they start out equal.
+    createdBy: instructorId,
   });
 
   await logActivity({

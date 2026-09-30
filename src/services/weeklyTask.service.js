@@ -70,6 +70,9 @@ exports.createWeeklyTask = async (courseId, instructorId, data) => {
   const task = await WeeklyTask.create({
     course: courseId,
     instructor: instructorId,
+    // Q6: pure historical attribution — see assignment.model.js's
+    // createdBy comment for the full rationale.
+    createdBy: instructorId,
     week: data.week,
     title: data.title,
     items: data.items,

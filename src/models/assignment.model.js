@@ -52,7 +52,21 @@
  *           description: Populated session reference (mutually exclusive with course)
  *         instructor:
  *           type: object
- *           description: Populated instructor reference
+ *           description: >
+ *             Populated instructor reference — this is the field
+ *             authorization checks are based on (who can currently edit,
+ *             delete, or grade this assignment).
+ *         createdBy:
+ *           type: string
+ *           nullable: true
+ *           description: >
+ *             ObjectId of whoever actually created this record. Pure
+ *             historical attribution — it is NEVER used for
+ *             authorization and does not change if `instructor` is later
+ *             reassigned. May be null/absent on records created before
+ *             this field existed and not yet backfilled (see
+ *             scripts/backfillCreatedBy.js).
+ *           example: 6713b5ac12ef4567890a1111
  *         attachments:
  *           type: array
  *           items:
@@ -176,6 +190,21 @@ const assignmentSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'An assignment must have an instructor'],
     },
+    // Q6: pure historical attribution — "who actually created this record"
+    // — and nothing else. `instructor` above is (today) also set to the
+    // creator, and is the field `checkOwnership`/`policy.service.js`
+    // actually authorize against; a later stage may let `instructor`
+    // change hands (e.g. to reflect the course's current instructor)
+    // without that meaning the original creator ever loses or gains
+    // authorization based on this field. `createdBy` is never read by any
+    // authorization check — see scripts/backfillCreatedBy.js for how
+    // existing records (created before this field existed) get it filled
+    // in. Not `required`: existing documents predate this field and are
+    // backfilled, not migrated in place.
+    createdBy: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'User',
+    },
     attachments: {
       type: [String],
       validate: [
@@ -195,6 +224,7 @@ const assignmentSchema = new mongoose.Schema(
 assignmentSchema.index({ course: 1 });
 assignmentSchema.index({ session: 1 });
 assignmentSchema.index({ instructor: 1 });
+assignmentSchema.index({ createdBy: 1 });
 
 assignmentSchema.pre('validate', function validateAssignment(next) {
   const hasCourse = !!this.course;

@@ -277,7 +277,9 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 
 ### Weekly Tasks
 
-Creation and listing live under `/v1/courses/:id/weekly-tasks` and `/v1/tracks/:id/weekly-tasks` (see above). These are the standalone, top-level actions keyed by the task's own ID:
+Creation and listing live under `/v1/courses/:id/weekly-tasks` and `/v1/tracks/:id/weekly-tasks` (see above). These are the standalone, top-level actions keyed by the task's own ID.
+
+Every weekly task now also carries `createdBy`, same rule as Assignments above: set once to the caller on creation, pure historical attribution, not client-settable, never used for authorization (`instructor` still is), may be absent on records predating this field.
 
 | Method   | Endpoint                                          | Access                       | Description                                                                                               |
 | -------- | ------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -288,7 +290,9 @@ Creation and listing live under `/v1/courses/:id/weekly-tasks` and `/v1/tracks/:
 
 ### Assignments
 
-Creation lives under `/v1/courses/:id/assignments` and `/v1/sessions/:id/assignments` (see above — an assignment belongs to exactly one course or standalone session, never a track directly). These are the standalone, top-level actions keyed by the assignment's own ID:
+Creation lives under `/v1/courses/:id/assignments` and `/v1/sessions/:id/assignments` (see above — an assignment belongs to exactly one course or standalone session, never a track directly). These are the standalone, top-level actions keyed by the assignment's own ID.
+
+Every assignment now also carries `createdBy` — set once, to the caller, on creation. It's pure historical attribution: not accepted from the request body (rejected outright, 400, if you try), and never used to decide who can manage the assignment — that's still `instructor`. May be absent on records created before this field existed and not yet backfilled (`scripts/backfillCreatedBy.js`).
 
 | Method   | Endpoint                                           | Access                       | Description                                                             |
 | -------- | -------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
