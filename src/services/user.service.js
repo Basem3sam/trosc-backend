@@ -49,7 +49,10 @@ exports.getAllUsers = async (query) => {
 };
 
 exports.getUserById = async (id) => {
-  const user = await User.findById(id);
+  // Admin-only route (GET /users/:id). `active` is select:false on the
+  // schema, so re-include it here too - same reason as getAllUsers: an
+  // admin looking at one account needs to see whether it is deactivated.
+  const user = await User.findById(id).select('+active');
   if (!user) throw new AppError('No user found with that ID', 404);
   return user;
 };

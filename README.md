@@ -766,18 +766,21 @@ It only ever sets those two fields. Safe to re-run; a no-op once clean. Run
 ### Dashboard Stats Snapshot Generation
 
 ```bash
-node scripts/generateDashboardSnapshot.js daily
-node scripts/generateDashboardSnapshot.js weekly
-node scripts/generateDashboardSnapshot.js monthly
-node scripts/generateDashboardSnapshot.js daily 2025-06-15   # backfill a specific date
+node scripts/generateDashboardSnapshot.js daily --previous     # the day that just finished
+node scripts/generateDashboardSnapshot.js weekly --previous    # last Monday-Sunday week
+node scripts/generateDashboardSnapshot.js monthly --previous   # last calendar month
+node scripts/generateDashboardSnapshot.js daily                # the day still in progress ("refresh now")
+node scripts/generateDashboardSnapshot.js daily 2025-06-15     # backfill the period containing a specific date
 ```
 
-Computes and **upserts** a `DashboardStats` snapshot for the given period (re-running for the same period/date refreshes it in place rather than duplicating). Calls the service directly — no HTTP, no auth token — so it's meant to be wired up to an OS-level cron job:
+Computes and **upserts** a `DashboardStats` snapshot for the given period (re-running for the same period/date refreshes it in place rather than duplicating). Calls the service directly — no HTTP, no auth token — so it's meant to be wired up to an OS-level cron job.
+
+> **A scheduled job must use `--previous`.** These jobs fire a few minutes after a period starts (00:05 for daily). With no argument the script snapshots the period that _contains now_, i.e. one that has existed for five minutes and shows about zero new users, while the period that actually just ended is never recorded. `--previous` snapshots the one that just finished. (BACKEND-REQUESTS-2 #5.2. Note this explains near-zero, misleading snapshots; a `trends` list that is completely empty means the job isn't running at all — see the checks below.) `--previous` and an explicit date can't be combined.
 
 ```cron
-5 0 * * *    cd /path/to/app && node scripts/generateDashboardSnapshot.js daily
-10 0 * * 1   cd /path/to/app && node scripts/generateDashboardSnapshot.js weekly
-15 0 1 * *   cd /path/to/app && node scripts/generateDashboardSnapshot.js monthly
+5 0 * * *    cd /path/to/app && node scripts/generateDashboardSnapshot.js daily --previous
+10 0 * * 1   cd /path/to/app && node scripts/generateDashboardSnapshot.js weekly --previous
+15 0 1 * *   cd /path/to/app && node scripts/generateDashboardSnapshot.js monthly --previous
 ```
 
 **In this repo, that cron trigger is `.github/workflows/dashboard-snapshots.yml`** rather than an OS-level cron — the production deployment (Render free tier) has no persistent cron of its own, so a scheduled GitHub Actions workflow runs the same three commands on the same schedule shown above, connecting directly to the production database. It needs one repo secret:
@@ -786,7 +789,14 @@ Computes and **upserts** a `DashboardStats` snapshot for the given period (re-ru
 | -------------- | ------------------------------------- |
 | `DATABASE_URL` | The production MongoDB connection string |
 
-It can also be triggered manually from the Actions tab (`workflow_dispatch`) with a chosen period, e.g. to backfill after downtime.
+Things to check if `trends` is still empty after the schedule has had time to run:
+
+- `package-lock.json` is committed (the workflow uses `npm ci` and npm caching, both of which fail without it).
+- The workflow file is on the repository's **default branch** — GitHub only runs scheduled workflows from there.
+- The `DATABASE_URL` secret exists (Settings → Secrets and variables → Actions).
+- The Actions tab shows the runs, and they are green. GitHub can delay a scheduled run by several minutes, and disables schedules on a repo with no activity for 60 days (re-enable them in the Actions tab).
+
+It can also be triggered manually from the Actions tab (`workflow_dispatch`): pick a period, and optionally a `date` (`YYYY-MM-DD`, UTC) to backfill the period containing it; leave the date blank to snapshot the period that just finished.
 
 The same result is also reachable on-demand via `POST /v1/dashboard-stats/snapshot` (admin only), for a manual "refresh now" action from an admin UI.
 
@@ -937,6 +947,8 @@ tests/
 - [x] **Staff submission counts (BACKEND-REQUESTS-2 stage 5, #3.2)** — the three assignment list endpoints (`/tracks|courses|sessions/:id/assignments`) now add `submissionCount` and `ungradedCount` for staff of each assignment (an admin, or the assignment's own instructor), so the Studio no longer needs one `GET /assignments/:id` per assignment to draw "3 submissions · 2 to grade". Counts only; students and non-managing instructors never get them, and the raw `submissions` array is still never sent. Stage 4 will swap the "is staff" check for the policy-service management rule in one place (`assignment.service.js#isAssignmentStaff`).
 - [x] **Submissions are links — documented, and the error says so (stage 5, #3.1, Q1)** — no behavior change to what is accepted (links were already the only format); a multipart upload used to come back as the baffling `"file" is required`, and now returns a message explaining submissions are links. Every "trusted host" error message (Joi attachment/submission validators and the Mongoose session/course/event/announcement/assignment validators) is now built from `src/utils/trustedHostsMessage.js`, which reads the one real allowlist — so the text lists every allowed host and can't drift from what is enforced (the old hand-typed lists had already omitted Discord's CDN). Swagger and API.md state the link-only design; Cloudinary remains an unimplemented future option.
 - [x] **Track ↔ session/course links stay in sync (stage 5, #4.1/#4.2)** — `addCourseToTrack`/`addSessionToTrack`/`removeCourseFromTrack`/`removeSessionFromTrack` no longer load two documents, mutate them and `.save()` both; that could leave a link half-written (notably when one document failed whole-document validation after the other had already saved — e.g. a legacy session with a now-invalid URL) and could never be repaired through the API. They now use atomic, idempotent `$addToSet`/`$pull`, write the child side first, and **repair** a one-sided link instead of erroring (a fully linked pair is still a 400). Removing a course no longer detaches or unenrolls it if it actually belongs to a different track, and adding a course now detaches it from *every* other track that still listed it. `deleteTrackCascade` works from the union of both sides, so deleting an already-desynced track still detaches every child. New `scripts/reconcileTrackSessions.js` (idempotent, `--dry-run`) repairs records that are already out of sync — **not executed**.
+- [x] **`active` on admin user listings (BACKEND-REQUESTS-2 stage 6, #5.1)** — `GET /v1/users` (including `?includeInactive=true`, `?active=false` and `?fields=`) and `GET /v1/users/:id` now always return an explicit `active` boolean, so an admin list can show who is deactivated. `active` is `select: false` on the schema, which is why it used to vanish; `getAllUsers` already re-selected it and `getUserById` now does too. Covered by tests so it can't silently regress.
+- [x] **Scheduled dashboard snapshots now record the period that just finished (stage 6, #5.2)** — the 00:05 UTC job was snapshotting the period containing _now_ (five minutes old, ~zero new users) and never the one that had just ended. `scripts/generateDashboardSnapshot.js` gained `--previous` (backed by the new, unit-tested `dashboardStatsService.getPreviousPeriodDate`), and `.github/workflows/dashboard-snapshots.yml` uses it for every scheduled run and for manual runs without a date. Manual runs also accept an optional, validated `date` for backfills, and workflow inputs are now passed through environment variables instead of being interpolated into shell.
 
 ### Planned 🔮
 
@@ -948,7 +960,7 @@ tests/
 - [ ] **`search()` uses regex instead of the `text` indexes that already exist** — `Track`/`Course` both define MongoDB `text` indexes, but `APIFeatures.js#search()` builds a `$regex` `$or` query, which can't use them. Fine at current data volume; would need attention if search performance ever becomes a problem.
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
 - [ ] **Full test coverage** — still need tests
-- [ ] **BACKEND-REQUESTS-2 stages 4 and 6** — stage 4: the co-instructor/per-course-instructor permission model (multiple instructors per track, per-course instructor, current-role-based authorization instead of "only the creator" — this is where `createdBy` vs. `instructor`, above, actually starts mattering), plus extending stage 2's membership-array reduction to `GET /courses/instructor/:id`/`GET /courses/track/:id` (currently still return the raw `students` array — see API.md). Stage 6: `active` on user admin listings and the dashboard-snapshot schedule. See `STAGE_PLAN.md` for the full breakdown.
+- [ ] **BACKEND-REQUESTS-2 stage 4** — the co-instructor/per-course-instructor permission model (multiple instructors per track, per-course instructor, current-role-based authorization instead of "only the creator" — this is where `createdBy` vs. `instructor`, above, actually starts mattering), plus extending stage 2's membership-array reduction to `GET /courses/instructor/:id`/`GET /courses/track/:id` (currently still return the raw `students` array — see API.md). See `STAGE_PLAN.md` for the full breakdown.
 - [ ] **Session list routes require authentication even for public content** — `session.route.js` applies `router.use(protect)` before every route, including `GET /sessions` (which also has `optionalAuth`, currently unreachable dead code since `protect` already ran). `track.route.js`/`course.route.js` don't have this restriction. Worth a decision: should published, `access: 'public'` sessions be anonymously browsable the way tracks/courses are, given self-enrollment implies previewing before enrolling?
 
 ---
