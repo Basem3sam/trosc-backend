@@ -10,6 +10,7 @@ const Announcement = require('../models/announcement.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
+const policy = require('./policy.service');
 const trackService = require('./track.service');
 const { logActivity } = require('./activityLog.service');
 
@@ -91,9 +92,11 @@ exports.createCourse = async (courseBody, requestingUser = null) => {
  * @param {Object} query - Express query object
  * @returns {Promise<{courses: Array, total: Number}>} Paginated courses
  */
-exports.getAllCourses = async (query) => {
+exports.getAllCourses = async (query, requestingUser = null) => {
+  // Q5/Q2: same fix as track.service.js#getAllTracks — previously
+  // returned every course regardless of `published` to any caller.
   const features = new APIFeatures(Course.find(), query, Course)
-    .filter()
+    .filter(policy.publishedListFilter(requestingUser))
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -102,8 +105,23 @@ exports.getAllCourses = async (query) => {
 
   const courses = await features.query;
 
+  // Q7: previously returned every course's raw `students` ID array to
+  // literally any caller, including anonymous — replaced with
+  // `studentCount` (already a schema virtual) plus `isEnrolled` for the
+  // requester. Each course's own instructor (or an admin) still gets the
+  // full array.
+  const sanitized = courses.map((c) => {
+    const obj = c.toObject();
+    const isStaff =
+      policy.isAdmin(requestingUser) ||
+      policy.isOwnerOf(obj, requestingUser, 'instructor');
+    return policy.redactMembership(obj, requestingUser, isStaff, {
+      isEnrolled: 'students',
+    });
+  });
+
   return {
-    courses: courses || [],
+    courses: sanitized || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -151,13 +169,9 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
 
   if (!course) throw new AppError('No course found with that ID', 404);
 
-  const isOwner = requestingUser?.id === course.instructor?._id?.toString();
-  const isAdmin = requestingUser?.role === 'admin';
-  const isEnrolled =
-    requestingUser &&
-    course.students?.some(
-      (studentId) => studentId.toString() === requestingUser.id,
-    );
+  const isOwner = policy.isOwnerOf(course, requestingUser, 'instructor');
+  const isAdmin = policy.isAdmin(requestingUser);
+  const isEnrolled = policy.isMemberOf(course.students, requestingUser);
 
   if (!course.published && !isOwner && !isAdmin) {
     throw new AppError('No course found with that ID', 404);
@@ -166,7 +180,16 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
     await course.populate({ path: 'students', select: 'name email photo' });
   }
 
-  return course;
+  // Q7: when none of the above populated `students`, it was still the
+  // raw ID array underneath — never actually hidden. Replaced with
+  // `studentCount` (schema virtual, already present) + `isEnrolled: false`.
+  const courseObj = course.toObject();
+  courseObj.isEnrolled = isEnrolled;
+  if (!(isOwner || isAdmin || isEnrolled)) {
+    delete courseObj.students;
+  }
+
+  return courseObj;
 };
 
 /**

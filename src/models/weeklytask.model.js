@@ -38,8 +38,21 @@
  *           example: 67123abc12ef4567890a5678
  *         instructor:
  *           type: string
- *           description: ObjectId reference to the owning instructor (copied from the course at creation time)
+ *           description: >
+ *             ObjectId reference to the caller who created this task —
+ *             this is the field authorization checks are based on (who
+ *             can currently edit or delete it).
  *           example: 67123abc12ef4567890a1234
+ *         createdBy:
+ *           type: string
+ *           nullable: true
+ *           description: >
+ *             ObjectId of whoever actually created this record. Pure
+ *             historical attribution — NEVER used for authorization and
+ *             does not change if `instructor` is later reassigned. May be
+ *             null/absent on records created before this field existed
+ *             and not yet backfilled (see scripts/backfillCreatedBy.js).
+ *           example: 67123abc12ef4567890a1111
  *         week:
  *           type: integer
  *           minimum: 1
@@ -105,6 +118,14 @@ const weeklyTaskSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'A weekly task must have an owning instructor'],
     },
+    // Q6: pure historical attribution, mirrors assignment.model.js's
+    // `createdBy` exactly — never read by any authorization check, not
+    // `required` since existing documents predate this field (see
+    // scripts/backfillCreatedBy.js).
+    createdBy: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'User',
+    },
     week: {
       type: Number,
       required: [true, 'A weekly task must have a week number'],
@@ -124,6 +145,7 @@ const weeklyTaskSchema = new mongoose.Schema(
 // One week-bucket per course per week number
 weeklyTaskSchema.index({ course: 1, week: 1 }, { unique: true });
 weeklyTaskSchema.index({ instructor: 1 });
+weeklyTaskSchema.index({ createdBy: 1 });
 
 const WeeklyTask = mongoose.model('WeeklyTask', weeklyTaskSchema);
 module.exports = WeeklyTask;

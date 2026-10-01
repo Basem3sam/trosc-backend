@@ -34,10 +34,23 @@
  *           example: "507f1f77bcf86cd799439011"
  *         students:
  *           type: array
- *           description: List of enrolled students
+ *           description: >
+ *             List of enrolled students. Only present in the API response
+ *             for the course's current instructor or an admin, or (with
+ *             name/email/photo populated) for the requester themself when
+ *             they're enrolled. Everyone else gets `studentCount` +
+ *             `isEnrolled` instead — this field is simply absent from
+ *             their response, not emptied.
  *           items:
  *             type: string
  *             example: "507f1f77bcf86cd799439012"
+ *         studentCount:
+ *           type: integer
+ *           description: Number of enrolled students (always present, for everyone)
+ *           example: 42
+ *         isEnrolled:
+ *           type: boolean
+ *           description: Whether the requesting user is enrolled in this course (always present when authenticated)
  *         sessions:
  *           type: array
  *           description: List of sessions belonging to this course
@@ -271,6 +284,7 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 const validateAttachments = require('../utils/validateAttachments');
+const { trustedHostMessage } = require('../utils/trustedHostsMessage');
 
 const syllabusItemSchema = new mongoose.Schema(
   {
@@ -365,7 +379,7 @@ const courseSchema = new mongoose.Schema(
       type: [String],
       validate: [
         validateAttachments,
-        'Course attachments must be valid URLs from trusted hosts',
+        trustedHostMessage('Each course attachment'),
       ],
     },
   },

@@ -5,6 +5,16 @@
  *     operationId: submitAssignment
  *     summary: Submit (or resubmit) your work for an assignment
  *     description: >
+ *       **Submissions are links, not file uploads** (design decision —
+ *       keeps storage free; Google Drive / other trusted-host links are the
+ *       supported path). Send JSON `{ "file": "<https link>" }`; a
+ *       `multipart/form-data` upload is not supported and is rejected with
+ *       a 400 that says so. The link must be HTTPS and from a trusted host
+ *       — the exact list is in the 400 message and at
+ *       `GET /v1/config/trusted-hosts`. Executable file extensions are
+ *       rejected. A real upload option may be added later as an optional
+ *       enhancement; links will stay as the free fallback.
+ *
  *       The requesting student must be enrolled in the assignment's course
  *       or session. Submitting again overwrites the previous file and
  *       clears any existing grade — a new file means the old grade no
@@ -45,7 +55,9 @@
  *                     submission:
  *                       $ref: '#/components/schemas/Submission'
  *       400:
- *         description: Validation error (bad or untrusted file URL)
+ *         description: >
+ *           Validation error - missing `file`, a multipart upload instead
+ *           of JSON, or a non-HTTPS / untrusted-host / executable link
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:

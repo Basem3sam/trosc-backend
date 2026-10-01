@@ -31,6 +31,7 @@ exports.createTrack = catchAsync(async (req, res, next) => {
 exports.getAllTracks = catchAsync(async (req, res, next) => {
   const { tracks, total, pagination } = await trackService.getAllTracks(
     req.query,
+    req.user,
   );
 
   res.status(200).json({

@@ -2,6 +2,7 @@ const Joi = require('joi');
 
 // Free hosting services Trosc uses
 const isTrustedHost = require('./isTrustedHost');
+const { trustedHostMessage } = require('./trustedHostsMessage');
 
 const attachmentValidation = Joi.array()
   .items(
@@ -31,8 +32,7 @@ const attachmentValidation = Joi.array()
         }
       }, 'Attachment URL validation')
       .messages({
-        'any.invalid':
-          'Attachment must be a valid URL from a trusted host (Google Drive, Dropbox, GitHub, Cloudinary, Imgur)',
+        'any.invalid': trustedHostMessage('Attachment'),
         'attachment.dangerous':
           'Executable files are not allowed as attachments',
       }),

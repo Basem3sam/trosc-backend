@@ -21,6 +21,7 @@ exports.assignmentStudentIdSchema = Joi.object({
 // Same trusted-host allowlist as src/utils/attachmentValidation.js, applied
 // to a single URL instead of an array (a submission has exactly one file).
 const isTrustedHost = require('../utils/isTrustedHost');
+const { trustedHostMessage } = require('../utils/trustedHostsMessage');
 
 const fileUrlSchema = Joi.string()
   .uri()
@@ -46,8 +47,20 @@ const fileUrlSchema = Joi.string()
     }
   }, 'Submission file URL validation')
   .messages({
-    'any.invalid':
-      'Submission file must be a valid URL from a trusted host (Google Drive, Dropbox, GitHub, Cloudinary, Imgur)',
+    // #3.1 (Decisions Q1): a submission is a LINK, not an uploaded file.
+    // A multipart/form-data upload arrives here as an empty body, which
+    // used to surface as the confusing '"file" is required' - say what is
+    // actually expected instead.
+    //
+    // NOTE: never put `{` / `}` in a Joi message string - Joi parses them as
+    // template references ({#label}, {{...}}) and would mangle the text.
+    'any.required':
+      'Submissions are links, not file uploads: send a JSON body with a "file" field set to an https link from a trusted host (e.g. a Google Drive share link) — see GET /v1/config/trusted-hosts',
+    'string.base':
+      'Submission "file" must be a link (string), e.g. a Google Drive share link — file uploads are not supported',
+    'string.uri':
+      'Submission "file" must be a link, e.g. a Google Drive share link — file uploads are not supported',
+    'any.invalid': trustedHostMessage('Submission file'),
     'attachment.dangerous': 'Executable files are not allowed as submissions',
     'string.empty': 'Submission file URL is required',
   });

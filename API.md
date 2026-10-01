@@ -149,13 +149,25 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `DELETE` | `/v1/users/:id`            | Admin     | Hard-delete user (409 if they're still the required instructor/creator of a Course, Track, Event, Announcement, Session, Assignment, or WeeklyTask — reassign that content first) |
 | `POST`   | `/v1/users/bulk`           | Admin     | Bulk activate / deactivate / delete                                                                                                                                               |
 
+> **⚠️ Breaking change (Q7 — public membership-array reduction):** for any
+> caller who isn't a resource's current instructor or an admin, Track,
+> Course, and Session responses no longer include the raw `students`
+> array (and, for Track, `pendingStudents`/`pendingLeaves`) — those keys
+> are simply absent, not emptied. Use `studentCount` (always present) and
+> `isEnrolled`/`isPending`/`isPendingLeave` (booleans about the requesting
+> user's own status) instead. This applies to every list and detail
+> endpoint below except the explicitly self/admin-scoped ones
+> (`/student/:studentId`, `/pending`, `/leaves`) and the manual
+> enroll/remove-student action endpoints, which already required
+> authorization to call and are unaffected.
+
 ### Tracks
 
 | Method   | Endpoint                                     | Access                                                | Description                                                                                         |
 | -------- | -------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `GET`    | `/v1/tracks`                                 | Public                                                | List all tracks (filter, sort, paginate)                                                            |
-| `GET`    | `/v1/tracks/popular`                         | Public                                                | Most enrolled tracks                                                                                |
-| `GET`    | `/v1/tracks/:id`                             | Public                                                | Get track details (404 if unpublished and caller is not owner/admin)                                |
+| `GET`    | `/v1/tracks`                                 | Public                                                | List all tracks (filter, sort, paginate). Excludes drafts (`published: false`) you're not authorized for — you only see your own drafts, or all of them as admin. See the Q7 callout below for the `students`/`studentCount`/`isEnrolled` shape |
+| `GET`    | `/v1/tracks/popular`                         | Public                                                | Most enrolled tracks, by `studentCount` — never includes `students`/`pendingStudents`/`pendingLeaves` |
+| `GET`    | `/v1/tracks/:id`                             | Public                                                | Get track details (404 if unpublished and caller is not owner/admin). `pendingStudents`/`pendingLeaves` only present for the owning instructor/admin — everyone else gets `isPending`/`isPendingLeave` |
 | `POST`   | `/v1/tracks`                                 | Admin / Instructor                                    | Create track. `instructor` (admin only) assigns it to any instructor/admin user; non-admins always get their own id |
 | `PATCH`  | `/v1/tracks/:id`                             | Admin / Instructor                                    | Update track (owner only; admin bypass). `instructor` reassignment is admin only |
 | `DELETE` | `/v1/tracks/:id`                             | Admin                                                 | Delete track (courses orphaned, sessions become standalone)                                         |
@@ -172,27 +184,27 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `GET`    | `/v1/tracks/:id/leaves`                      | Admin / Instructor                                    | View pending leave requests                                                                         |
 | `POST`   | `/v1/tracks/:id/leaves/:studentId/approve`   | Admin / Instructor                                    | Approve leave request (self-approval blocked; owning instructor or admin only)                      |
 | `POST`   | `/v1/tracks/:id/leaves/:studentId/reject`    | Admin / Instructor                                    | Reject leave request (owning instructor or admin only)                                              |
-| `PATCH`  | `/v1/tracks/:trackId/courses/:courseId`      | Admin / Instructor                                    | Add course to track                                                                                 |
+| `PATCH`  | `/v1/tracks/:trackId/courses/:courseId`      | Admin / Instructor                                    | Add course to track. Keeps `Track.courses` and `Course.track` in sync; safe to repeat — a half-linked course is repaired (200), a fully linked one is 400 |
 | `DELETE` | `/v1/tracks/:trackId/courses/:courseId`      | Admin / Instructor                                    | Remove course from track                                                                            |
-| `PATCH`  | `/v1/tracks/:trackId/sessions/:sessionId`    | Admin / Instructor                                    | Add session to track                                                                                |
+| `PATCH`  | `/v1/tracks/:trackId/sessions/:sessionId`    | Admin / Instructor                                    | Add session to track. Keeps `Track.sessions` and `Session.tracks` in sync; safe to repeat — a half-linked session is repaired (200), a fully linked one is 400 |
 | `DELETE` | `/v1/tracks/:trackId/sessions/:sessionId`    | Admin / Instructor                                    | Remove session from track                                                                           |
 | `POST`   | `/v1/tracks/:id/reviews`                     | Protected (enrolled student)                          | Submit a rating + review for a track (one per student). Response's `user` is populated (`_id`, `name`, `photo`) |
 | `GET`    | `/v1/tracks/:id/reviews`                     | Public                                                | List reviews for a track (paginated)                                                                |
 | `DELETE` | `/v1/tracks/:id/reviews/:reviewId`           | Author / Admin                                        | Delete a track review (review's own author, or admin bypass)                                        |
-| `GET`    | `/v1/tracks/:id/assignments`                 | Protected (enrolled student / any instructor / admin) | All assignments across every course + standalone session in the track, with `mySubmission` attached |
+| `GET`    | `/v1/tracks/:id/assignments`                 | Protected (enrolled student / any instructor / admin) | All assignments across every course + standalone session in the track, with `mySubmission` attached; staff also get `submissionCount` / `ungradedCount` |
 | `GET`    | `/v1/tracks/:id/weekly-tasks`                | Protected (enrolled student / any instructor / admin) | All weekly task buckets across every course in the track, with per-item `done` flags                |
 
 ### Courses
 
 | Method   | Endpoint                                    | Access                                                | Description                                                                                  |
 | -------- | ------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `GET`    | `/v1/courses`                               | Public                                                | List all courses (filter, sort, paginate)                                                    |
+| `GET`    | `/v1/courses`                               | Public                                                | List all courses (filter, sort, paginate). Excludes drafts (`published: false`) you're not authorized for — same rule as `/v1/tracks` |
 | `GET`    | `/v1/courses/:id`                           | Public                                                | Get course details (404 if unpublished and caller is not owner/admin)                        |
 | `POST`   | `/v1/courses`                               | Admin / Instructor                                    | Create course. Optional `track` attaches it immediately — requester must own that track (or be admin); keeps `Track.courses` in sync |
 | `PATCH`  | `/v1/courses/:id`                           | Admin / Instructor                                    | Update course (owner only; admin bypass). `track` can be reassigned or set to `null` to detach — each side requires owning that track (or admin), and detaching enforces the same "track needs ≥1 course or session" rule `DELETE /tracks/:id/courses/:courseId` has |
 | `DELETE` | `/v1/courses/:id`                           | Admin / Instructor                                    | Delete course (sessions become standalone; owner only; admin bypass)                         |
-| `GET`    | `/v1/courses/instructor/:instructorId`      | Public                                                | Courses by instructor                                                                        |
-| `GET`    | `/v1/courses/track/:trackId`                | Public                                                | Courses in a track                                                                           |
+| `GET`    | `/v1/courses/instructor/:instructorId`      | Public                                                | Courses by instructor. ⚠️ Not yet covered by the Q7 fix below — still returns the raw `students` array to any caller (stage 3+ candidate) |
+| `GET`    | `/v1/courses/track/:trackId`                | Public                                                | Courses in a track. Same ⚠️ caveat as the row above                                          |
 | `GET`    | `/v1/courses/student/:studentId`            | Self / Admin                                          | Courses a student is enrolled in                                                             |
 | `POST`   | `/v1/courses/:id/enroll-me`                 | Protected                                             | Self-enroll (prerequisites + access rules enforced: public/track-only/private; rate limited) |
 | `DELETE` | `/v1/courses/:id/leave-me`                  | Protected                                             | Leave course (rate limited)                                                                  |
@@ -204,7 +216,7 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `GET`    | `/v1/courses/:id/reviews`                   | Public                                                | List reviews for a course (paginated)                                                        |
 | `DELETE` | `/v1/courses/:id/reviews/:reviewId`         | Author / Admin                                        | Delete a course review (review's own author, or admin bypass)                                |
 | `POST`   | `/v1/courses/:id/assignments`               | Admin / owner instructor                              | Create an assignment for this course                                                         |
-| `GET`    | `/v1/courses/:id/assignments`               | Protected (enrolled student / any instructor / admin) | Assignments for this course, with `mySubmission` attached                                    |
+| `GET`    | `/v1/courses/:id/assignments`               | Protected (enrolled student / any instructor / admin) | Assignments for this course, with `mySubmission` attached; staff (admin / the assignment's instructor) also get `submissionCount` + `ungradedCount` |
 | `POST`   | `/v1/courses/:id/weekly-tasks`              | Admin / owner instructor                              | Create a weekly task bucket for a course (one per week number)                               |
 | `GET`    | `/v1/courses/:id/weekly-tasks`              | Protected (enrolled student / any instructor / admin) | Weekly task buckets for this course, with per-item `done` flags                              |
 
@@ -212,13 +224,13 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 
 | Method   | Endpoint                                | Access                                                | Description                                                                     |
 | -------- | --------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `GET`    | `/v1/sessions`                          | Protected                                             | List all sessions (`url`, `embedUrl`, `resources` omitted in list view)         |
-| `GET`    | `/v1/sessions/:id`                      | Protected                                             | Get session details (`url`, `embedUrl`, `resources` stripped if not enrolled); enrolled callers also get `myProgress: { status, watchedAt }` |
+| `GET`    | `/v1/sessions`                          | Protected                                             | List all sessions. Excludes drafts you're not authorized for (same rule as tracks/courses); `url`/`embedUrl`/`resources`/`progress` omitted in list view unless you're the owner/admin/enrolled |
+| `GET`    | `/v1/sessions/:id`                      | Protected                                             | Get session details — **404 if the session is a draft and you're not its owner or an admin** (not content-redacted, invisible); `url`/`embedUrl`/`resources` stripped if not enrolled; enrolled callers also get `myProgress: { status, watchedAt }` |
 | `POST`   | `/v1/sessions`                          | Admin / Instructor                                    | Create session                                                                  |
 | `PATCH`  | `/v1/sessions/:id`                      | Admin / Instructor                                    | Update session (owner only; admin bypass)                                       |
 | `DELETE` | `/v1/sessions/:id`                      | Admin / Instructor                                    | Delete session (owner only; admin bypass)                                       |
-| `GET`    | `/v1/sessions/instructor/:instructorId` | Protected                                             | Sessions by instructor                                                          |
-| `GET`    | `/v1/sessions/track/:trackId`           | Protected                                             | Sessions in a track                                                             |
+| `GET`    | `/v1/sessions/instructor/:instructorId` | Protected                                             | Sessions by instructor. Same draft-exclusion + field redaction as `GET /v1/sessions` |
+| `GET`    | `/v1/sessions/track/:trackId`           | Protected                                             | Sessions in a track. Same draft-exclusion + field redaction as `GET /v1/sessions` |
 | `GET`    | `/v1/sessions/student/:studentId`       | Self / Admin                                          | Sessions a student is enrolled in                                               |
 | `POST`   | `/v1/sessions/:id/enroll-me`            | Protected                                             | Self-enroll in session (track-only/private access rules enforced; rate limited) |
 | `DELETE` | `/v1/sessions/:id/leave-me`             | Protected                                             | Leave session (rate limited)                                                    |
@@ -229,7 +241,7 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `GET`    | `/v1/sessions/:id/reviews`              | Public                                                | List reviews for a session (paginated)                                          |
 | `DELETE` | `/v1/sessions/:id/reviews/:reviewId`    | Author / Admin                                        | Delete a session review (review's own author, or admin bypass)                  |
 | `POST`   | `/v1/sessions/:id/assignments`          | Admin / owner instructor                              | Create an assignment for this standalone session                                |
-| `GET`    | `/v1/sessions/:id/assignments`          | Protected (enrolled student / any instructor / admin) | Assignments for this standalone session, with `mySubmission` attached           |
+| `GET`    | `/v1/sessions/:id/assignments`          | Protected (enrolled student / any instructor / admin) | Assignments for this standalone session, with `mySubmission` attached; staff (admin / the assignment's instructor) also get `submissionCount` + `ungradedCount` |
 
 ### Events
 
@@ -265,7 +277,9 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 
 ### Weekly Tasks
 
-Creation and listing live under `/v1/courses/:id/weekly-tasks` and `/v1/tracks/:id/weekly-tasks` (see above). These are the standalone, top-level actions keyed by the task's own ID:
+Creation and listing live under `/v1/courses/:id/weekly-tasks` and `/v1/tracks/:id/weekly-tasks` (see above). These are the standalone, top-level actions keyed by the task's own ID.
+
+Every weekly task now also carries `createdBy`, same rule as Assignments above: set once to the caller on creation, pure historical attribution, not client-settable, never used for authorization (`instructor` still is), may be absent on records predating this field.
 
 | Method   | Endpoint                                          | Access                       | Description                                                                                               |
 | -------- | ------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -276,14 +290,20 @@ Creation and listing live under `/v1/courses/:id/weekly-tasks` and `/v1/tracks/:
 
 ### Assignments
 
-Creation lives under `/v1/courses/:id/assignments` and `/v1/sessions/:id/assignments` (see above — an assignment belongs to exactly one course or standalone session, never a track directly). These are the standalone, top-level actions keyed by the assignment's own ID:
+> **Additive change (Stage 5, #3.2):** `GET /v1/tracks/:id/assignments`, `GET /v1/courses/:id/assignments` and `GET /v1/sessions/:id/assignments` now add `submissionCount` (students who have submitted) and `ungradedCount` (of those, how many have no grade yet — a grade of `0` counts as graded) to each assignment **for staff of that assignment only** (an admin, or the assignment's own `instructor`). Students, and instructors who don't manage the assignment, never receive these two keys. They are counts only — the raw `submissions` array is still never sent on a list endpoint. No existing field changed.
+>
+> **Submissions are links, not uploads (Stage 5, #3.1 / Decisions Q1):** `POST /v1/assignments/:id/submissions` takes JSON `{ "file": "<https link>" }`. `multipart/form-data` uploads are **not supported** and get a 400 that says so. The link must be HTTPS and on a trusted host — the 400 message now lists every allowed host, and the same list is served at `GET /v1/config/trusted-hosts`. Real uploads may be added later as an optional enhancement; links stay as the free fallback.
+
+Creation lives under `/v1/courses/:id/assignments` and `/v1/sessions/:id/assignments` (see above — an assignment belongs to exactly one course or standalone session, never a track directly). These are the standalone, top-level actions keyed by the assignment's own ID.
+
+Every assignment now also carries `createdBy` — set once, to the caller, on creation. It's pure historical attribution: not accepted from the request body (rejected outright, 400, if you try), and never used to decide who can manage the assignment — that's still `instructor`. May be absent on records created before this field existed and not yet backfilled (`scripts/backfillCreatedBy.js`).
 
 | Method   | Endpoint                                           | Access                       | Description                                                             |
 | -------- | -------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
 | `GET`    | `/v1/assignments/:id`                              | Admin / owner instructor     | Single assignment with its submissions. Each submission's `file` is stripped in favor of a `hasFile` boolean — use the file endpoint below to actually open it |
 | `PATCH`  | `/v1/assignments/:id`                              | Admin / owner instructor     | Update an assignment's title, description, deadline, and/or attachments |
 | `DELETE` | `/v1/assignments/:id`                              | Admin / owner instructor     | Delete an assignment (and its submissions with it)                      |
-| `POST`   | `/v1/assignments/:id/submissions`                  | Protected (enrolled student) | Submit or resubmit your work (resubmitting clears any existing grade and feedback) |
+| `POST`   | `/v1/assignments/:id/submissions`                  | Protected (enrolled student) | Submit or resubmit your work as a **link**: JSON `{ "file": "<https link>" }` (file uploads / multipart are **not** supported; allowed hosts: `GET /v1/config/trusted-hosts`). Resubmitting clears any existing grade and feedback |
 | `GET`    | `/v1/assignments/:id/submissions/:studentId/file`  | Admin / owner instructor     | Redirects (302) to the student's submitted file — the only path that ever exposes the raw URL |
 | `PATCH`  | `/v1/assignments/:id/submissions/:studentId/grade` | Admin / owner instructor     | Grade a student's submission (0–100), with optional `feedback` (up to 2000 characters) |
 
@@ -319,6 +339,12 @@ Admin-only platform analytics. `live` is computed on the fly and never persisted
 > `avgCompletionRate` in a snapshot = average, across all assignments, of (submissions ÷ that assignment's course/session roster size) as a percentage. Roster size is always the _current_ roster (MongoDB doesn't retain historical rosters), so this is most accurate for the latest snapshot and only approximate for older ones.
 
 > `mostActiveTrack` is `{ _id, title }` (or `null`) everywhere it appears — including `/live`, which previously returned a bare ObjectId while every stored-snapshot endpoint already populated it.
+
+### Config
+
+| Method | Endpoint                    | Access | Description                                                                                     |
+| ------ | ---------------------------- | ------ | ------------------------------------------------------------------------------------------------ |
+| `GET`  | `/v1/config/trusted-hosts`  | Public | The exact hostname allowlist every session/resource/attachment/submission URL is validated against (`src/utils/trustedHosts.js`) — includes YouTube, Google Drive, GitHub, Cloudinary, Imgur, Dropbox, Discord CDN, etc. Use this to warn about an untrusted host client-side before submitting. |
 
 ### Feed & Health
 

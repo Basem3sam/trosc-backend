@@ -97,6 +97,7 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 const validateAttachments = require('../utils/validateAttachments');
+const { trustedHostMessage } = require('../utils/trustedHostsMessage');
 
 const eventSchema = new mongoose.Schema(
   {
@@ -146,7 +147,7 @@ const eventSchema = new mongoose.Schema(
       type: [String],
       validate: [
         validateAttachments,
-        'Event attachments must be valid URLs from trusted hosts',
+        trustedHostMessage('Each event attachment'),
       ],
     },
     attendees: [

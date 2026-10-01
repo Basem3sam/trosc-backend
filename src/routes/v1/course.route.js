@@ -663,7 +663,9 @@
  *     description: >
  *       Each assignment includes `mySubmission` — the requesting user's own
  *       submission, or null if they haven't submitted. Accessible to admins,
- *       any instructor, or a student enrolled in the course.
+ *       any instructor, or a student enrolled in the course. Admins and the assignment's own
+ *       instructor also get `submissionCount` and `ungradedCount` on each
+ *       assignment (counts only - never other students' files or grades).
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -859,7 +861,7 @@ router
     validate(createCourseSchema),
     courseController.createCourse,
   )
-  .get(courseController.getAllCourses);
+  .get(optionalAuth, courseController.getAllCourses);
 
 // ===================================================================
 // 🔍 FILTERING ROUTES

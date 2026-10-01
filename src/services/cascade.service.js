@@ -10,6 +10,15 @@ const Event = require('../models/event.model');
 const Announcement = require('../models/announcement.model');
 const AppError = require('../utils/AppError');
 
+// De-duplicates ObjectIds (by string value) across any number of arrays.
+function uniqueIds(...lists) {
+  const byString = new Map();
+  lists.forEach((list) => {
+    (list || []).forEach((id) => byString.set(id.toString(), id));
+  });
+  return [...byString.values()];
+}
+
 // Called when a student joins a track (self-approve or instructor add)
 exports.syncUserEnrollments = async (userId, trackId) => {
   const trackExists = await Track.exists({ _id: trackId });
@@ -152,6 +161,21 @@ exports.deleteTrackCascade = async (trackId) => {
       throw new AppError('No track found with that ID', 404);
     }
 
+    // #4.1/#4.2: a track's content lives on BOTH sides (Track.courses /
+    // Track.sessions and Course.track / Session.tracks) and the two can be
+    // out of sync in already-stored data. Work from the union of both
+    // sides so deleting a desynced track still detaches every child that
+    // points at it, instead of leaving courses/sessions referencing a
+    // track that no longer exists.
+    const linkedCourseIds = await Course.distinct('_id', {
+      track: trackId,
+    }).session(session);
+    const linkedSessionIds = await Session.distinct('_id', {
+      tracks: trackId,
+    }).session(session);
+    const courseIds = uniqueIds(track.courses, linkedCourseIds);
+    const sessionIds = uniqueIds(track.sessions, linkedSessionIds);
+
     // Sessions can belong to MULTIPLE tracks (Session.tracks is an
     // array), unlike courses (Course.track is a single ref). Fetch them
     // up front so the assignment purge below can tell "session is
@@ -160,7 +184,7 @@ exports.deleteTrackCascade = async (trackId) => {
     // course" (that session — and its assignments — survive this
     // delete, they just lose this track's reference).
     const sessionsInTrack = await Session.find({
-      _id: { $in: track.sessions },
+      _id: { $in: sessionIds },
     }).session(session);
 
     const orphanedSessionIds = sessionsInTrack
@@ -176,12 +200,12 @@ exports.deleteTrackCascade = async (trackId) => {
     // ClientSession, one operation in flight at a time.
     await Assignment.deleteMany({
       $or: [
-        { course: { $in: track.courses } },
+        { course: { $in: courseIds } },
         { session: { $in: orphanedSessionIds } },
       ],
     }).session(session);
 
-    await WeeklyTask.deleteMany({ course: { $in: track.courses } }).session(
+    await WeeklyTask.deleteMany({ course: { $in: courseIds } }).session(
       session,
     );
 
@@ -189,7 +213,7 @@ exports.deleteTrackCascade = async (trackId) => {
 
     // Courses become standalone (no track)
     await Course.updateMany(
-      { _id: { $in: track.courses } },
+      { _id: { $in: courseIds } },
       { $set: { track: null } },
     ).session(session);
 
@@ -211,15 +235,15 @@ exports.deleteTrackCascade = async (trackId) => {
 
     // Remove all track students from track courses and sessions
     if (track.students?.length) {
-      if (track.courses?.length) {
+      if (courseIds.length) {
         await Course.updateMany(
-          { _id: { $in: track.courses } },
+          { _id: { $in: courseIds } },
           { $pull: { students: { $in: track.students } } },
         ).session(session);
       }
-      if (track.sessions?.length) {
+      if (sessionIds.length) {
         await Session.updateMany(
-          { _id: { $in: track.sessions } },
+          { _id: { $in: sessionIds } },
           { $pull: { students: { $in: track.students } } },
         ).session(session);
       }
@@ -232,8 +256,8 @@ exports.deleteTrackCascade = async (trackId) => {
         {
           $unset: { enrolledTrack: 1 },
           $pull: {
-            enrolledCourses: { $in: track.courses || [] },
-            enrolledSessions: { $in: track.sessions || [] },
+            enrolledCourses: { $in: courseIds },
+            enrolledSessions: { $in: sessionIds },
           },
         },
       ).session(session);

@@ -56,10 +56,22 @@
  *           example: "507f1f77bcf86cd799439011"
  *         students:
  *           type: array
- *           description: List of enrolled students
+ *           description: >
+ *             List of enrolled students. Only present in the API response
+ *             when the requester can see the session's content (its
+ *             instructor, an admin, or someone enrolled directly or via a
+ *             parent track/course). Everyone else gets `studentCount` +
+ *             `isEnrolled` instead.
  *           items:
  *             type: string
  *             example: "507f1f77bcf86cd799439012"
+ *         studentCount:
+ *           type: integer
+ *           description: Number of directly-enrolled students (always present, for everyone)
+ *           example: 30
+ *         isEnrolled:
+ *           type: boolean
+ *           description: Whether the requesting user is enrolled in this session — directly, via a parent track, or via a parent course (always present when authenticated)
  *         tracks:
  *           type: array
  *           description: Parent track IDs this session belongs to
@@ -292,6 +304,7 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 const isTrustedHost = require('../utils/isTrustedHost');
+const { trustedHostMessage } = require('../utils/trustedHostsMessage');
 
 const resourceSchema = new mongoose.Schema({
   title: {
@@ -312,8 +325,7 @@ const resourceSchema = new mongoose.Schema({
           return false;
         }
       },
-      message:
-        'Resource URL must be from a trusted host (YouTube, Drive, GitHub, Cloudinary, etc.)',
+      message: trustedHostMessage('Resource URL'),
     },
   },
 });
@@ -358,15 +370,14 @@ const sessionSchema = new mongoose.Schema(
       validate: {
         validator(v) {
           if (!v) return true;
-          const youtubeRegex =
-            /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-          const driveRegex =
-            /^(https?:\/\/)?(drive\.google\.com|docs\.google\.com)\/.+/i;
-          if (youtubeRegex.test(v) || driveRegex.test(v)) return true;
-          // Same trusted-host allowlist as resourceSchema.url below —
-          // this fallback used to accept ANY https?:// URL
-          // (validator.isURL), which let session.url bypass the
-          // allowlist that resources[].url enforces.
+          // #3.3/Q8: this used to have its own youtubeRegex/driveRegex
+          // fast-path (which also accepted bare/http URLs, bypassing the
+          // https-only rule below) ahead of the trusted-host check —
+          // exactly the "conflicting list in a different file" Q8 says
+          // not to have. isTrustedHost() (backed by trustedHosts.js,
+          // which now includes youtube.com/youtu.be/youtube-nocookie.com)
+          // is the ONE validator for every URL field in this schema, same
+          // as resourceSchema.url right above.
           try {
             const parsed = new URL(v);
             return (
@@ -376,8 +387,7 @@ const sessionSchema = new mongoose.Schema(
             return false;
           }
         },
-        message:
-          'Session URL must be a valid YouTube, Google Drive, or other valid URL',
+        message: trustedHostMessage('Session URL'),
       },
     },
     instructor: {
@@ -459,6 +469,14 @@ sessionSchema.index({ course: 1 });
 sessionSchema.index({ instructor: 1 });
 // For published + level filtering
 sessionSchema.index({ published: 1, level: 1 });
+
+// Q7: matches Track/Course's existing studentCount virtual — lets list/
+// detail responses report how many students are enrolled without ever
+// exposing the raw `students` array to a caller who isn't authorized to
+// see it (src/services/policy.service.js#redactMembership).
+sessionSchema.virtual('studentCount').get(function studentCount() {
+  return this.students ? this.students.length : 0;
+});
 
 sessionSchema.pre('save', function setIsStandalone(next) {
   // Auto-set isStandalone based on relationships

@@ -121,6 +121,7 @@ exports.getSessionsByInstructor = catchAsync(async (req, res, next) => {
     await sessionService.getSessionsByInstructor(
       req.params.instructorId,
       req.query,
+      req.user,
     );
 
   res.status(200).json({
@@ -137,7 +138,11 @@ exports.getSessionsByInstructor = catchAsync(async (req, res, next) => {
 // Get sessions by track
 exports.getSessionsByTrack = catchAsync(async (req, res, next) => {
   const { sessions, total, pagination } =
-    await sessionService.getSessionsByTrack(req.params.trackId, req.query);
+    await sessionService.getSessionsByTrack(
+      req.params.trackId,
+      req.query,
+      req.user,
+    );
 
   res.status(200).json({
     status: 'success',

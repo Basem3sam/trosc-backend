@@ -5,6 +5,7 @@ const Session = require('../models/session.model');
 const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
+const policy = require('./policy.service');
 const { logActivity } = require('./activityLog.service');
 
 // ===================================================================
@@ -57,10 +58,13 @@ exports.createTrack = async (trackBody, requestingUserId) => {
  * @param {Object} query - Express query object with filters, sort, page, limit
  * @returns {Promise<{tracks: Array, total: Number}>} Paginated tracks and total count
  */
-exports.getAllTracks = async (query) => {
-  // Create features instance with the Track model
+exports.getAllTracks = async (query, requestingUser = null) => {
+  // Q5/Q2: previously returned every track regardless of `published`,
+  // to any caller including anonymous — a draft "[TEST]" track's title
+  // was fully public. Admins see everything; everyone else sees
+  // published tracks plus any drafts they themselves own.
   const features = new APIFeatures(Track.find(), query, Track)
-    .filter()
+    .filter(policy.publishedListFilter(requestingUser))
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -71,8 +75,25 @@ exports.getAllTracks = async (query) => {
   // Execute the query and get results
   const tracks = await features.query;
 
+  // Q7: previously returned every track's raw `students`/`pendingStudents`/
+  // `pendingLeaves` ID arrays to literally any caller, including
+  // anonymous — replaced with `studentCount` (already a schema virtual)
+  // plus `isEnrolled`/`isPending`/`isPendingLeave` for the requester.
+  // Each track's own instructor (or an admin) still gets the full arrays.
+  const sanitized = tracks.map((t) => {
+    const obj = t.toObject();
+    const isStaff =
+      policy.isAdmin(requestingUser) ||
+      policy.isOwnerOf(obj, requestingUser, 'instructor');
+    return policy.redactMembership(obj, requestingUser, isStaff, {
+      isEnrolled: 'students',
+      isPending: 'pendingStudents',
+      isPendingLeave: 'pendingLeaves',
+    });
+  });
+
   return {
-    tracks: tracks || [], // Ensure it's always an array
+    tracks: sanitized || [], // Ensure it's always an array
     total: features.totalDocs || 0,
     pagination: features.pagination, // Include pagination info
   };
@@ -126,13 +147,9 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
     throw new AppError('No track found with that ID', 404);
   }
 
-  const isOwner = requestingUser?.id === track.instructor?._id?.toString();
-  const isAdmin = requestingUser?.role === 'admin';
-  const isEnrolled =
-    requestingUser &&
-    track.students?.some(
-      (studentId) => studentId.toString() === requestingUser.id,
-    );
+  const isOwner = policy.isOwnerOf(track, requestingUser, 'instructor');
+  const isAdmin = policy.isAdmin(requestingUser);
+  const isEnrolled = policy.isMemberOf(track.students, requestingUser);
 
   if (!track.published && !isOwner && !isAdmin) {
     throw new AppError('No track found with that ID', 404);
@@ -142,7 +159,27 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
     await track.populate({ path: 'students', select: 'name email photo' });
   }
 
-  return track;
+  // Q7: `pendingStudents`/`pendingLeaves` had NO gate at all before this —
+  // anyone who could see the track (including an enrolled-but-not-staff
+  // student) got the raw applicant/leave-request ID lists. Only the
+  // track's own instructor or an admin is "staff" for these two fields —
+  // being merely enrolled doesn't qualify, unlike for `students` above.
+  // Everyone else gets `isPending`/`isPendingLeave` for their own status
+  // instead. `students`, when NOT populated above (i.e. the caller is
+  // none of owner/admin/enrolled), still needs the same raw-ID-array fix
+  // `getAllTracks` already got — replaced with `studentCount` (schema
+  // virtual, already present) + `isEnrolled: false`.
+  const trackObj = track.toObject();
+  trackObj.isEnrolled = isEnrolled;
+  policy.redactMembership(trackObj, requestingUser, isOwner || isAdmin, {
+    isPending: 'pendingStudents',
+    isPendingLeave: 'pendingLeaves',
+  });
+  if (!(isOwner || isAdmin || isEnrolled)) {
+    delete trackObj.students;
+  }
+
+  return trackObj;
 };
 
 /**
@@ -239,6 +276,90 @@ exports.deleteTrack = async (trackId, requestingUserId) => {
 // 🔗 COURSE-TRACK RELATIONSHIP MANAGEMENT
 // ===================================================================
 
+// #4.1 / #4.2 - keeping both sides of the track relationships in sync.
+//
+// A track<->course link lives in TWO places (Track.courses and
+// Course.track) and a track<->session link lives in TWO places
+// (Track.sessions and Session.tracks). `sessionCount`/`courseCount` are
+// virtuals over the TRACK side arrays, while `GET /sessions/track/:id`,
+// `GET /courses/track/:id` and enrollment sync all read the CHILD side -
+// so when the two sides disagree the frontend sees "3 sessions linked but
+// sessionCount: 0" (BACKEND-REQUESTS-2 #4.1/#4.2).
+//
+// The four functions below used to load both documents, mutate them in
+// memory and call `.save()` on each inside a Promise.all. That is fragile
+// in three specific ways, all fixed here:
+//   1. Not atomic across documents, and `.save()` re-validates the WHOLE
+//      document - so a legacy record with one now-invalid field (e.g. a
+//      session URL that predates the stricter trusted-host check) made the
+//      second save fail AFTER the first had already committed, leaving the
+//      link half-written with no way to repair it through the API.
+//   2. The "already in this track" guard only looked at the track side, so
+//      a one-sided link could never be repaired (the session side got a
+//      duplicate pushed instead) or was stuck returning 400 forever.
+//   3. Read-modify-write on whole arrays loses updates under concurrent
+//      requests.
+// Now every write is a single-document atomic operator ($addToSet / $pull
+// / $set) that skips whole-document validation, each step is idempotent,
+// and the child side (the side reads and enrollment trust) is written
+// first. If a request dies between the two writes, repeating it repairs
+// the link instead of failing; `scripts/reconcileTrackSessions.js` and
+// `scripts/reconcileTrackCourses.js` repair records that are already
+// desynced in the database.
+
+// True if `list` (array of ObjectIds) contains `id`.
+function listHasId(list, id) {
+  const target = id.toString();
+  return (list || []).some((item) => item.toString() === target);
+}
+
+// The raw id stored in `doc[path]`, as a string (or null). Needed because
+// Course.track is auto-populated by a pre-find hook, and Mongoose then
+// returns the populated document - whose toString() is NOT its id, which
+// made the old `course.track.toString() !== trackId` comparison always
+// true.
+function refId(doc, path) {
+  const raw = doc.populated(path) || doc.get(path);
+  if (!raw) return null;
+  return (raw._id || raw).toString();
+}
+
+// A student added to / removed from a track is (un)enrolled in its content
+// by the functions below; these helpers keep that bookkeeping in one place.
+async function enrollTrackStudentsInCourse(track, courseId) {
+  if (!track.students?.length) return;
+  await Course.updateOne(
+    { _id: courseId },
+    { $addToSet: { students: { $each: track.students } } },
+  );
+  await User.updateMany(
+    { _id: { $in: track.students } },
+    { $addToSet: { enrolledCourses: courseId } },
+  );
+}
+
+async function enrollTrackStudentsInSession(track, sessionId) {
+  if (!track.students?.length) return;
+  await Session.updateOne(
+    { _id: sessionId },
+    { $addToSet: { students: { $each: track.students } } },
+  );
+  await User.updateMany(
+    { _id: { $in: track.students } },
+    { $addToSet: { enrolledSessions: sessionId } },
+  );
+}
+
+/**
+ * Add a course to a track, keeping Track.courses and Course.track in sync.
+ * Idempotent and self-repairing: if only one side of the link exists (a
+ * desynced record) the missing side is written instead of erroring.
+ * @param {string} trackId - MongoDB track ID
+ * @param {string} courseId - MongoDB course ID
+ * @returns {Promise<Track>} The updated track
+ * @throws {AppError} 404 if track/course not found, 400 if the link is
+ *   already fully in place
+ */
 exports.addCourseToTrack = async (trackId, courseId) => {
   const [track, course] = await Promise.all([
     Track.findById(trackId),
@@ -248,48 +369,41 @@ exports.addCourseToTrack = async (trackId, courseId) => {
   if (!track) throw new AppError('No track found', 404);
   if (!course) throw new AppError('No course found', 404);
 
-  if (track.courses.some((id) => id.toString() === courseId)) {
+  const onTrackSide = listHasId(track.courses, courseId);
+  const onCourseSide = refId(course, 'track') === trackId.toString();
+
+  if (onTrackSide && onCourseSide) {
     throw new AppError('Course already in this track', 400);
   }
 
-  // If the course already belongs to a different track, detach it from
-  // that track's `courses` array first. Otherwise the old track keeps a
-  // stale reference: `course.track` would point here, but the old track's
-  // `courses` array would still list it too — and anything that trusts
-  // that array (e.g. deleteTrack orphaning its courses) would wrongly act
-  // on a course it no longer owns.
-  if (course.track && course.track.toString() !== trackId) {
-    await Track.findByIdAndUpdate(course.track, {
-      $pull: { courses: courseId },
-    });
-  }
+  // A course belongs to exactly one track. Detach it from EVERY other
+  // track that still lists it (not just the one course.track points at),
+  // otherwise a stale reference stays behind and anything trusting that
+  // array (e.g. deleteTrack orphaning its courses) would wrongly act on a
+  // course it no longer owns.
+  await Track.updateMany(
+    { _id: { $ne: trackId }, courses: courseId },
+    { $pull: { courses: courseId } },
+  );
 
-  // Update both sides
-  track.courses.push(courseId);
-  course.track = trackId;
-
-  await Promise.all([track.save(), course.save()]);
+  // Child side first (what reads and enrollment trust), then the parent.
+  await Course.updateOne({ _id: courseId }, { $set: { track: trackId } });
+  await Track.updateOne({ _id: trackId }, { $addToSet: { courses: courseId } });
 
   // Enroll existing track students into the new course
-  if (track.students?.length) {
-    await Course.findByIdAndUpdate(courseId, {
-      $addToSet: { students: { $each: track.students } },
-    });
-    await User.updateMany(
-      { _id: { $in: track.students } },
-      { $addToSet: { enrolledCourses: courseId } },
-    );
-  }
+  await enrollTrackStudentsInCourse(track, courseId);
 
-  return track;
+  return Track.findById(trackId);
 };
 
 /**
- * Add a session to a track with validation
+ * Add a session to a track, keeping Track.sessions and Session.tracks in
+ * sync. Idempotent and self-repairing, like addCourseToTrack.
  * @param {string} trackId - MongoDB track ID
  * @param {string} sessionId - MongoDB session ID
  * @returns {Promise<Track>} Updated track with new session
- * @throws {AppError} 404 if track/session not found, 400 if invalid operation
+ * @throws {AppError} 404 if track/session not found, 400 if the link is
+ *   already fully in place
  */
 exports.addSessionToTrack = async (trackId, sessionId) => {
   const [track, session] = await Promise.all([
@@ -300,103 +414,140 @@ exports.addSessionToTrack = async (trackId, sessionId) => {
   if (!track) throw new AppError('No track found', 404);
   if (!session) throw new AppError('No session found', 404);
 
-  if (track.sessions.some((id) => id.toString() === sessionId)) {
+  const onTrackSide = listHasId(track.sessions, sessionId);
+  const onSessionSide = listHasId(session.tracks, trackId);
+
+  if (onTrackSide && onSessionSide) {
     throw new AppError('Session already in this track', 400);
   }
 
-  track.sessions.push(sessionId);
-  session.tracks.push(trackId);
-  session.isStandalone = !session.tracks.length && !session.course;
-
-  await Promise.all([track.save(), session.save()]);
+  // Child side first. $addToSet means a repeat (or a half-written earlier
+  // attempt) can never produce a duplicate entry. A session linked to a
+  // track is by definition not standalone.
+  await Session.updateOne(
+    { _id: sessionId },
+    { $addToSet: { tracks: trackId }, $set: { isStandalone: false } },
+  );
+  await Track.updateOne(
+    { _id: trackId },
+    { $addToSet: { sessions: sessionId } },
+  );
 
   // Enroll existing track students into the new session
-  if (track.students?.length) {
-    await Session.findByIdAndUpdate(sessionId, {
-      $addToSet: { students: { $each: track.students } },
-    });
-    await User.updateMany(
-      { _id: { $in: track.students } },
-      { $addToSet: { enrolledSessions: sessionId } },
-    );
-  }
+  await enrollTrackStudentsInSession(track, sessionId);
 
-  return track;
+  return Track.findById(trackId);
 };
 
+/**
+ * Remove a course from a track, keeping both sides in sync. The course is
+ * orphaned (track = null), not deleted.
+ * @param {string} trackId - MongoDB track ID
+ * @param {string} courseId - MongoDB course ID
+ * @returns {Promise<Track>} Updated track without the course
+ * @throws {AppError} 404 if track not found, 400 if removing it would
+ *   leave the track with no course or session
+ */
 exports.removeCourseFromTrack = async (trackId, courseId) => {
   const track = await Track.findById(trackId);
   if (!track) throw new AppError('No track found', 404);
 
-  track.courses.pull(courseId);
-
-  // Check: track still has content?
-  if (track.courses.length === 0 && track.sessions.length === 0) {
+  // Check: track still has content? (computed before any write, so a
+  // rejected removal changes nothing)
+  const remainingCourses = (track.courses || []).filter(
+    (id) => id.toString() !== courseId.toString(),
+  );
+  if (remainingCourses.length === 0 && (track.sessions || []).length === 0) {
     throw new AppError(
       'Cannot remove last course: track must have at least one course or session',
       400,
     );
   }
 
+  await Track.updateOne({ _id: trackId }, { $pull: { courses: courseId } });
+
   const course = await Course.findById(courseId);
   if (course) {
-    course.track = null; // Orphan the course
-    await course.save();
+    const currentTrackId = refId(course, 'track');
 
-    // Unenroll the track's current students from the now-detached course —
-    // symmetric with addCourseToTrack, which auto-enrolls existing track
-    // students into a course when it's added. Without this, students stay
-    // enrolled in a course that's no longer gated behind the track they
-    // joined, with no way to notice or clean it up.
-    //
-    // Known limitation: a student who is both a track member *and*
-    // separately/directly enrolled in this exact course will also be
-    // unenrolled here, since enrollment doesn't currently record *how* a
-    // student got access (track vs. direct). Fixing that fully needs a
-    // provenance field on enrollment — a larger, separately-tracked change.
-    if (track.students?.length) {
-      await Course.findByIdAndUpdate(courseId, {
-        $pull: { students: { $in: track.students } },
-      });
-      await User.updateMany(
-        { _id: { $in: track.students } },
-        { $pull: { enrolledCourses: courseId } },
-      );
+    // Only orphan the course if it actually belongs to THIS track (or to
+    // none - a desynced record). If it belongs to a different track,
+    // removing it here must only clean up this track's stale reference;
+    // it must not detach the course from the track that really owns it or
+    // unenroll that track's students.
+    if (!currentTrackId || currentTrackId === trackId.toString()) {
+      if (currentTrackId) {
+        await Course.updateOne({ _id: courseId }, { $set: { track: null } });
+      }
+
+      // Unenroll the track's current students from the now-detached
+      // course - symmetric with addCourseToTrack, which auto-enrolls
+      // existing track students into a course when it's added. Without
+      // this, students stay enrolled in a course that's no longer gated
+      // behind the track they joined, with no way to notice or clean it up.
+      //
+      // Known limitation: a student who is both a track member *and*
+      // separately/directly enrolled in this exact course will also be
+      // unenrolled here, since enrollment doesn't currently record *how* a
+      // student got access (track vs. direct). Fixing that fully needs a
+      // provenance field on enrollment - a larger, separately-tracked
+      // change.
+      if (track.students?.length) {
+        await Course.updateOne(
+          { _id: courseId },
+          { $pull: { students: { $in: track.students } } },
+        );
+        await User.updateMany(
+          { _id: { $in: track.students } },
+          { $pull: { enrolledCourses: courseId } },
+        );
+      }
     }
   }
 
-  await track.save();
-  return track;
+  return Track.findById(trackId);
 };
 
 /**
- * Remove a session from a track
+ * Remove a session from a track, keeping both sides in sync.
  * @param {string} trackId - MongoDB track ID
  * @param {string} sessionId - MongoDB session ID
  * @returns {Promise<Track>} Updated track without the session
- * @throws {AppError} 404 if track/session not found, 400 if session not in track
+ * @throws {AppError} 404 if track not found, 400 if removing it would
+ *   leave the track with no course or session
  */
 exports.removeSessionFromTrack = async (trackId, sessionId) => {
   const track = await Track.findById(trackId);
   if (!track) throw new AppError('No track found', 404);
 
-  track.sessions.pull(sessionId);
-
-  // Check: track still has content?
-  if (track.courses.length === 0 && track.sessions.length === 0) {
+  // Check: track still has content? (computed before any write)
+  const remainingSessions = (track.sessions || []).filter(
+    (id) => id.toString() !== sessionId.toString(),
+  );
+  if (remainingSessions.length === 0 && (track.courses || []).length === 0) {
     throw new AppError(
       'Cannot remove last session: track must have at least one course or session',
       400,
     );
   }
 
-  const session = await Session.findById(sessionId);
-  if (session) {
-    session.tracks.pull(trackId);
-    session.isStandalone = !session.tracks.length && !session.course; // true if also not in a course
-    await session.save();
+  await Track.updateOne({ _id: trackId }, { $pull: { sessions: sessionId } });
 
-    // Unenroll this track's current students from the session — symmetric
+  // `new: true` so isStandalone is computed from the session's tracks AS
+  // THEY ARE NOW (after this pull), not from a stale read.
+  const session = await Session.findByIdAndUpdate(
+    sessionId,
+    { $pull: { tracks: trackId } },
+    { new: true },
+  );
+  if (session) {
+    // true if it is also not in another track or a course
+    await Session.updateOne(
+      { _id: sessionId },
+      { $set: { isStandalone: !session.tracks?.length && !session.course } },
+    );
+
+    // Unenroll this track's current students from the session - symmetric
     // with addSessionToTrack, which auto-enrolls existing track students
     // into a session when it's added. Without this, students stay
     // enrolled in a session that's no longer reachable via the track they
@@ -406,11 +557,13 @@ exports.removeSessionFromTrack = async (trackId, sessionId) => {
     // separately/directly enrolled in this exact session will also be
     // unenrolled here, since enrollment doesn't currently record *how* a
     // student got access (track vs. direct). Fixing that fully needs a
-    // provenance field on enrollment — a larger, separately-tracked change.
+    // provenance field on enrollment - a larger, separately-tracked
+    // change.
     if (track.students?.length) {
-      await Session.findByIdAndUpdate(sessionId, {
-        $pull: { students: { $in: track.students } },
-      });
+      await Session.updateOne(
+        { _id: sessionId },
+        { $pull: { students: { $in: track.students } } },
+      );
       await User.updateMany(
         { _id: { $in: track.students } },
         { $pull: { enrolledSessions: sessionId } },
@@ -418,8 +571,7 @@ exports.removeSessionFromTrack = async (trackId, sessionId) => {
     }
   }
 
-  await track.save();
-  return track;
+  return Track.findById(trackId);
 };
 
 // ===================================================================
@@ -515,6 +667,18 @@ exports.getPopularTracks = async (limit = 10) => {
         'instructor.passwordChangedAt': 0,
         'instructor.passwordResetToken': 0,
         'instructor.passwordResetExpires': 0,
+        // Q7: this endpoint is fully public (no auth on the route, no
+        // requestingUser param here to compute isEnrolled/isPending
+        // against) — an aggregation pipeline also bypasses Mongoose's
+        // toObject()/virtuals machinery entirely, so `policy.
+        // redactMembership()` doesn't apply here the way it does for
+        // getAllTracks/getTrackDetails. studentCount was already added
+        // above via $addFields; the raw arrays are unconditionally
+        // excluded since there's no legitimate "staff" viewer of a
+        // public leaderboard endpoint.
+        students: 0,
+        pendingStudents: 0,
+        pendingLeaves: 0,
       },
     },
   ]);
