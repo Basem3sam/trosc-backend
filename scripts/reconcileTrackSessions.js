@@ -35,6 +35,12 @@ require('../src/config/env.config')();
 const mongoose = require('mongoose');
 const Track = require('../src/models/track.model');
 const Session = require('../src/models/session.model');
+// Track, Course and Session auto-populate their `instructor` on every find
+// (a pre-find hook), which needs the "User" model registered. The server
+// registers every model at startup; a standalone script only has what it
+// requires itself, so without this line the first find() throws
+// MissingSchemaError: Schema hasn't been registered for model "User".
+require('../src/models/user.model');
 
 (async () => {
   const dryRun = process.argv.includes('--dry-run');
