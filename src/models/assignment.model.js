@@ -223,10 +223,7 @@ const assignmentSchema = new mongoose.Schema(
     },
     attachments: {
       type: [String],
-      validate: [
-        validateAttachments,
-        trustedHostMessage('Each attachment'),
-      ],
+      validate: [validateAttachments, trustedHostMessage('Each attachment')],
     },
     deadline: {
       type: Date,

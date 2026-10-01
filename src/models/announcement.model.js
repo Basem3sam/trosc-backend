@@ -86,10 +86,7 @@ const announcementSchema = new mongoose.Schema(
     },
     attachments: {
       type: [String],
-      validate: [
-        validateAttachments,
-        trustedHostMessage('Each attachment'),
-      ],
+      validate: [validateAttachments, trustedHostMessage('Each attachment')],
     },
     createdBy: {
       type: mongoose.Schema.ObjectId,
