@@ -265,6 +265,27 @@ exports.generateSnapshot = async (periodName, date = new Date()) => {
   return snapshot;
 };
 
+/**
+ * A date that falls inside the period BEFORE the one containing `now`
+ * (for daily: yesterday; weekly: last Monday-Sunday week; monthly: last
+ * calendar month). Pass the result to generateSnapshot().
+ *
+ * BACKEND-REQUESTS-2 #5.2: the scheduled job runs a few minutes after a
+ * period starts (00:05 for daily, Monday 00:10 for weekly, the 1st at
+ * 00:15 for monthly). generateSnapshot() with no date snapshots the period
+ * CONTAINING now - so every scheduled run captured a period that had only
+ * just begun (about zero `newUsers`) and the period that had actually just
+ * finished was never recorded. The scheduled job should snapshot the
+ * period that just ended instead; this is how it finds one.
+ * @param {'daily'|'weekly'|'monthly'} periodName
+ * @param {Date|string} [now] - defaults to the current time
+ * @returns {Date} one millisecond before the current period starts
+ */
+exports.getPreviousPeriodDate = (periodName, now = new Date()) => {
+  const { start } = getPeriodBounds(periodName, now);
+  return new Date(start.getTime() - 1);
+};
+
 // ==============================
 // 🔸 Read path
 // ==============================

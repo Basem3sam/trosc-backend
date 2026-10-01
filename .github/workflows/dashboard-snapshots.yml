@@ -7,8 +7,20 @@
 # repo, rather than relying on the free-tier Render web service's uptime
 # for an internal job.
 #
+# BACKEND-REQUESTS-2 #5.2: the scheduled runs now pass `--previous`, so each
+# one snapshots the period that just FINISHED (yesterday / last Mon-Sun
+# week / last calendar month). Before, they snapshotted the period that
+# contained "now" - which at 00:05 UTC has existed for five minutes - so
+# every stored snapshot showed about zero new users and the period that had
+# actually ended was never recorded.
+#
 # Required repo secret:
 #   DATABASE_URL - the production MongoDB connection string
+#
+# Scheduled workflows only run from the repository's DEFAULT branch, and
+# GitHub may delay them by several minutes under load. On a repo with no
+# activity for 60 days GitHub disables scheduled workflows until re-enabled
+# in the Actions tab.
 #
 # env.config() also requires JWT_SECRET/JWT_EXPIRES_IN/FRONTEND_URL to be
 # present (it validates every required var up front regardless of which
@@ -32,6 +44,10 @@ on:
         required: false
         type: choice
         options: ['daily', 'weekly', 'monthly']
+      date:
+        description: 'Optional backfill: any date (YYYY-MM-DD, UTC) inside the period to snapshot. Blank = the period that just finished.'
+        required: false
+        type: string
 
 jobs:
   snapshot:
@@ -46,22 +62,39 @@ jobs:
       - run: npm ci --omit=dev
       - name: Determine period
         id: period
+        env:
+          INPUT_PERIOD: ${{ inputs.period }}
+          SCHEDULE: ${{ github.event.schedule }}
         run: |
-          if [ -n "${{ inputs.period }}" ]; then
-            echo "value=${{ inputs.period }}" >> "$GITHUB_OUTPUT"
+          if [ -n "$INPUT_PERIOD" ]; then
+            echo "value=$INPUT_PERIOD" >> "$GITHUB_OUTPUT"
           else
-            case "${{ github.event.schedule }}" in
+            case "$SCHEDULE" in
               '5 0 * * *') echo "value=daily" >> "$GITHUB_OUTPUT" ;;
               '10 0 * * 1') echo "value=weekly" >> "$GITHUB_OUTPUT" ;;
               '15 0 1 * *') echo "value=monthly" >> "$GITHUB_OUTPUT" ;;
-              *) echo "Unrecognized schedule: ${{ github.event.schedule }}" && exit 1 ;;
+              *) echo "Unrecognized schedule: $SCHEDULE" && exit 1 ;;
             esac
           fi
       - name: Generate snapshot
-        run: node scripts/generateDashboardSnapshot.js ${{ steps.period.outputs.value }}
         env:
           NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: unused-in-this-script-but-required-by-env-config-32chars
           JWT_EXPIRES_IN: 1h
           FRONTEND_URL: http://localhost
+          PERIOD: ${{ steps.period.outputs.value }}
+          INPUT_DATE: ${{ inputs.date }}
+        run: |
+          if [ -n "$INPUT_DATE" ]; then
+            # Manual backfill of a specific date. Validated before use: this
+            # value is free text typed into the Actions UI.
+            if ! echo "$INPUT_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+              echo "date must look like YYYY-MM-DD, got: $INPUT_DATE" && exit 1
+            fi
+            node scripts/generateDashboardSnapshot.js "$PERIOD" "$INPUT_DATE"
+          else
+            # Cron runs AND manual runs without a date: the period that just
+            # finished (see the #5.2 note at the top of this file).
+            node scripts/generateDashboardSnapshot.js "$PERIOD" --previous
+          fi

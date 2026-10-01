@@ -309,7 +309,9 @@
  *     description: |
  *       Retrieves a list of users. By default only active users are
  *       returned; pass `active=false` or `includeInactive=true` to see
- *       deactivated accounts too (e.g. to reactivate one).
+ *       deactivated accounts too (e.g. to reactivate one). Every user in
+ *       the response carries an `active` boolean, so a mixed list
+ *       (`includeInactive=true`) can show who is deactivated.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -386,7 +388,7 @@
  *   get:
  *     operationId: getUserById
  *     summary: Get user by ID (admin only)
- *     description: Retrieve specific user details by ID
+ *     description: Retrieve specific user details by ID, including the `active` flag (false = deactivated)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []

@@ -136,6 +136,8 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 
 ### Users
 
+> **Stage 6 (#5.1):** every user returned by `GET /v1/users` (with or without `?includeInactive=true` / `?active=false` / `?fields=`) and by `GET /v1/users/:id` carries an explicit `active` boolean (`false` = deactivated). All of these are admin-only.
+
 | Method   | Endpoint                   | Access    | Description                                                                                                                                                                       |
 | -------- | -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET`    | `/v1/users/me`             | Protected | Get current user profile, including `pendingTrack`: the `_id` of a track the user has applied to but isn't approved into yet, or `null` if none                                 |
@@ -324,6 +326,8 @@ Audit trail of user actions. There is deliberately **no `POST` endpoint** — en
 ### Dashboard Stats
 
 Admin-only platform analytics. `live` is computed on the fly and never persisted; everything else reads from or writes to stored, point-in-time snapshots (one per `period` + `date`, upserted rather than duplicated on re-generation).
+
+> **Scheduled snapshots (Stage 6, #5.2):** the scheduled job stores the period that just _finished_ (yesterday / last Monday–Sunday week / last calendar month), dated by that period's start. A row dated today therefore only appears after today has ended; use `/live` for the day in progress. `POST /snapshot` with no `date` still snapshots the period containing now, as before.
 
 | Method   | Endpoint                              | Access | Description                                                                                      |
 | -------- | ------------------------------------- | ------ | ------------------------------------------------------------------------------------------------ |
