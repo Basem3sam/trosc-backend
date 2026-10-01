@@ -37,25 +37,58 @@ function assertCanView(resource, label, requestingUser) {
   // matching how course/track creation is gated by role only elsewhere.
 }
 
-// Strip every student's raw `submissions` and attach only the requesting
-// user's own submission as `mySubmission`, so this stays a safe endpoint
-// for students to hit (no classmates' files/grades leaked).
-function withMySubmission(assignments, userId) {
+// Staff for a given assignment = an admin, or the assignment's own
+// instructor (the same people who can open GET /assignments/:id and grade
+// it today). Deliberately NOT "any instructor": an instructor who does not
+// manage this assignment gets no submission information about it, the same
+// as before. Stage 4 will swap this one check for the policy-service
+// management rule without touching anything else in this helper.
+function isAssignmentStaff(plain, requestingUser) {
+  if (requestingUser.role === 'admin') return true;
+  const instructorId = plain.instructor?._id || plain.instructor;
+  return !!instructorId && instructorId.toString() === requestingUser.id;
+}
+
+// Strip every student's raw `submissions` from every caller and attach
+// only the requesting user's own submission as `mySubmission`, so this
+// stays a safe endpoint for students to hit (no classmates' files/grades
+// leaked).
+//
+// #3.2: for staff of that assignment, also attach two counts computed from
+// the same in-memory array (no extra queries) so the Studio can render
+// "3 submissions · 2 to grade" without calling GET /assignments/:id once
+// per assignment. Counts only - never identities, files or grades.
+//   submissionCount - how many students have submitted
+//   ungradedCount   - how many of those have no grade yet
+function shapeAssignmentsForCaller(assignments, requestingUser) {
   return assignments.map((assignment) => {
     const plain = assignment.toObject();
+    const submissions = plain.submissions || [];
     const mySubmission =
-      plain.submissions.find((s) => s.student.toString() === userId) || null;
+      submissions.find((s) => s.student.toString() === requestingUser.id) ||
+      null;
 
-    return {
+    const shaped = {
       ...plain,
       submissions: undefined,
       mySubmission,
     };
+
+    if (isAssignmentStaff(plain, requestingUser)) {
+      shaped.submissionCount = submissions.length;
+      shaped.ungradedCount = submissions.filter(
+        (s) => s.grade === undefined || s.grade === null,
+      ).length;
+    }
+
+    return shaped;
   });
 }
 
 /**
  * Get all assignments directly attached to a single course or session.
+ * Each assignment includes `mySubmission`; staff of that assignment (admin
+ * or its instructor) also get `submissionCount` / `ungradedCount` (#3.2).
  * @param {'course'|'session'} resourceType
  * @param {string} resourceId
  * @param {Object} requestingUser - req.user (id, role)
@@ -80,13 +113,14 @@ exports.getResourceAssignments = async (
     .populate('session', 'title')
     .populate('instructor', 'name photo');
 
-  return withMySubmission(assignments, requestingUser.id);
+  return shapeAssignmentsForCaller(assignments, requestingUser);
 };
 
 /**
  * Get every assignment across all courses in a track, PLUS every
  * assignment on any standalone session mounted directly on the track
- * (i.e. not part of a course). Each assignment includes `mySubmission`.
+ * (i.e. not part of a course). Each assignment includes `mySubmission`;
+ * staff of that assignment also get `submissionCount` / `ungradedCount`.
  *
  * Access: admin, instructor (any), or a student enrolled in the track.
  *
@@ -114,7 +148,7 @@ exports.getTrackAssignments = async (trackId, requestingUser) => {
     .populate('session', 'title')
     .populate('instructor', 'name photo');
 
-  return withMySubmission(assignments, requestingUser.id);
+  return shapeAssignmentsForCaller(assignments, requestingUser);
 };
 
 /**

@@ -58,6 +58,7 @@
 
 const mongoose = require('mongoose');
 const validateAttachments = require('../utils/validateAttachments');
+const { trustedHostMessage } = require('../utils/trustedHostsMessage');
 
 const announcementSchema = new mongoose.Schema(
   {
@@ -87,7 +88,7 @@ const announcementSchema = new mongoose.Schema(
       type: [String],
       validate: [
         validateAttachments,
-        'Attachments must be valid URLs from trusted hosts',
+        trustedHostMessage('Each attachment'),
       ],
     },
     createdBy: {

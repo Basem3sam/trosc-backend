@@ -196,7 +196,12 @@
  *   patch:
  *     operationId: addSessionToTrack
  *     summary: Add a session to a track
- *     description: Associate a session with a track (admin and instructors only)
+ *     description: >
+ *       Associate a session with a track (admin and instructors only). Keeps
+ *       `Track.sessions` and `Session.tracks` in sync with atomic, idempotent
+ *       writes. If the link already exists on only ONE side (a previously
+ *       desynced record) this call repairs the missing side and returns 200;
+ *       it returns 400 only when both sides are already linked.
  *     tags: [Tracks]
  *     security:
  *       - bearerAuth: []
@@ -221,7 +226,7 @@
  *             schema:
  *               $ref: '#/components/schemas/TrackResponse'
  *       400:
- *         description: Session already exists in track or invalid operation
+ *         description: Session is already fully linked to this track
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
@@ -232,7 +237,11 @@
  *   delete:
  *     operationId: removeSessionFromTrack
  *     summary: Remove a session from a track
- *     description: Remove session association from a track (admin and instructors only)
+ *     description: >
+ *       Remove session association from a track (admin and instructors only).
+ *       Updates both sides, recomputes the session's `isStandalone` (it stays
+ *       non-standalone while it is in another track or a course), and
+ *       unenrolls the track's students from it.
  *     tags: [Tracks]
  *     security:
  *       - bearerAuth: []
@@ -257,7 +266,7 @@
  *             schema:
  *               $ref: '#/components/schemas/TrackResponse'
  *       400:
- *         description: Session not found in track
+ *         description: Removing it would leave the track with no course or session
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
@@ -535,7 +544,13 @@
  *   patch:
  *     operationId: addCourseToTrack
  *     summary: Add a course to a track
- *     description: Associate a course with a track (admin and instructors only)
+ *     description: >
+ *       Associate a course with a track (admin and instructors only). Keeps
+ *       `Track.courses` and `Course.track` in sync with atomic, idempotent
+ *       writes, and detaches the course from any other track that still
+ *       listed it. A link that exists on only ONE side (a previously
+ *       desynced record) is repaired and returns 200; 400 only when both
+ *       sides are already linked.
  *     tags: [Tracks]
  *     security:
  *       - bearerAuth: []
@@ -560,7 +575,7 @@
  *             schema:
  *               $ref: '#/components/schemas/TrackResponse'
  *       400:
- *         description: Course already exists in track
+ *         description: Course is already fully linked to this track
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
@@ -847,7 +862,9 @@
  *       assignment on a standalone session mounted directly on the track, sorted
  *       by deadline. Each assignment includes `mySubmission` — the requesting
  *       user's own submission, or null if they haven't submitted. Accessible to
- *       admins, any instructor, or a student enrolled in the track.
+ *       admins, any instructor, or a student enrolled in the track. Admins and the assignment's own
+ *       instructor also get `submissionCount` and `ungradedCount` on each
+ *       assignment (counts only - never other students' files or grades).
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []

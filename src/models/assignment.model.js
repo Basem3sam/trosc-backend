@@ -83,7 +83,22 @@
  *         mySubmission:
  *           type: object
  *           nullable: true
- *           description: The requesting user's own submission, or null if not submitted (only present on the track-assignments list endpoint)
+ *           description: The requesting user's own submission, or null if not submitted (only present on the assignment list endpoints)
+ *         submissionCount:
+ *           type: integer
+ *           description: >
+ *             Number of students who have submitted. Only present on the
+ *             assignment list endpoints (tracks/courses/sessions
+ *             `/:id/assignments`), and only for staff of that assignment
+ *             (an admin, or the assignment's own instructor). Never sent to
+ *             students or to instructors who don't manage the assignment.
+ *           example: 3
+ *         ungradedCount:
+ *           type: integer
+ *           description: >
+ *             How many of those submissions have no grade yet. Same
+ *             visibility as `submissionCount`.
+ *           example: 2
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -143,6 +158,7 @@
 const mongoose = require('mongoose');
 const AppError = require('../utils/AppError');
 const validateAttachments = require('../utils/validateAttachments');
+const { trustedHostMessage } = require('../utils/trustedHostsMessage');
 
 const submissionSchema = new mongoose.Schema({
   student: {
@@ -209,7 +225,7 @@ const assignmentSchema = new mongoose.Schema(
       type: [String],
       validate: [
         validateAttachments,
-        'Attachments must be valid URLs from trusted hosts',
+        trustedHostMessage('Each attachment'),
       ],
     },
     deadline: {

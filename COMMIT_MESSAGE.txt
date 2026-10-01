@@ -1,0 +1,52 @@
+feat(stage-5): staff submission counts, link-only submission messages, atomic track link sync
+
+BACKEND-REQUESTS-2 #3.2, #3.1 (Decisions Q1), #3.3 follow-through, #4.1, #4.2.
+
+#3.2 Staff submission counts
+- GET /tracks|courses|sessions/:id/assignments add submissionCount and
+  ungradedCount for staff of each assignment (admin, or the assignment's own
+  instructor). Counts only; students and non-managing instructors never get
+  them; the raw `submissions` array is still never sent. A grade of 0 counts
+  as graded.
+- assignment.service.js: withMySubmission -> shapeAssignmentsForCaller, with
+  isAssignmentStaff() as the single "is staff" check (Stage 4 replaces it
+  with the policy-service rule).
+
+#3.1 Submissions are links
+- No change to what is accepted (links only). A multipart upload / missing
+  `file` now returns a message saying submissions are links, not the opaque
+  '"file" is required'; non-string / non-URL `file` have their own messages.
+- New src/utils/trustedHostsMessage.js builds every "trusted host" message
+  from src/utils/trustedHosts.js. Wired into attachmentValidation.js,
+  assignmentSubmission.validation.js and the session / assignment / course /
+  event / announcement models. Messages keep the phrase "must be a valid
+  HTTPS URL from a trusted host" and now list every allowed host.
+- Swagger, API.md and README state the link-only design. Cloudinary remains
+  an unimplemented, optional future enhancement.
+
+#4.1 / #4.2 Track <-> session/course link sync
+- track.service.js: addCourseToTrack, addSessionToTrack, removeCourseFromTrack
+  and removeSessionFromTrack now use atomic, idempotent $addToSet / $pull /
+  $set (child side first) instead of load-mutate-save on two documents.
+  A link present on only one side is repaired (200) instead of erroring or
+  duplicating; a fully linked pair is still 400.
+- addCourseToTrack detaches the course from EVERY other track that lists it.
+- removeCourseFromTrack no longer detaches/unenrolls a course that actually
+  belongs to a different track.
+- removeSessionFromTrack recomputes isStandalone from the post-pull state.
+- cascade.service.js#deleteTrackCascade works from the union of Track.courses
+  / Track.sessions and Course.track / Session.tracks, so deleting an already
+  desynced track still detaches every child.
+- New scripts/reconcileTrackSessions.js (idempotent, --dry-run): recomputes
+  Track.sessions from Session.tracks and fixes Session.isStandalone.
+  NOT executed.
+
+Behaviour changes to be aware of
+- PATCH /tracks/:id/sessions/:sid and /courses/:cid on a half-linked record
+  now return 200 and repair it (previously 400 or a silent duplicate).
+- Error message texts for URL validation changed (same leading phrase).
+- No response shape removed; submissionCount / ungradedCount are additive.
+
+Tests (new): assignmentStaffCounts.test.js, submissionLinkOnly.test.js,
+trackLinkSync.test.js.
+Docs: README.md, API.md, TESTING.md, STAGE_PLAN.md.

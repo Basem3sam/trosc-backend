@@ -284,6 +284,7 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 const validateAttachments = require('../utils/validateAttachments');
+const { trustedHostMessage } = require('../utils/trustedHostsMessage');
 
 const syllabusItemSchema = new mongoose.Schema(
   {
@@ -378,7 +379,7 @@ const courseSchema = new mongoose.Schema(
       type: [String],
       validate: [
         validateAttachments,
-        'Course attachments must be valid URLs from trusted hosts',
+        trustedHostMessage('Each course attachment'),
       ],
     },
   },

@@ -618,7 +618,7 @@ Common HTTP status codes:
 
 ### 1. No File Uploads
 
-Instead of S3/Cloudinary storage costs, all media is referenced by URL. The system validates URLs against a single, shared whitelist of trusted hosts (`src/utils/trustedHosts.js` — YouTube, Drive, Dropbox, GitHub, Cloudinary, Imgur, Discord CDN), used consistently by both the Mongoose-level and Joi-level attachment validators, and served as-is at `GET /v1/config/trusted-hosts` so a form can warn about an untrusted host before submitting. Cloudinary is documented here as a possible **future, optional** enhancement (authenticated/private delivery + backend-generated signed URLs, never a permanent public URL, and the API secret never reaches the frontend) — it is not implemented and nothing in the current stages requires it. Google Drive/other trusted-host links remain the free, always-available fallback.
+Instead of S3/Cloudinary storage costs, all media is referenced by URL. The system validates URLs against a single, shared whitelist of trusted hosts (`src/utils/trustedHosts.js` — YouTube, Drive, Dropbox, GitHub, Cloudinary, Imgur, Discord CDN), used consistently by both the Mongoose-level and Joi-level attachment validators, and served as-is at `GET /v1/config/trusted-hosts` so a form can warn about an untrusted host before submitting. Cloudinary is documented here as a possible **future, optional** enhancement (authenticated/private delivery + backend-generated signed URLs, never a permanent public URL, and the API secret never reaches the frontend) — it is not implemented and nothing in the current stages requires it. Google Drive/other trusted-host links remain the free, always-available fallback. **Assignment submissions follow the same design: a submission is a link (`POST /assignments/:id/submissions` with JSON `{ "file": "<https link>" }`), not a file upload — multipart is rejected with a message saying so, and the error for an untrusted host lists every allowed host.**
 
 ### 2. Cascade Enrollment Service with Transactions
 
@@ -702,6 +702,7 @@ Draft (`published: false`) visibility rules — "an admin or the resource's curr
 | `node scripts/createAdmin.js <email>`                                           | Promote a user to admin                                                  |
 | `node scripts/cleanupOrphanedTrackReferences.js [--dry-run]`                    | One-off/repeatable maintenance: removes references to deleted users from `Track.students`/`pendingStudents`/`pendingLeaves` |
 | `node scripts/reconcileTrackCourses.js [--dry-run]`                              | One-off/repeatable maintenance: recomputes each track's `courses` array from the courses that actually point at it (`Course.track` is the source of truth) |
+| `node scripts/reconcileTrackSessions.js [--dry-run]`                             | One-off/repeatable maintenance: recomputes each track's `sessions` array from the sessions that actually point at it (`Session.tracks` is the source of truth) and fixes `Session.isStandalone` |
 | `node scripts/generateDashboardSnapshot.js <daily\|weekly\|monthly> [ISO date]` | Generate/refresh a dashboard-stats snapshot — meant to be cron-triggered |
 
 ### Email Diagnostic Tool
@@ -745,6 +746,22 @@ Recomputes every track's `courses` array from the courses that actually have
 that's the field `course.service.js` used to write directly before it was
 fixed to keep both sides in sync (see the Roadmap entry below). Fixes any
 track left out of sync from before that fix. Safe to re-run.
+
+### Track/Session Sync Reconciliation
+
+```bash
+node scripts/reconcileTrackSessions.js --dry-run   # preview
+node scripts/reconcileTrackSessions.js              # apply
+```
+
+The sessions counterpart of the script above (BACKEND-REQUESTS-2 #4.1 — a track
+reporting `sessionCount: 0` while sessions are linked to it). Recomputes every
+track's `sessions` array from the sessions that actually have that track in
+`Session.tracks` — `Session.tracks` is treated as the source of truth because
+it is the side `GET /sessions/track/:id` and enrollment already read — then
+recomputes `Session.isStandalone` (standalone = in no track and no course).
+It only ever sets those two fields. Safe to re-run; a no-op once clean. Run
+`--dry-run` first.
 
 ### Dashboard Stats Snapshot Generation
 
@@ -917,6 +934,9 @@ tests/
 - [x] **`createdBy` attribution field (BACKEND-REQUESTS-2 stage 3, Q6)** — `Assignment` and `WeeklyTask` gained a `createdBy` field, set once at creation alongside (and equal to, today) `instructor`. It is pure historical attribution: no authorization check reads it, it's not accepted from any request body (Joi rejects the unknown key outright, 400), and it's `nullable`/not `required` since existing records predate it. `scripts/backfillCreatedBy.js` fills `createdBy = instructor` for any pre-existing record missing it — idempotent, `--dry-run` supported, never overwrites an existing value, safe to re-run — **not executed** as part of this delivery, ready whenever that's decided separately. This decouples the two concepts ahead of stage 4, where `instructor`'s authorization role gets extended to co-instructors without `createdBy` needing to move.
 - [x] **Public membership-array reduction (BACKEND-REQUESTS-2 stage 2, Q7)** — a non-staff caller no longer receives the raw `students` array (Track/Course/Session) or `pendingStudents`/`pendingLeaves` (Track) — those keys are now simply absent from their response, replaced with `studentCount` (always present) and `isEnrolled`/`isPending`/`isPendingLeave` (the requester's own status). This closes three real leaks, not just a style change: `GET /tracks`/`GET /courses` (list) previously returned every record's raw membership arrays to any caller including anonymous; `GET /tracks/:id`'s `pendingStudents`/`pendingLeaves` had **no gate at all** — even a random enrolled student could see who else had applied to join or leave; and `GET /tracks/popular`'s aggregation pipeline bypassed the usual Mongoose serialization entirely and leaked the same arrays on a fully public endpoint. `policy.service.js` gained `isMemberOf`/`redactMembership` for this. **Intentional breaking API change** — see the callout in API.md above the Tracks section. Deliberately deferred: `GET /courses/instructor/:id` and `GET /courses/track/:id` still return the raw array (flagged in API.md as a stage-3+ candidate) to keep this stage's diff reviewable.
 - [x] **YouTube added to the trusted-host allowlist, one list to rule them all** — `src/utils/trustedHosts.js` now includes `youtube.com` / `youtu.be` / `youtube-nocookie.com` (subdomains like `www.`/`m.` are covered automatically). `Session.url`'s old hardcoded youtube/drive regex fast-path (which also quietly allowed non-`https` URLs) is gone — every URL field in the app, Mongoose- or Joi-validated, now goes through the exact same `isTrustedHost()` check. The list is also served at `GET /v1/config/trusted-hosts` so a form can warn about an untrusted host before submitting instead of only finding out from a 400.
+- [x] **Staff submission counts (BACKEND-REQUESTS-2 stage 5, #3.2)** — the three assignment list endpoints (`/tracks|courses|sessions/:id/assignments`) now add `submissionCount` and `ungradedCount` for staff of each assignment (an admin, or the assignment's own instructor), so the Studio no longer needs one `GET /assignments/:id` per assignment to draw "3 submissions · 2 to grade". Counts only; students and non-managing instructors never get them, and the raw `submissions` array is still never sent. Stage 4 will swap the "is staff" check for the policy-service management rule in one place (`assignment.service.js#isAssignmentStaff`).
+- [x] **Submissions are links — documented, and the error says so (stage 5, #3.1, Q1)** — no behavior change to what is accepted (links were already the only format); a multipart upload used to come back as the baffling `"file" is required`, and now returns a message explaining submissions are links. Every "trusted host" error message (Joi attachment/submission validators and the Mongoose session/course/event/announcement/assignment validators) is now built from `src/utils/trustedHostsMessage.js`, which reads the one real allowlist — so the text lists every allowed host and can't drift from what is enforced (the old hand-typed lists had already omitted Discord's CDN). Swagger and API.md state the link-only design; Cloudinary remains an unimplemented future option.
+- [x] **Track ↔ session/course links stay in sync (stage 5, #4.1/#4.2)** — `addCourseToTrack`/`addSessionToTrack`/`removeCourseFromTrack`/`removeSessionFromTrack` no longer load two documents, mutate them and `.save()` both; that could leave a link half-written (notably when one document failed whole-document validation after the other had already saved — e.g. a legacy session with a now-invalid URL) and could never be repaired through the API. They now use atomic, idempotent `$addToSet`/`$pull`, write the child side first, and **repair** a one-sided link instead of erroring (a fully linked pair is still a 400). Removing a course no longer detaches or unenrolls it if it actually belongs to a different track, and adding a course now detaches it from *every* other track that still listed it. `deleteTrackCascade` works from the union of both sides, so deleting an already-desynced track still detaches every child. New `scripts/reconcileTrackSessions.js` (idempotent, `--dry-run`) repairs records that are already out of sync — **not executed**.
 
 ### Planned 🔮
 
@@ -928,7 +948,7 @@ tests/
 - [ ] **`search()` uses regex instead of the `text` indexes that already exist** — `Track`/`Course` both define MongoDB `text` indexes, but `APIFeatures.js#search()` builds a `$regex` `$or` query, which can't use them. Fine at current data volume; would need attention if search performance ever becomes a problem.
 - [ ] **Webhook Support** for external integrations (Discord, Slack)
 - [ ] **Full test coverage** — still need tests
-- [ ] **BACKEND-REQUESTS-2 stages 4–6** — the co-instructor/per-course-instructor permission model (multiple instructors per track, per-course instructor, current-role-based authorization instead of "only the creator" — this is where `createdBy` vs. `instructor`, above, actually starts mattering), staff submission/ungraded counts, the `Track.sessions`/`courseCount` sync + repair pass, and extending stage 2's membership-array reduction to `GET /courses/instructor/:id`/`GET /courses/track/:id` (currently still return the raw `students` array — see API.md). See `STAGE_PLAN.md` for the full breakdown.
+- [ ] **BACKEND-REQUESTS-2 stages 4 and 6** — stage 4: the co-instructor/per-course-instructor permission model (multiple instructors per track, per-course instructor, current-role-based authorization instead of "only the creator" — this is where `createdBy` vs. `instructor`, above, actually starts mattering), plus extending stage 2's membership-array reduction to `GET /courses/instructor/:id`/`GET /courses/track/:id` (currently still return the raw `students` array — see API.md). Stage 6: `active` on user admin listings and the dashboard-snapshot schedule. See `STAGE_PLAN.md` for the full breakdown.
 - [ ] **Session list routes require authentication even for public content** — `session.route.js` applies `router.use(protect)` before every route, including `GET /sessions` (which also has `optionalAuth`, currently unreachable dead code since `protect` already ran). `track.route.js`/`course.route.js` don't have this restriction. Worth a decision: should published, `access: 'public'` sessions be anonymously browsable the way tracks/courses are, given self-enrollment implies previewing before enrolling?
 
 ---

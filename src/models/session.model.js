@@ -304,6 +304,7 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
 const isTrustedHost = require('../utils/isTrustedHost');
+const { trustedHostMessage } = require('../utils/trustedHostsMessage');
 
 const resourceSchema = new mongoose.Schema({
   title: {
@@ -324,8 +325,7 @@ const resourceSchema = new mongoose.Schema({
           return false;
         }
       },
-      message:
-        'Resource URL must be a valid HTTPS URL from a trusted host (YouTube, Drive, GitHub, Cloudinary, etc.) — see GET /v1/config/trusted-hosts',
+      message: trustedHostMessage('Resource URL'),
     },
   },
 });
@@ -387,8 +387,7 @@ const sessionSchema = new mongoose.Schema(
             return false;
           }
         },
-        message:
-          'Session URL must be a valid HTTPS URL from a trusted host (YouTube, Google Drive, GitHub, etc.) — see GET /v1/config/trusted-hosts',
+        message: trustedHostMessage('Session URL'),
       },
     },
     instructor: {

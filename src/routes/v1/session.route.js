@@ -432,7 +432,9 @@
  *     description: >
  *       Each assignment includes `mySubmission` — the requesting user's own
  *       submission, or null if they haven't submitted. Accessible to admins,
- *       any instructor, or a student enrolled in the session.
+ *       any instructor, or a student enrolled in the session. Admins and the assignment's own
+ *       instructor also get `submissionCount` and `ungradedCount` on each
+ *       assignment (counts only - never other students' files or grades).
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
