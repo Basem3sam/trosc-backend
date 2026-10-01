@@ -34,13 +34,15 @@ exports.getAllUsers = async (query) => {
     .filter(defaultFilter)
     .search(['name', 'email'])
     .sort()
-    .limitFields();
+    // `active` is select:false on the schema — re-include it so admins can
+    // see which users in the list are deactivated. Must go through
+    // limitFields (a later chained .select('+active') is dropped after
+    // the default '-__v' exclusion).
+    .limitFields(['active']);
 
   await features.paginate();
 
-  // `active` is select:false on the schema — explicitly re-include it so
-  // admins can actually see which users in the list are deactivated.
-  const users = await features.query.select('+active');
+  const users = await features.query;
   return {
     users: users || [],
     total: features.totalDocs || 0,

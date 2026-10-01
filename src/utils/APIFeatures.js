@@ -120,7 +120,14 @@ class APIFeatures {
   }
 
   // 4️⃣ Enhanced Field Limiting with Security
-  limitFields() {
+  //
+  // `alwaysInclude` lists select:false paths the caller explicitly wants
+  // back (e.g. ['active'] for admin listings). They must be folded into
+  // THIS select call: chaining a later `.select('+active')` after the
+  // default '-__v' exclusion silently loses the '+' (Mongoose resolves it
+  // to `active: 0`), so the field vanishes from the results.
+  limitFields(alwaysInclude = []) {
+    const forced = alwaysInclude.map((f) => `+${f}`).join(' ');
     if (this.queryString.fields) {
       const hiddenFields = this.getHiddenFields();
       const requestedFields = this.queryString.fields
@@ -139,9 +146,9 @@ class APIFeatures {
         })
         .join(' ');
 
-      this.query = this.query.select(safeFields);
+      this.query = this.query.select(`${safeFields} ${forced}`.trim());
     } else {
-      this.query = this.query.select('-__v');
+      this.query = this.query.select(`-__v ${forced}`.trim());
     }
     return this;
   }
