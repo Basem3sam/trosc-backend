@@ -14,6 +14,10 @@ const asUser = (method, path, who) =>
 const st = async (method, path, who, body) =>
   (await asUser(method, path, who).send(body)).status;
 
+// POST /courses without `track` returns the raw document (instructor is an
+// id string); with `track` or on update it is populated. Accept both.
+const idOf = (value) => (value && value._id) || value;
+
 const DAY = 86400000;
 const deadline = () => new Date(Date.now() + DAY).toISOString();
 
@@ -29,7 +33,7 @@ describe('Stage 4 final-product rules', () => {
 
       const c = await asUser('post', '/v1/courses', inst).send(COURSE);
       expect(c.status).toBe(201);
-      expect(c.body.data.course.instructor._id).toBe(inst.user.id);
+      expect(idOf(c.body.data.course.instructor)).toBe(inst.user.id);
       const s = await asUser('post', '/v1/sessions', inst).send({
         title: 'Rule Session',
       });
@@ -69,7 +73,7 @@ describe('Stage 4 final-product rules', () => {
         instructor: other.user.id,
       });
       expect(c.status).toBe(201);
-      expect(c.body.data.course.instructor._id).toBe(inst.user.id);
+      expect(idOf(c.body.data.course.instructor)).toBe(inst.user.id);
 
       const s = await asUser('post', '/v1/sessions', inst).send({
         title: 'Ignored instructor',
@@ -98,7 +102,7 @@ describe('Stage 4 final-product rules', () => {
         instructor: a.user.id,
       });
       expect(c.status).toBe(201);
-      expect(c.body.data.course.instructor._id).toBe(a.user.id);
+      expect(idOf(c.body.data.course.instructor)).toBe(a.user.id);
       const cp = `/v1/courses/${c.body.data.course._id}`;
 
       expect(await st('patch', cp, admin, { instructor: stu.user.id })).toBe(
