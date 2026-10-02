@@ -190,6 +190,8 @@ describe('Course Controller – Missing Endpoints', () => {
       student = fixture.student;
       studentToken = fixture.studentToken;
       track = fixture.track;
+      // These endpoints are public/published-only since Package 2.
+      await Course.findByIdAndUpdate(fixture.course._id, { published: true });
     });
 
     it('GET /v1/courses/instructor/:instructorId – returns courses by instructor', async () => {
@@ -219,9 +221,9 @@ describe('Course Controller – Missing Endpoints', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.results).toBe(1);
-      expect(res.body.data.courses[0].students).toContain(
-        student._id.toString(),
-      );
+      // Q7: non-staff get isEnrolled/studentCount, not the raw array.
+      expect(res.body.data.courses[0].isEnrolled).toBe(true);
+      expect(res.body.data.courses[0]).not.toHaveProperty('students');
     });
 
     it("GET – rejects if student tries to view another student's courses", async () => {

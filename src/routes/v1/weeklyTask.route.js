@@ -3,7 +3,7 @@ const weeklyTaskController = require('../../controllers/weeklyTask.controller');
 const {
   protect,
   restrictTo,
-  checkOwnership,
+  requireManage,
 } = require('../../middlewares/auth.middleware');
 const validate = require('../../middlewares/validate.middleware');
 const {
@@ -20,11 +20,7 @@ router
   .post(
     protect,
     restrictTo('admin', 'instructor'),
-    checkOwnership({
-      model: 'Course',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
+    requireManage({ resource: 'course' }),
     validate(resourceIdSchema, 'params'),
     validate(createWeeklyTaskSchema),
     weeklyTaskController.createWeeklyTask,

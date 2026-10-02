@@ -32,6 +32,87 @@ async function assertValidInstructor(instructorId) {
   }
 }
 
+// The raw id stored in `doc[path]`, as a string (or null). Needed because
+// Course.track is auto-populated by a pre-find hook, and Mongoose then
+// returns the populated document - whose toString() is NOT its id, which
+// made the old `course.track.toString() !== trackId` comparison always
+// true.
+function refId(doc, path) {
+  const raw = doc.populated(path) || doc.get(path);
+  if (!raw) return null;
+  return (raw._id || raw).toString();
+}
+
+// ids stored at `path` of a (possibly populated) document, as strings.
+function refIds(doc, path) {
+  const raw = doc.populated(path) || doc.get(path) || [];
+  return raw.map((value) => (value._id || value).toString());
+}
+
+/**
+ * Stage 4 / #2.2: validates and normalizes a co-instructor list. Every id
+ * must belong to an existing user with role 'instructor' or 'admin' (400
+ * otherwise); duplicates are removed; the lead is never listed twice, so
+ * an id equal to `leadId` is silently dropped.
+ * @param {string[]} ids
+ * @param {string} leadId - the track's lead instructor id
+ * @returns {Promise<string[]>} the cleaned list of co-instructor ids
+ */
+async function normalizeInstructors(ids, leadId) {
+  const unique = [...new Set(ids.map(String))].filter(
+    (id) => id !== String(leadId),
+  );
+  if (!unique.length) return [];
+
+  const users = await User.find({ _id: { $in: unique } }).select('role');
+  const roleById = new Map(users.map((u) => [u.id, u.role]));
+
+  unique.forEach((id) => {
+    if (!roleById.has(id)) {
+      throw new AppError(`No user found with co-instructor ID ${id}`, 400);
+    }
+    if (!['instructor', 'admin'].includes(roleById.get(id))) {
+      throw new AppError(
+        'Co-instructors must be users with role "instructor" or "admin"',
+        400,
+      );
+    }
+  });
+
+  return unique;
+}
+
+/**
+ * Returns the update to apply with `instructors` made consistent with the
+ * (possibly new) lead: an explicit `instructors` list is validated; if only
+ * the lead changes and the new lead was a co-instructor, they are moved out
+ * of the co-instructor list. The previous lead is NOT added as a
+ * co-instructor automatically - an admin who reassigns the lead decides
+ * whether the old lead stays on the track.
+ */
+async function withConsistentInstructors(track, updateBody) {
+  const leadId = updateBody.instructor || refId(track, 'instructor');
+
+  if (updateBody.instructors !== undefined) {
+    return {
+      ...updateBody,
+      instructors: await normalizeInstructors(updateBody.instructors, leadId),
+    };
+  }
+
+  if (updateBody.instructor) {
+    const current = refIds(track, 'instructors');
+    if (current.includes(String(leadId))) {
+      return {
+        ...updateBody,
+        instructors: current.filter((id) => id !== String(leadId)),
+      };
+    }
+  }
+
+  return updateBody;
+}
+
 /**
  * Create a new track
  * @param {Object} trackBody - Track data including title, description, instructor
@@ -41,6 +122,13 @@ async function assertValidInstructor(instructorId) {
 exports.createTrack = async (trackBody, requestingUserId) => {
   if (trackBody.instructor && trackBody.instructor !== requestingUserId) {
     await assertValidInstructor(trackBody.instructor);
+  }
+  if (trackBody.instructors !== undefined) {
+    // eslint-disable-next-line no-param-reassign
+    trackBody.instructors = await normalizeInstructors(
+      trackBody.instructors,
+      trackBody.instructor,
+    );
   }
 
   const track = await Track.create(trackBody);
@@ -59,12 +147,39 @@ exports.createTrack = async (trackBody, requestingUserId) => {
  * @returns {Promise<{tracks: Array, total: Number}>} Paginated tracks and total count
  */
 exports.getAllTracks = async (query, requestingUser = null) => {
+  // #2.6: `?instructor=:userId` means "tracks this user leads OR
+  // co-instructs". It is taken out of the generic query-string filter
+  // (which would match the lead only) and validated here.
+  const { instructor: instructorFilter, ...restQuery } = query || {};
+  if (
+    instructorFilter !== undefined &&
+    !(
+      typeof instructorFilter === 'string' &&
+      /^[0-9a-fA-F]{24}$/.test(instructorFilter)
+    )
+  ) {
+    throw new AppError('Instructor must be a valid MongoDB ID', 400);
+  }
+
   // Q5/Q2: previously returned every track regardless of `published`,
   // to any caller including anonymous — a draft "[TEST]" track's title
-  // was fully public. Admins see everything; everyone else sees
-  // published tracks plus any drafts they themselves own.
-  const features = new APIFeatures(Track.find(), query, Track)
-    .filter(policy.publishedListFilter(requestingUser))
+  // was fully public. Admins see everything; the public sees published
+  // tracks; an instructor also sees the drafts they can manage (lead or
+  // co-instructor, by their CURRENT role - stage 4).
+  const features = new APIFeatures(Track.find(), restQuery, Track)
+    .filter(
+      policy.andFilters(
+        policy.manageableListFilter(requestingUser, null, 'track'),
+        instructorFilter
+          ? {
+              $or: [
+                { instructor: instructorFilter },
+                { instructors: instructorFilter },
+              ],
+            }
+          : {},
+      ),
+    )
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -82,9 +197,7 @@ exports.getAllTracks = async (query, requestingUser = null) => {
   // Each track's own instructor (or an admin) still gets the full arrays.
   const sanitized = tracks.map((t) => {
     const obj = t.toObject();
-    const isStaff =
-      policy.isAdmin(requestingUser) ||
-      policy.isOwnerOf(obj, requestingUser, 'instructor');
+    const isStaff = policy.canManageTrack(requestingUser, obj);
     return policy.redactMembership(obj, requestingUser, isStaff, {
       isEnrolled: 'students',
       isPending: 'pendingStudents',
@@ -147,7 +260,8 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
     throw new AppError('No track found with that ID', 404);
   }
 
-  const isOwner = policy.isOwnerOf(track, requestingUser, 'instructor');
+  // "Owner" now means lead OR co-instructor, by current role (stage 4).
+  const isOwner = policy.isTrackStaff(track, requestingUser);
   const isAdmin = policy.isAdmin(requestingUser);
   const isEnrolled = policy.isMemberOf(track.students, requestingUser);
 
@@ -197,14 +311,17 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
  * @throws {AppError} 404 if the track doesn't exist
  */
 exports.getSessionCatalog = async (trackId) => {
-  const track = await Track.findById(trackId).select('_id');
-  if (!track) {
+  // Package 2: public endpoint - a draft track, and draft sessions inside
+  // a published track, are not part of the public catalog (Q2/Q5).
+  const track = await Track.findById(trackId).select('_id published');
+  if (!track || !track.published) {
     throw new AppError('No track found with that ID', 404);
   }
 
-  const sessions = await Session.find({ tracks: trackId }).select(
-    'title description startDate duration',
-  );
+  const sessions = await Session.find({
+    tracks: trackId,
+    published: true,
+  }).select('title description startDate duration');
 
   return sessions;
 };
@@ -234,11 +351,14 @@ exports.updateTrack = async (trackId, updateBody, requestingUserId) => {
 
   if (!track) throw new AppError('No track found', 404);
 
-  track.set(updateBody);
+  track.set(await withConsistentInstructors(track, updateBody));
 
   await track.save(); // triggers pre('save') validation
 
-  await track.populate({ path: 'instructor', select: 'name email role photo' });
+  await track.populate([
+    { path: 'instructor', select: 'name photo' },
+    { path: 'instructors', select: 'name photo' },
+  ]);
 
   await logActivity({
     userId: requestingUserId,
@@ -311,17 +431,6 @@ exports.deleteTrack = async (trackId, requestingUserId) => {
 function listHasId(list, id) {
   const target = id.toString();
   return (list || []).some((item) => item.toString() === target);
-}
-
-// The raw id stored in `doc[path]`, as a string (or null). Needed because
-// Course.track is auto-populated by a pre-find hook, and Mongoose then
-// returns the populated document - whose toString() is NOT its id, which
-// made the old `course.track.toString() !== trackId` comparison always
-// true.
-function refId(doc, path) {
-  const raw = doc.populated(path) || doc.get(path);
-  if (!raw) return null;
-  return (raw._id || raw).toString();
 }
 
 // A student added to / removed from a track is (un)enrolled in its content
@@ -578,15 +687,17 @@ exports.removeSessionFromTrack = async (trackId, sessionId) => {
 // 🔍 ADVANCED QUERIES & ANALYTICS
 // ===================================================================
 
-/**
- * Get all tracks created by a specific instructor
- * @param {string} instructorId - MongoDB user ID (instructor)
- * @param {Object} query - Filtering and pagination options
- * @returns {Promise<{tracks: Array, total: Number}>} Instructor's tracks
- */
-exports.getTracksByInstructor = async (instructorId, query) => {
+// Package 2: shared by the two track sub-lists below. The Q5 draft rule
+// (published only; staff also get the drafts they manage; admins all) plus
+// the Q7 redaction, the same as getAllTracks.
+async function runTrackSubList(query, requestingUser, extra) {
   const features = new APIFeatures(Track.find(), query, Track)
-    .filter({ instructor: instructorId })
+    .filter(
+      policy.andFilters(
+        policy.manageableListFilter(requestingUser, null, 'track'),
+        extra,
+      ),
+    )
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -595,36 +706,46 @@ exports.getTracksByInstructor = async (instructorId, query) => {
 
   const tracks = await features.query;
 
+  const sanitized = tracks.map((t) => {
+    const obj = t.toObject();
+    const isStaff = policy.canManageTrack(requestingUser, obj);
+    return policy.redactMembership(obj, requestingUser, isStaff, {
+      isEnrolled: 'students',
+      isPending: 'pendingStudents',
+      isPendingLeave: 'pendingLeaves',
+    });
+  });
+
   return {
-    tracks,
+    tracks: sanitized,
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
-};
+}
+
+/**
+ * Get all tracks created by a specific instructor
+ * @param {string} instructorId - MongoDB user ID (instructor)
+ * @param {Object} query - Filtering and pagination options
+ * @param {Object|null} requestingUser - caller (null = anonymous)
+ * @returns {Promise<{tracks: Array, total: Number}>} Instructor's tracks
+ */
+exports.getTracksByInstructor = (instructorId, query, requestingUser = null) =>
+  runTrackSubList(query, requestingUser, { instructor: instructorId });
 
 /**
  * Get all tracks a student is enrolled in
  * @param {string} studentId - MongoDB user ID (student)
  * @param {Object} query - Filtering and pagination options
+ * @param {Object|null} requestingUser - caller (null = anonymous)
  * @returns {Promise<{tracks: Array, total: Number}>} Student's enrolled tracks
+ *
+ * A track the student is enrolled in that was later unpublished is hidden
+ * from this list (same as every list and the detail endpoint), unless the
+ * caller manages it or is an admin.
  */
-exports.getTracksByStudent = async (studentId, query) => {
-  const features = new APIFeatures(Track.find(), query, Track)
-    .filter({ students: studentId })
-    .search(['title', 'description'])
-    .sort()
-    .limitFields();
-
-  await features.paginate();
-
-  const tracks = await features.query;
-
-  return {
-    tracks,
-    total: features.totalDocs || 0,
-    pagination: features.pagination,
-  };
-};
+exports.getTracksByStudent = (studentId, query, requestingUser = null) =>
+  runTrackSubList(query, requestingUser, { students: studentId });
 
 /**
  * Get most popular tracks based on student enrollment count
@@ -650,11 +771,17 @@ exports.getPopularTracks = async (limit = 10) => {
     {
       $limit: limit,
     },
+    // Stage 4: `instructor` and `instructors` are looked up with an
+    // explicit { _id, name, photo } projection - the same shape every other
+    // GET /tracks* response now has (no email/role on a public endpoint).
     {
       $lookup: {
         from: 'users',
-        localField: 'instructor',
-        foreignField: '_id',
+        let: { leadId: '$instructor' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$_id', '$$leadId'] } } },
+          { $project: { name: 1, photo: 1 } },
+        ],
         as: 'instructor',
       },
     },
@@ -662,11 +789,18 @@ exports.getPopularTracks = async (limit = 10) => {
       $unwind: '$instructor',
     },
     {
+      $lookup: {
+        from: 'users',
+        let: { coIds: { $ifNull: ['$instructors', []] } },
+        pipeline: [
+          { $match: { $expr: { $in: ['$_id', '$$coIds'] } } },
+          { $project: { name: 1, photo: 1 } },
+        ],
+        as: 'instructors',
+      },
+    },
+    {
       $project: {
-        'instructor.password': 0,
-        'instructor.passwordChangedAt': 0,
-        'instructor.passwordResetToken': 0,
-        'instructor.passwordResetExpires': 0,
         // Q7: this endpoint is fully public (no auth on the route, no
         // requestingUser param here to compute isEnrolled/isPending
         // against) — an aggregation pipeline also bypasses Mongoose's

@@ -46,15 +46,21 @@ function withDoneFlags(tasks, userId) {
 /**
  * Create a new weekly task bucket for a course.
  * @param {string} courseId
- * @param {string} instructorId - req.user.id (the creator)
+ * @param {string} instructorId - req.user.id (the caller; becomes createdBy)
  * @param {Object} data - { week, title, items }
  * @returns {Promise<WeeklyTask>}
  */
 exports.createWeeklyTask = async (courseId, instructorId, data) => {
-  const course = await Course.findById(courseId).select('_id');
+  const course = await Course.findById(courseId).select('instructor');
   if (!course) {
     throw new AppError('No course found with that ID', 404);
   }
+
+  // Stage 4 (#4A.5): `instructor` is the course's CURRENT instructor, so it
+  // stays meaningful when an admin or a track co-instructor creates the
+  // task; authority itself comes from the course (policy.service.js), never
+  // from this field. `createdBy` below is the caller.
+  const courseInstructor = course.instructor?._id || course.instructor;
 
   const existing = await WeeklyTask.findOne({
     course: courseId,
@@ -69,7 +75,7 @@ exports.createWeeklyTask = async (courseId, instructorId, data) => {
 
   const task = await WeeklyTask.create({
     course: courseId,
-    instructor: instructorId,
+    instructor: courseInstructor || instructorId,
     // Q6: pure historical attribution — see assignment.model.js's
     // createdBy comment for the full rationale.
     createdBy: instructorId,
@@ -135,8 +141,8 @@ exports.getTrackWeeklyTasks = async (trackId, requestingUser) => {
 };
 
 /**
- * Update a weekly task's week number, title, and/or items. Ownership
- * (instructor === requester, or admin) is enforced by the checkOwnership
+ * Update a weekly task's week number, title, and/or items. Management
+ * rights (stage 4) are enforced by the requireManage
  * middleware before this runs.
  *
  * Items passed WITH their existing _id are edited in place, preserving
@@ -202,8 +208,8 @@ exports.updateWeeklyTask = async (taskId, data, requestingUserId) => {
 
 /**
  * Delete a weekly task (and all of its completion records with it).
- * Ownership (instructor === requester, or admin) is enforced by the
- * checkOwnership middleware before this runs.
+ * Management rights are enforced by the requireManage middleware before
+ * this runs.
  * @param {string} taskId
  */
 exports.deleteWeeklyTask = async (taskId, requestingUserId) => {

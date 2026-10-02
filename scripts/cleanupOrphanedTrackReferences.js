@@ -13,7 +13,7 @@
 //
 // This script is intentionally generic rather than hardcoded to that one
 // track/user pair: it scans every track's students/pendingStudents/
-// pendingLeaves arrays, finds any id that doesn't resolve to an existing
+// pendingLeaves/instructors arrays, finds any id that doesn't resolve to an existing
 // User, and pulls it. Safe to re-run on a schedule or after any manual
 // data surgery — it's a no-op once the data is clean, and the cascade
 // fix in cascade.service.js means it shouldn't find anything new going
@@ -25,7 +25,9 @@ const mongoose = require('mongoose');
 const Track = require('../src/models/track.model');
 const User = require('../src/models/user.model');
 
-const FIELDS = ['students', 'pendingStudents', 'pendingLeaves'];
+// Stage 4: `instructors` (co-instructors) is a user-reference array too, so
+// a deleted co-instructor is cleaned up exactly like a deleted student.
+const FIELDS = ['students', 'pendingStudents', 'pendingLeaves', 'instructors'];
 
 (async () => {
   const dryRun = process.argv.includes('--dry-run');
@@ -33,9 +35,15 @@ const FIELDS = ['students', 'pendingStudents', 'pendingLeaves'];
   await mongoose.connect(process.env.DATABASE_URL);
 
   try {
-    const tracks = await Track.find().select(
-      `_id title ${FIELDS.join(' ')}`,
-    );
+    // Raw read through the aggregation framework on purpose: Track's
+    // pre-find hook populates `instructor`/`instructors`, and populate
+    // silently DROPS ids that no longer resolve - exactly the orphans this
+    // script is looking for.
+    const projection = { title: 1 };
+    FIELDS.forEach((field) => {
+      projection[field] = 1;
+    });
+    const tracks = await Track.aggregate([{ $project: projection }]);
 
     const allReferencedIds = new Set();
     tracks.forEach((track) => {

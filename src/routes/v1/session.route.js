@@ -147,7 +147,7 @@
  *   delete:
  *     operationId: deleteSessionById
  *     summary: Delete a session
- *     description: Permanently delete a session (admin and instructors only). Instructors can only delete sessions they created.
+ *     description: Permanently delete a session (admin and instructors only). Instructors can only delete sessions they currently manage (the session's instructor, its course's instructor, or lead/co-instructor of a track it belongs to).
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []
@@ -311,7 +311,7 @@
  *   get:
  *     operationId: getSessionsByStudent
  *     summary: Get sessions by student enrollment
- *     description: Returns sessions a student is enrolled in. Admin can view any student; students can only view themselves.
+ *     description: Returns sessions a student is enrolled in. Admin can view any student; students can only view themselves. A session that was unpublished after enrolling is hidden unless the caller manages it or is an admin; `students`/`progress` are replaced by `isEnrolled`/`studentCount`.
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []
@@ -382,7 +382,7 @@
  *   post:
  *     operationId: createSessionAssignment
  *     summary: Create an assignment for a standalone session
- *     description: Owner instructor or admin only.
+ *     description: Admin, the parent session's current instructor, or a lead/co-instructor of a track it belongs to. The assignment's `instructor` is set to the session's current instructor; `createdBy` is the caller.
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -432,9 +432,11 @@
  *     description: >
  *       Each assignment includes `mySubmission` — the requesting user's own
  *       submission, or null if they haven't submitted. Accessible to admins,
- *       any instructor, or a student enrolled in the session. Admins and the assignment's own
- *       instructor also get `submissionCount` and `ungradedCount` on each
- *       assignment (counts only - never other students' files or grades).
+ *       any instructor, or a student enrolled in the session. Everyone who can
+ *       manage the assignment (an admin, the parent's current instructor, or
+ *       a lead/co-instructor of its track) also gets `submissionCount` and
+ *       `ungradedCount` on each assignment (counts only - never other
+ *       students' files or grades).
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -651,7 +653,7 @@ const sessionController = require('../../controllers/session.controller');
 const {
   protect,
   restrictTo,
-  checkOwnership,
+  requireManage,
   optionalAuth,
 } = require('../../middlewares/auth.middleware');
 const validateMiddleware = require('../../middlewares/validate.middleware');
@@ -707,22 +709,14 @@ router
   .patch(
     restrictTo('admin', 'instructor'),
     validateMiddleware(sessionIdValidation, 'params'),
-    checkOwnership({
-      model: 'Session',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
+    requireManage({ resource: 'session' }),
     validateMiddleware(updateSessionValidation),
     sessionController.updateSession,
   )
   .delete(
     restrictTo('admin', 'instructor'),
     validateMiddleware(sessionIdValidation, 'params'),
-    checkOwnership({
-      model: 'Session',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
+    requireManage({ resource: 'session' }),
     sessionController.deleteSession,
   );
 
@@ -730,29 +724,25 @@ router
 // 👥 STUDENT MANAGEMENT ROUTES
 // ===================================================================
 
-router.route('/:id/students').post(
-  restrictTo('admin', 'instructor'),
-  validateMiddleware(sessionIdValidation, 'params'),
-  checkOwnership({
-    model: 'Session',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
-  validateMiddleware(addStudentValidation),
-  sessionController.addStudent,
-);
+router
+  .route('/:id/students')
+  .post(
+    restrictTo('admin', 'instructor'),
+    validateMiddleware(sessionIdValidation, 'params'),
+    requireManage({ resource: 'session' }),
+    validateMiddleware(addStudentValidation),
+    sessionController.addStudent,
+  );
 
-router.route('/:id/students/:studentId').delete(
-  restrictTo('admin', 'instructor'),
-  validateMiddleware(sessionIdValidation, 'params'),
-  validateMiddleware(studentIdParamValidation, 'params'),
-  checkOwnership({
-    model: 'Session',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
-  sessionController.removeStudent,
-);
+router
+  .route('/:id/students/:studentId')
+  .delete(
+    restrictTo('admin', 'instructor'),
+    validateMiddleware(sessionIdValidation, 'params'),
+    validateMiddleware(studentIdParamValidation, 'params'),
+    requireManage({ resource: 'session' }),
+    sessionController.removeStudent,
+  );
 
 router.put(
   '/:id/progress',

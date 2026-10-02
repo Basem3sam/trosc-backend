@@ -3,20 +3,13 @@ const assignmentController = require('../../controllers/assignment.controller');
 const {
   protect,
   restrictTo,
-  checkOwnership,
+  requireManage,
 } = require('../../middlewares/auth.middleware');
 const validate = require('../../middlewares/validate.middleware');
 const {
   resourceIdSchema,
   createAssignmentSchema,
 } = require('../../validations/assignment.validation');
-
-// Maps the generic resourceType string to the Mongoose model name that
-// checkOwnership needs to look up the parent Course/Session.
-const MODEL_BY_RESOURCE_TYPE = {
-  course: 'Course',
-  session: 'Session',
-};
 
 /**
  * Factory: builds an assignments sub-router for a given resource type
@@ -46,11 +39,9 @@ module.exports = (resourceType) => {
       protect,
       restrictTo('admin', 'instructor'),
       validate(resourceIdSchema, 'params'),
-      checkOwnership({
-        model: MODEL_BY_RESOURCE_TYPE[resourceType],
-        ownerField: 'instructor',
-        paramName: 'id',
-      }),
+      // Stage 4: the PARENT course/session decides (its current
+      // instructor, or its track's lead/co-instructors, or an admin).
+      requireManage({ resource: resourceType }),
       validate(createAssignmentSchema),
       assignmentController.createAssignment(resourceType),
     );

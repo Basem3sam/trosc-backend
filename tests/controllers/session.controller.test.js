@@ -143,6 +143,8 @@ describe('Session Controller – Missing Endpoints', () => {
         students: [student._id],
       });
 
+      // Student sub-lists are published-only since Package 2.
+      session.published = true;
       session.tracks.push(track._id);
       await session.save();
 
@@ -193,13 +195,9 @@ describe('Session Controller – Missing Endpoints', () => {
       expect(res.status).toBe(200);
       expect(res.body.results).toBe(1);
 
-      const sessionStudents = res.body.data.sessions[0].students;
-
-      const studentIds = sessionStudents.map((item) => item._id || item);
-
-      expect(studentIds.map((id) => id.toString())).toContain(
-        student._id.toString(),
-      );
+      // Q7 (Package 2): the raw `students` array is replaced by isEnrolled.
+      expect(res.body.data.sessions[0].isEnrolled).toBe(true);
+      expect(res.body.data.sessions[0]).not.toHaveProperty('students');
     });
 
     it("GET – rejects if student tries to view another student's sessions", async () => {

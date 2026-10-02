@@ -5,19 +5,37 @@ const { createTestUser } = require('./helpers/testUser');
 describe('Track & Course CRUD', () => {
   describe('Tracks', () => {
     let instructorToken;
+    let instructorId;
     let adminToken;
 
     beforeEach(async () => {
-      const { token: instToken } = await createTestUser({ role: 'instructor' });
+      const { user: inst, token: instToken } = await createTestUser({
+        role: 'instructor',
+      });
       instructorToken = instToken;
+      instructorId = inst.id;
       const { token: admToken } = await createTestUser({ role: 'admin' });
       adminToken = admToken;
     });
 
-    it('instructor can create a track', async () => {
+    // Stage 4 (final product rule 2): POST /tracks is admin-only.
+    it('instructor can no longer create a track (admin only)', async () => {
       const res = await request(app)
         .post('/v1/tracks')
         .set('Authorization', `Bearer ${instructorToken}`)
+        .send({
+          title: 'Test Track',
+          description: 'A track for testing',
+          level: 'beginner',
+          published: true,
+        });
+      expect(res.status).toBe(403);
+    });
+
+    it('admin can create a track', async () => {
+      const res = await request(app)
+        .post('/v1/tracks')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           title: 'Test Track',
           description: 'A track for testing',
@@ -31,12 +49,13 @@ describe('Track & Course CRUD', () => {
       // First create a track for this test
       const createRes = await request(app)
         .post('/v1/tracks')
-        .set('Authorization', `Bearer ${instructorToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           title: 'Test Track',
           description: 'A track for testing',
           level: 'beginner',
           published: true,
+          instructor: instructorId,
         });
       expect(createRes.status).toBe(201);
       const trackId = createRes.body.data.track._id;
@@ -51,12 +70,13 @@ describe('Track & Course CRUD', () => {
     it('instructor can update their own track', async () => {
       const createRes = await request(app)
         .post('/v1/tracks')
-        .set('Authorization', `Bearer ${instructorToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           title: 'Test Track',
           description: 'A track for testing',
           level: 'beginner',
           published: true,
+          instructor: instructorId,
         });
       expect(createRes.status).toBe(201);
       const trackId = createRes.body.data.track._id;
@@ -72,12 +92,13 @@ describe('Track & Course CRUD', () => {
     it('admin can delete any track', async () => {
       const createRes = await request(app)
         .post('/v1/tracks')
-        .set('Authorization', `Bearer ${instructorToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           title: 'Test Track',
           description: 'A track for testing',
           level: 'beginner',
           published: true,
+          instructor: instructorId,
         });
       expect(createRes.status).toBe(201);
       const trackId = createRes.body.data.track._id;

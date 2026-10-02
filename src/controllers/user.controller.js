@@ -90,18 +90,25 @@ exports.getMyEnrollments = catchAsync(async (req, res, next) => {
   // cascade.service.js), but the User fields are the side every
   // enroll/unenroll flow ultimately writes to, so they're the
   // authoritative source if the two ever drift apart.
+  //
+  // Package 2: content that has since been unpublished is hidden here too
+  // (same rule as every other list); admins still see everything.
+  const onlyPublished = req.user.role === 'admin' ? {} : { published: true };
   const [track, courses, sessions] = await Promise.all([
     req.user.enrolledTrack
-      ? Track.findById(req.user.enrolledTrack).select(
-          'title description coverImage level published',
-        )
+      ? Track.findOne({
+          _id: req.user.enrolledTrack,
+          ...onlyPublished,
+        }).select('title description coverImage level published')
       : null,
-    Course.find({ _id: { $in: req.user.enrolledCourses || [] } }).select(
-      'title description coverImage level track published',
-    ),
-    Session.find({ _id: { $in: req.user.enrolledSessions || [] } }).select(
-      'title description coverImage level published startDate',
-    ),
+    Course.find({
+      _id: { $in: req.user.enrolledCourses || [] },
+      ...onlyPublished,
+    }).select('title description coverImage level track published'),
+    Session.find({
+      _id: { $in: req.user.enrolledSessions || [] },
+      ...onlyPublished,
+    }).select('title description coverImage level published startDate'),
   ]);
 
   res.status(200).json({

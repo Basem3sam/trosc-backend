@@ -26,8 +26,17 @@
  *           example: "Learn modern web development with JavaScript, React, Node.js and MongoDB"
  *         instructor:
  *           type: string
- *           description: ObjectId reference to the instructor. Returned as a populated object in GET responses.
+ *           description: ObjectId reference to the lead instructor. Returned as a populated `{ _id, name, photo }` object in GET responses (no email/role).
  *           example: "507f1f77bcf86cd799439011"
+ *         instructors:
+ *           type: array
+ *           description: >
+ *             Co-instructors (round-2 #2.2). `instructor` stays the lead.
+ *             Returned populated as `{ _id, name, photo }` (never email or
+ *             role) on every GET /tracks* response. Admin-settable only.
+ *           items:
+ *             type: string
+ *             example: "507f1f77bcf86cd799439014"
  *         courses:
  *           type: array
  *           description: List of courses belonging to this track
@@ -112,9 +121,11 @@
  *         instructor:
  *           _id: "507f1f77bcf86cd799439011"
  *           name: "Basem Esam"
- *           email: "basem@example.com"
- *           role: "instructor"
  *           photo: "instructor-profile.jpg"
+ *         instructors:
+ *           - _id: "507f1f77bcf86cd799439014"
+ *             name: "Sara Ali"
+ *             photo: "sara.jpg"
  *         courses: ["507f1f77bcf86cd799439041", "507f1f77bcf86cd799439042"]
  *         students: ["507f1f77bcf86cd799439012", "507f1f77bcf86cd799439013"]
  *         sessions: ["507f1f77bcf86cd799439031", "507f1f77bcf86cd799439032"]
@@ -151,6 +162,11 @@
  *           type: string
  *           description: Admin only. Assigns a specific instructor (must have role instructor or admin). Ignored/overwritten with the requester's own id for non-admins.
  *           example: "507f1f77bcf86cd799439011"
+ *         instructors:
+ *           type: array
+ *           description: Admin only (silently dropped for non-admins, like `instructor`). Co-instructor ids; each must be a user with role instructor or admin (400 otherwise). Duplicates and the lead's own id are removed.
+ *           items:
+ *             type: string
  *
  *     TrackUpdate:
  *       type: object
@@ -176,6 +192,11 @@
  *           type: string
  *           description: Admin only. Reassigns the track to a different instructor (must have role instructor or admin). Rejected/stripped for non-admins.
  *           example: "507f1f77bcf86cd799439011"
+ *         instructors:
+ *           type: array
+ *           description: Admin only (silently dropped for non-admins). REPLACES the whole co-instructor list; send [] to clear it. Same validation as on create. Removing someone revokes their access immediately.
+ *           items:
+ *             type: string
  *
  *     TrackResponse:
  *       type: object
@@ -252,6 +273,17 @@ const trackSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'A track must have an instructor.'],
     },
+    // Stage 4 / round-2 #2.2: co-instructors. `instructor` stays the lead.
+    // Admin-set only (see track.controller.js); every id must be a user
+    // with role instructor or admin, de-duplicated, and never the lead
+    // (see track.service.js#normalizeInstructors). Management authority is
+    // computed from this array's CURRENT contents (policy.service.js).
+    instructors: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: 'User',
+      },
+    ],
     courses: [
       {
         type: mongoose.Schema.ObjectId,
@@ -315,6 +347,7 @@ const trackSchema = new mongoose.Schema(
 
 // Indexes for performance
 trackSchema.index({ instructor: 1 });
+trackSchema.index({ instructors: 1 });
 trackSchema.index({ students: 1 });
 // For GET /users/me's pendingTrack lookup (Track.findOne({ pendingStudents: userId })
 // in user.service.js#getMe) and the "already applied elsewhere" check in
@@ -350,12 +383,13 @@ trackSchema.virtual('contentCount').get(function contentCount() {
   };
 });
 
-// Populate instructor info on every query
+// Populate the lead and the co-instructors on every query. Only _id, name
+// and photo: Track responses are public (GET /tracks, /tracks/:id), so an
+// instructor's email and role must never leave through them (same privacy
+// rule as round-2 #1.3).
 trackSchema.pre(/^find/, function populateInstructor(next) {
-  this.populate({
-    path: 'instructor',
-    select: 'name email role photo', // Customize fields as needed
-  });
+  this.populate({ path: 'instructor', select: 'name photo' });
+  this.populate({ path: 'instructors', select: 'name photo' });
   next();
 });
 

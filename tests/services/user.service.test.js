@@ -196,6 +196,7 @@ describe('GET /v1/users/me/enrollments (route)', () => {
       description: 'For enrollments test',
       instructor: instructor._id,
       students: [user._id],
+      published: true,
     });
 
     await User.findByIdAndUpdate(user._id, { enrolledTrack: track._id });

@@ -18,19 +18,24 @@ const { logActivity } = require('./activityLog.service');
 // previously applied neither, which is exactly how a draft session's
 // url reached a student via that endpoint.
 //
+// `scope` is `await policy.loadStaffScope(req, user)`.
+//
 // NOTE: this only redacts fields per-document; it does NOT decide which
 // documents are in the list at all. Callers are responsible for applying
 // `policy.publishedListFilter()` to their query so draft sessions the
 // caller isn't authorized for never reach this function in the first
 // place (Q5's "draft listing behavior" contract).
-function sanitizeSessionList(sessions, requestingUser) {
+function sanitizeSessionList(sessions, requestingUser, scope) {
   const userId = requestingUser?.id;
   const isAdmin = policy.isAdmin(requestingUser);
 
   return sessions.map((s) => {
     const obj = typeof s.toObject === 'function' ? s.toObject() : { ...s };
 
-    const isOwner = policy.isOwnerOf(obj, requestingUser, 'instructor');
+    // Stage 4: "owner" = anyone who currently manages the session (its own
+    // instructor, its course's instructor, or lead/co-instructor of a
+    // track it belongs to), computed from the caller's loaded scope.
+    const isOwner = policy.isSessionStaffByScope(obj, requestingUser, scope);
     const isDirectStudent =
       !!userId &&
       obj.students?.some(
@@ -53,7 +58,25 @@ function sanitizeSessionList(sessions, requestingUser) {
   });
 }
 
+// Stage 4 / rule 3: an admin may set `instructor` to someone else - that
+// user must exist and be an instructor or admin (400 otherwise).
+async function assertValidInstructor(instructorId) {
+  const user = await User.findById(instructorId).select('role');
+  if (!user) {
+    throw new AppError('No user found with that instructor ID', 400);
+  }
+  if (!['instructor', 'admin'].includes(user.role)) {
+    throw new AppError(
+      'Instructor must be a user with role "instructor" or "admin"',
+      400,
+    );
+  }
+}
+
 exports.createSession = async (sessionData, requestingUserId) => {
+  if (sessionData.instructor && sessionData.instructor !== requestingUserId) {
+    await assertValidInstructor(sessionData.instructor);
+  }
   const session = await Session.create(sessionData);
   await logActivity({
     userId: requestingUserId,
@@ -75,8 +98,14 @@ exports.getAllSessions = async (query, requestingUser = null) => {
   // into `conditions`, which also drives the pagination count) rather
   // than pre-filtering Session.find() directly, so `total`/`totalPages`
   // stay accurate for whichever documents the caller can actually see.
+  // Stage 4: instructors also see the drafts they currently manage.
+  const scope = await policy.loadStaffScope({}, requestingUser);
   const features = new APIFeatures(Session.find(), query, Session)
-    .filter(policy.publishedListFilter(requestingUser))
+    .filter(
+      policy.andFilters(
+        policy.manageableListFilter(requestingUser, scope, 'session'),
+      ),
+    )
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -89,7 +118,7 @@ exports.getAllSessions = async (query, requestingUser = null) => {
 
   // M16/#1.1/#1.2: field-level redaction (url/embedUrl/resources/progress)
   // for whichever documents made it past the visibility filter above.
-  const sanitized = sanitizeSessionList(sessions, requestingUser);
+  const sanitized = sanitizeSessionList(sessions, requestingUser, scope);
 
   return {
     sessions: sanitized || [],
@@ -127,7 +156,11 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
 
   const userId = requestingUser?.id;
   const isAdmin = policy.isAdmin(requestingUser);
-  const isOwner = policy.isOwnerOf(sessionObj, requestingUser, 'instructor');
+  // Stage 4: "owner" = currently manages the session (its instructor, its
+  // course's instructor, or lead/co-instructor of a track it belongs to).
+  const isOwner =
+    policy.isInstructorRole(requestingUser) &&
+    (await policy.canManage({}, requestingUser, 'session', sessionId));
 
   // #1.1/Q2: same "draft is invisible, not just content-redacted" rule
   // track.service.js#getTrackDetails and course.service.js#getCourseDetails
@@ -136,7 +169,7 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
   // its `url`) reached a student directly. Reuses the "session not found"
   // message so a draft's existence isn't distinguishable from it truly
   // not existing.
-  if (!policy.canViewResource(sessionObj, requestingUser, 'instructor')) {
+  if (!sessionObj.published && !isOwner && !isAdmin) {
     throw new AppError('Session not found', 404);
   }
 
@@ -208,6 +241,9 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
 };
 
 exports.updateSession = async (sessionId, updateData, requestingUserId) => {
+  if (updateData.instructor) {
+    await assertValidInstructor(updateData.instructor);
+  }
   const session = await Session.findByIdAndUpdate(sessionId, updateData, {
     new: true,
     runValidators: true,
@@ -345,11 +381,14 @@ exports.getSessionsByInstructor = async (
   // already had — same fix as getSessionsByTrack below, applied here too
   // for consistency (Q2: "apply the same privacy principle consistently
   // across all session read endpoints").
+  const scope = await policy.loadStaffScope({}, requestingUser);
   const features = new APIFeatures(Session.find(), query, Session)
-    .filter({
-      instructor: instructorId,
-      ...policy.publishedListFilter(requestingUser),
-    })
+    .filter(
+      policy.andFilters(
+        policy.manageableListFilter(requestingUser, scope, 'session'),
+        { instructor: instructorId },
+      ),
+    )
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -361,7 +400,7 @@ exports.getSessionsByInstructor = async (
     .populate('students', 'role');
 
   return {
-    sessions: sanitizeSessionList(sessions, requestingUser) || [],
+    sessions: sanitizeSessionList(sessions, requestingUser, scope) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -371,11 +410,14 @@ exports.getSessionsByTrack = async (trackId, query, requestingUser = null) => {
   // #1.1/#1.2: previously the one endpoint with NO sanitization at all —
   // a draft session's `url` (and the full per-student `progress` array)
   // reached any caller, including students, via this exact path.
+  const scope = await policy.loadStaffScope({}, requestingUser);
   const features = new APIFeatures(Session.find(), query, Session)
-    .filter({
-      tracks: trackId,
-      ...policy.publishedListFilter(requestingUser),
-    })
+    .filter(
+      policy.andFilters(
+        policy.manageableListFilter(requestingUser, scope, 'session'),
+        { tracks: trackId },
+      ),
+    )
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -387,7 +429,7 @@ exports.getSessionsByTrack = async (trackId, query, requestingUser = null) => {
     .populate('students', 'role');
 
   return {
-    sessions: sanitizeSessionList(sessions, requestingUser) || [],
+    sessions: sanitizeSessionList(sessions, requestingUser, scope) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -477,20 +519,27 @@ exports.setSessionProgress = async (sessionId, requestingUser, status) => {
   return { status: myEntry.status, watchedAt: myEntry.watchedAt };
 };
 
-exports.getSessionsByStudent = async (studentId, query) => {
+exports.getSessionsByStudent = async (
+  studentId,
+  query,
+  requestingUser = null,
+) => {
   // Route-level guard (session.route.js) already restricts the caller to
-  // the student themselves or an admin, so `students: studentId` alone
-  // already implies the caller is authorized to see this session's own
-  // content in full — unlike getAllSessions/getSessionsByTrack/
-  // getSessionsByInstructor, url/embedUrl/resources/students are NOT
-  // redacted here (the shared sanitizeSessionList() would incorrectly
-  // strip `students`, which the frontend legitimately reads off this
-  // endpoint to confirm the caller's own enrollment). The one thing still
-  // stripped is the raw `progress` array — a session can have several
-  // enrolled students, and that array would otherwise leak every other
-  // student's watch status to this caller (#1.2).
+  // the student themselves or an admin. Package 2: this list now goes
+  // through the same Q5 draft filter and sanitizeSessionList() (Q7, #1.2)
+  // as every other session list - a session the student is enrolled in
+  // that was later unpublished is hidden (unless the caller manages it or
+  // is an admin), and `students`/`progress` are replaced by `isEnrolled`
+  // / `studentCount`. url/embedUrl/resources stay visible to the enrolled
+  // student (sanitizeSessionList keeps them for direct students).
+  const scope = await policy.loadStaffScope({}, requestingUser);
   const features = new APIFeatures(Session.find(), query, Session)
-    .filter({ students: studentId })
+    .filter(
+      policy.andFilters(
+        policy.manageableListFilter(requestingUser, scope, 'session'),
+        { students: studentId },
+      ),
+    )
     .sort()
     .limitFields();
 
@@ -501,14 +550,8 @@ exports.getSessionsByStudent = async (studentId, query) => {
     'name email role',
   );
 
-  const sanitized = sessions.map((s) => {
-    const obj = s.toObject();
-    delete obj.progress;
-    return obj;
-  });
-
   return {
-    sessions: sanitized || [],
+    sessions: sanitizeSessionList(sessions, requestingUser, scope) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };

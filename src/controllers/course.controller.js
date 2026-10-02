@@ -5,10 +5,16 @@ const enrollmentService = require('../services/enrollment.service');
 const catchAsync = require('../utils/catchAsync');
 
 exports.createCourse = catchAsync(async (req, res, next) => {
-  // Auto-assign instructor from logged-in user, prevent body spoofing
+  // Auto-assign instructor from logged-in user, prevent body spoofing —
+  // EXCEPT for admins (round-2 #2.1), who may create a course on an
+  // instructor's behalf, the same way POST /tracks works.
+  const { instructor: requestedInstructor } = req.body;
   delete req.body.instructor;
   delete req.body.students;
-  req.body.instructor = req.user.id;
+  req.body.instructor =
+    req.user.role === 'admin' && requestedInstructor
+      ? requestedInstructor
+      : req.user.id;
 
   const course = await courseService.createCourse(req.body, req.user);
 
@@ -49,8 +55,11 @@ exports.getCourse = catchAsync(async (req, res, next) => {
 });
 
 exports.updateCourse = catchAsync(async (req, res, next) => {
-  // Prevent changing instructor via update (security)
-  delete req.body.instructor;
+  // Prevent changing instructor via update (security), EXCEPT for admins
+  // (round-2 #2.1): an admin can hand a course to another instructor.
+  if (req.user.role !== 'admin') {
+    delete req.body.instructor;
+  }
   delete req.body.students;
   delete req.body.sessions;
 
@@ -169,6 +178,7 @@ exports.getCoursesByInstructor = catchAsync(async (req, res, next) => {
     await courseService.getCoursesByInstructor(
       req.params.instructorId,
       req.query,
+      req.user,
     );
 
   res.status(200).json({
@@ -186,6 +196,7 @@ exports.getCoursesByTrack = catchAsync(async (req, res, next) => {
   const { courses, total, pagination } = await courseService.getCoursesByTrack(
     req.params.trackId,
     req.query,
+    req.user,
   );
 
   res.status(200).json({
@@ -201,7 +212,11 @@ exports.getCoursesByTrack = catchAsync(async (req, res, next) => {
 
 exports.getCoursesByStudent = catchAsync(async (req, res, next) => {
   const { courses, total, pagination } =
-    await courseService.getCoursesByStudent(req.params.studentId, req.query);
+    await courseService.getCoursesByStudent(
+      req.params.studentId,
+      req.query,
+      req.user,
+    );
 
   res.status(200).json({
     status: 'success',

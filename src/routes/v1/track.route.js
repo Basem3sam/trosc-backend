@@ -12,8 +12,12 @@
  *     operationId: createTrack
  *     summary: Create a new learning track
  *     description: |
- *       Create a new learning track (admin and instructors only).
- *       Instructor is auto-assigned from the auth token.
+ *       Create a new learning track (ADMIN ONLY - instructors get 403).
+ *       Instructor is auto-assigned from the auth token. An admin may set
+ *       `instructor` (the lead) and `instructors` (co-instructors); for
+ *       anyone else both are ignored. A co-instructor list never repeats
+ *       the lead or a duplicate id, and every id must be a user with role
+ *       instructor or admin (400 otherwise).
  *     tags: [Tracks]
  *     security:
  *       - bearerAuth: []
@@ -53,7 +57,13 @@
  *       Retrieve all tracks (public endpoint).
  *       Supports filtering, sorting, and pagination.
  *       **Filter examples:**
- *       `?level=beginner`, `?published=true`, `?createdAt[gte]=2024-01-01`.
+ *       `?level=beginner`, `?published=true`, `?createdAt[gte]=2024-01-01`,
+ *       `?instructor=:userId`.
+ *
+ *       Visibility: the public sees published tracks only; an instructor
+ *       also sees the drafts of tracks they currently lead or co-instruct;
+ *       an admin sees everything. `instructor` and `instructors` come back
+ *       as `{ _id, name, photo }` - never email or role.
  *     tags: [Tracks]
  *     parameters:
  *       - name: page
@@ -66,6 +76,15 @@
  *         schema:
  *           type: integer
  *           default: 10
+ *       - name: instructor
+ *         in: query
+ *         description: >
+ *           User id. Returns the tracks this user leads OR co-instructs
+ *           (round-2 #2.6), combined with the visibility rules above.
+ *           400 if it is not a valid id.
+ *         schema:
+ *           type: string
+ *           example: "507f1f77bcf86cd799439011"
  *       - name: level
  *         in: query
  *         schema:
@@ -104,7 +123,7 @@
  *     description: |
  *       Retrieve detailed information about a track.
  *       Returns 404 if the track is unpublished and the caller is neither
- *       the instructor nor an admin.
+ *       one of its instructors (lead or co-instructor) nor an admin.
  *     tags: [Tracks]
  *     parameters:
  *       - name: id
@@ -448,7 +467,9 @@
  *     operationId: getTrackSessionCatalog
  *     summary: Public catalog of a track's sessions
  *     description: |
- *       Public endpoint, no authentication required. Returns just enough
+ *       Public endpoint, no authentication required. Only published
+ *       sessions of a published track are listed (404 for a draft track).
+ *       Returns just enough
  *       for a visitor to see what the track covers before enrolling —
  *       no `url`, `embedUrl`, or `resources`.
  *     tags: [Tracks]
@@ -524,7 +545,7 @@
  *   get:
  *     operationId: getTracksByStudent
  *     summary: Get tracks by student enrollment
- *     description: Returns tracks a student is enrolled in. Admin can view any student; students can only view themselves.
+ *     description: Returns tracks a student is enrolled in. Admin can view any student; students can only view themselves. A track that was unpublished after enrolling is hidden unless the caller manages it or is an admin; the Q7 redaction applies.
  *     tags: [Tracks]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -862,9 +883,11 @@
  *       assignment on a standalone session mounted directly on the track, sorted
  *       by deadline. Each assignment includes `mySubmission` — the requesting
  *       user's own submission, or null if they haven't submitted. Accessible to
- *       admins, any instructor, or a student enrolled in the track. Admins and the assignment's own
- *       instructor also get `submissionCount` and `ungradedCount` on each
- *       assignment (counts only - never other students' files or grades).
+ *       admins, any instructor, or a student enrolled in the track. Everyone who can
+ *       manage the assignment (an admin, the parent's current instructor, or
+ *       a lead/co-instructor of its track) also gets `submissionCount` and
+ *       `ungradedCount` on each assignment (counts only - never other
+ *       students' files or grades).
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -1031,7 +1054,8 @@ const trackController = require('../../controllers/track.controller');
 const {
   protect,
   restrictTo,
-  checkOwnership,
+  requireManage,
+  requireTrackLink,
   optionalAuth,
 } = require('../../middlewares/auth.middleware');
 const validate = require('../../middlewares/validate.middleware');
@@ -1060,7 +1084,7 @@ router
   .route('/')
   .post(
     protect,
-    restrictTo('admin', 'instructor'),
+    restrictTo('admin'),
     validate(createTrackSchema),
     trackController.createTrack,
   )
@@ -1085,11 +1109,7 @@ router.get(
   protect,
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
-  checkOwnership({
-    model: 'Track',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'track' }),
   trackController.getPendingStudents,
 );
 
@@ -1099,11 +1119,7 @@ router.post(
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
   validate(studentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Track',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'track' }),
   selfApproval,
   trackController.approveStudent,
 );
@@ -1114,11 +1130,7 @@ router.post(
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
   validate(studentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Track',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'track' }),
   trackController.rejectStudent,
 );
 
@@ -1139,6 +1151,7 @@ router.get(
   protect,
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
+  requireManage({ resource: 'track' }),
   trackController.getTrackAnalytics,
 );
 
@@ -1159,11 +1172,7 @@ router
     protect,
     restrictTo('admin', 'instructor'),
     validate(getTrackSchema, 'params'),
-    checkOwnership({
-      model: 'Track',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
+    requireManage({ resource: 'track' }),
     validate(updateTrackSchema),
     trackController.updateTrack,
   )
@@ -1171,11 +1180,7 @@ router
     protect,
     restrictTo('admin'),
     validate(deleteTrackSchema, 'params'),
-    checkOwnership({
-      model: 'Track',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
+    requireManage({ resource: 'track' }),
     trackController.deleteTrack,
   );
 
@@ -1187,22 +1192,14 @@ router
     protect,
     restrictTo('admin', 'instructor'),
     validate(manageCourseSchema, 'params'), // Reuse or create manageCourseSchema
-    checkOwnership({
-      model: 'Track',
-      ownerField: 'instructor',
-      paramName: 'trackId',
-    }),
+    requireTrackLink({ kind: 'course', mode: 'link' }),
     trackController.addCourseToTrack,
   )
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
     validate(manageCourseSchema, 'params'),
-    checkOwnership({
-      model: 'Track',
-      ownerField: 'instructor',
-      paramName: 'trackId',
-    }),
+    requireTrackLink({ kind: 'course', mode: 'unlink' }),
     trackController.removeCourseFromTrack,
   );
 
@@ -1212,52 +1209,40 @@ router
     protect,
     restrictTo('admin', 'instructor'),
     validate(manageSessionSchema, 'params'),
-    checkOwnership({
-      model: 'Track',
-      ownerField: 'instructor',
-      paramName: 'trackId',
-    }),
+    requireTrackLink({ kind: 'session', mode: 'link' }),
     trackController.addSessionToTrack,
   )
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
     validate(manageSessionSchema, 'params'),
-    checkOwnership({
-      model: 'Track',
-      ownerField: 'instructor',
-      paramName: 'trackId',
-    }),
+    requireTrackLink({ kind: 'session', mode: 'unlink' }),
     trackController.removeSessionFromTrack,
   );
 
 // --- STUDENT ENROLLMENT FOR TRACKS ---
 
-router.route('/:id/students').post(
-  protect,
-  restrictTo('admin', 'instructor'),
-  validate(getTrackSchema, 'params'),
-  checkOwnership({
-    model: 'Track',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
-  validate(addStudentSchema),
-  trackController.addStudent,
-);
+router
+  .route('/:id/students')
+  .post(
+    protect,
+    restrictTo('admin', 'instructor'),
+    validate(getTrackSchema, 'params'),
+    requireManage({ resource: 'track' }),
+    validate(addStudentSchema),
+    trackController.addStudent,
+  );
 
-router.route('/:id/students/:studentId').delete(
-  protect,
-  restrictTo('admin', 'instructor'),
-  validate(getTrackSchema, 'params'),
-  validate(studentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Track',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
-  trackController.removeStudent,
-);
+router
+  .route('/:id/students/:studentId')
+  .delete(
+    protect,
+    restrictTo('admin', 'instructor'),
+    validate(getTrackSchema, 'params'),
+    validate(studentIdSchema, 'params'),
+    requireManage({ resource: 'track' }),
+    trackController.removeStudent,
+  );
 
 // --- LEAVE REQUESTS ---
 router.get(
@@ -1265,6 +1250,7 @@ router.get(
   protect,
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
+  requireManage({ resource: 'track' }),
   trackController.getPendingLeaves,
 );
 
@@ -1282,11 +1268,7 @@ router.post(
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
   validate(studentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Track',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'track' }),
   selfApproval,
   trackController.approveLeaveTrack,
 );
@@ -1297,11 +1279,7 @@ router.post(
   restrictTo('admin', 'instructor'),
   validate(getTrackSchema, 'params'),
   validate(studentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Track',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'track' }),
   trackController.rejectLeaveTrack,
 );
 

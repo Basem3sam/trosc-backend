@@ -7,8 +7,10 @@ exports.createTrack = catchAsync(async (req, res, next) => {
   // admin is allowed to set explicitly (#2.1). A non-admin can never set
   // it — it's overwritten with their own id below regardless of what they
   // sent, same as before this change.
-  const { instructor: requestedInstructor } = req.body;
+  const { instructor: requestedInstructor, instructors: requestedCo } =
+    req.body;
   delete req.body.instructor;
+  delete req.body.instructors;
   delete req.body.students;
   delete req.body.courses;
   delete req.body.sessions;
@@ -17,6 +19,12 @@ exports.createTrack = catchAsync(async (req, res, next) => {
     req.user.role === 'admin' && requestedInstructor
       ? requestedInstructor
       : req.user.id;
+
+  // Stage 4 / #2.2: co-instructors are admin-settable only; for anyone else
+  // the field is dropped, same as `instructor` is overwritten above.
+  if (req.user.role === 'admin' && requestedCo !== undefined) {
+    req.body.instructors = requestedCo;
+  }
 
   const track = await trackService.createTrack(req.body, req.user.id);
 
@@ -75,6 +83,7 @@ exports.updateTrack = catchAsync(async (req, res, next) => {
   // an admin can reassign a track to any instructor/admin user.
   if (req.user.role !== 'admin') {
     delete req.body.instructor;
+    delete req.body.instructors; // stage 4 / #2.2: admin-only as well
   }
   delete req.body.students;
   delete req.body.courses;
@@ -269,6 +278,7 @@ exports.getTracksByInstructor = catchAsync(async (req, res, next) => {
     await trackService.getTracksByInstructor(
       req.params.instructorId,
       req.query,
+      req.user,
     );
 
   res.status(200).json({
@@ -286,6 +296,7 @@ exports.getTracksByStudent = catchAsync(async (req, res, next) => {
   const { tracks, total, pagination } = await trackService.getTracksByStudent(
     req.params.studentId,
     req.query,
+    req.user,
   );
 
   res.status(200).json({
