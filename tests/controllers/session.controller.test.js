@@ -143,6 +143,8 @@ describe('Session Controller – Missing Endpoints', () => {
         students: [student._id],
       });
 
+      // Student sub-lists are published-only since Package 2.
+      session.published = true;
       session.tracks.push(track._id);
       await session.save();
 
