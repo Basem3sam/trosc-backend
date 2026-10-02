@@ -12,7 +12,7 @@
  *     operationId: updateWeeklyTask
  *     summary: Update a weekly task's week, title, and/or items
  *     description: >
- *       Owner instructor or admin only. Items sent with their existing `_id`
+ *       Admin, the task's course's current instructor, or a lead/co-instructor of that course's track (never the creator, by itself). Items sent with their existing `_id`
  *       are edited in place, preserving students' completion history for that
  *       item. Items sent without an `_id` are treated as new. Any previously
  *       existing item left out of the new `items` array is removed, along
@@ -76,7 +76,7 @@
  *   delete:
  *     operationId: deleteWeeklyTask
  *     summary: Delete a weekly task
- *     description: Owner instructor or admin only.
+ *     description: Admin, the task's course's current instructor, or a lead/co-instructor of that course's track.
  *     tags: [Weekly Tasks]
  *     security:
  *       - bearerAuth: []
@@ -154,10 +154,7 @@
 
 const express = require('express');
 const weeklyTaskController = require('../../controllers/weeklyTask.controller');
-const {
-  protect,
-  checkOwnership,
-} = require('../../middlewares/auth.middleware');
+const { protect, requireManage } = require('../../middlewares/auth.middleware');
 const validate = require('../../middlewares/validate.middleware');
 const {
   taskIdSchema,
@@ -176,21 +173,13 @@ router
     protect,
     validate(taskIdSchema, 'params'),
     validate(updateWeeklyTaskSchema),
-    checkOwnership({
-      model: 'WeeklyTask',
-      ownerField: 'instructor',
-      paramName: 'taskId',
-    }),
+    requireManage({ resource: 'weeklyTask', paramName: 'taskId' }),
     weeklyTaskController.updateWeeklyTask,
   )
   .delete(
     protect,
     validate(taskIdSchema, 'params'),
-    checkOwnership({
-      model: 'WeeklyTask',
-      ownerField: 'instructor',
-      paramName: 'taskId',
-    }),
+    requireManage({ resource: 'weeklyTask', paramName: 'taskId' }),
     weeklyTaskController.deleteWeeklyTask,
   );
 

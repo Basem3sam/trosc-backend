@@ -19,27 +19,58 @@ const { logActivity } = require('./activityLog.service');
 // ===================================================================
 
 /**
- * Confirms `requestingUser` may link/unlink a course to/from `trackId` —
- * admins always can; otherwise the requester must be that track's own
- * instructor. Mirrors the checkOwnership({ model: 'Track', ... }) gate
- * the dedicated PATCH/DELETE /tracks/:trackId/courses/:courseId
- * endpoints already enforce — needed here because addCourseToTrack/
- * removeCourseFromTrack don't check ownership themselves (that was
- * always the route middleware's job, and this call path doesn't go
- * through it).
+ * Rule 4 guard for the `track` field on POST/PATCH /courses (the dedicated
+ * PATCH/DELETE /tracks/:trackId/courses/:courseId endpoints use the
+ * requireTrackLink middleware, which applies the same rule):
+ *   link   - an admin, OR the course's own instructor who is ALSO the lead
+ *            / a co-instructor of the TARGET track;
+ *   unlink - an admin, OR staff of that track, OR the course's own
+ *            instructor.
+ * @param {string} courseInstructorId - the course's current instructor id
+ * @param {'link'|'unlink'} mode
  * @throws {AppError} 404 if the track doesn't exist, 403 if not permitted
  */
-async function assertTrackOwnership(trackId, requestingUser) {
-  if (requestingUser?.role === 'admin') return;
+async function assertTrackLinkRight(
+  trackId,
+  courseInstructorId,
+  requestingUser,
+  mode,
+) {
+  if (policy.isAdmin(requestingUser)) return;
 
-  const track = await Track.findById(trackId).select('instructor');
+  const track = await policy.loadStaffTrack({}, trackId);
   if (!track) {
     throw new AppError('No track found with that ID', 404);
   }
-  if (track.instructor.toString() !== requestingUser?.id) {
+  const item = { instructor: courseInstructorId };
+  const allowed =
+    mode === 'link'
+      ? policy.canLinkToTrack(requestingUser, item, track)
+      : policy.canUnlinkFromTrack(requestingUser, item, track);
+  if (!allowed) {
     throw new AppError(
-      'You can only link a course to, or unlink it from, a track you own',
+      mode === 'link'
+        ? 'You can only link your own course to a track you lead or co-instruct'
+        : 'You can only unlink a course you own or from a track you manage',
       403,
+    );
+  }
+}
+
+/**
+ * Round-2 #2.1: confirms `instructorId` is an existing user whose role is
+ * 'instructor' or 'admin'. Only reached when an admin set `instructor`.
+ * @throws {AppError} 400 if the user doesn't exist or has the wrong role
+ */
+async function assertValidInstructor(instructorId) {
+  const user = await User.findById(instructorId).select('role');
+  if (!user) {
+    throw new AppError('No user found with that instructor ID', 400);
+  }
+  if (!['instructor', 'admin'].includes(user.role)) {
+    throw new AppError(
+      'Instructor must be a user with role "instructor" or "admin"',
+      400,
     );
   }
 }
@@ -59,11 +90,21 @@ exports.createCourse = async (courseBody, requestingUser = null) => {
   // track's existing students into the new course).
   const { track: trackId, ...courseData } = courseBody;
 
+  // #2.1: an admin may create the course on an instructor's behalf.
+  if (courseData.instructor && courseData.instructor !== requestingUser?.id) {
+    await assertValidInstructor(courseData.instructor);
+  }
+
   const course = await Course.create(courseData);
 
   if (trackId) {
     try {
-      await assertTrackOwnership(trackId, requestingUser);
+      await assertTrackLinkRight(
+        trackId,
+        courseData.instructor,
+        requestingUser,
+        'link',
+      );
       await trackService.addCourseToTrack(trackId, course._id);
     } catch (err) {
       // Don't leave an orphan course behind if the requested track
@@ -95,8 +136,15 @@ exports.createCourse = async (courseBody, requestingUser = null) => {
 exports.getAllCourses = async (query, requestingUser = null) => {
   // Q5/Q2: same fix as track.service.js#getAllTracks — previously
   // returned every course regardless of `published` to any caller.
+  // Stage 4: an instructor also sees the drafts they can manage (their own
+  // courses and every course in a track they lead or co-instruct).
+  const scope = await policy.loadStaffScope({}, requestingUser);
   const features = new APIFeatures(Course.find(), query, Course)
-    .filter(policy.publishedListFilter(requestingUser))
+    .filter(
+      policy.andFilters(
+        policy.manageableListFilter(requestingUser, scope, 'course'),
+      ),
+    )
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -112,9 +160,7 @@ exports.getAllCourses = async (query, requestingUser = null) => {
   // full array.
   const sanitized = courses.map((c) => {
     const obj = c.toObject();
-    const isStaff =
-      policy.isAdmin(requestingUser) ||
-      policy.isOwnerOf(obj, requestingUser, 'instructor');
+    const isStaff = policy.isCourseStaffByScope(obj, requestingUser, scope);
     return policy.redactMembership(obj, requestingUser, isStaff, {
       isEnrolled: 'students',
     });
@@ -169,8 +215,13 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
 
   if (!course) throw new AppError('No course found with that ID', 404);
 
-  const isOwner = policy.isOwnerOf(course, requestingUser, 'instructor');
+  // "Owner" now means: currently an instructor AND the course's
+  // instructor or a lead/co-instructor of its track (stage 4).
   const isAdmin = policy.isAdmin(requestingUser);
+  const isOwner =
+    policy.isInstructorRole(requestingUser) &&
+    (policy.isOwnerOf(course, requestingUser, 'instructor') ||
+      (await policy.canManage({}, requestingUser, 'course', courseId)));
   const isEnrolled = policy.isMemberOf(course.students, requestingUser);
 
   if (!course.published && !isOwner && !isAdmin) {
@@ -200,6 +251,13 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
  * @throws {AppError} 404 if course not found
  */
 exports.updateCourse = async (courseId, updateBody, requestingUser = null) => {
+  // #2.1: admin-only reassignment (the controller already dropped
+  // `instructor` for everyone else). Validated before any write so a bad
+  // id changes nothing; takes effect on the very next request.
+  if (updateBody.instructor) {
+    await assertValidInstructor(updateBody.instructor);
+  }
+
   // Self-reference can only happen on update (a client can't know a
   // course's own ID before it's created to list it as its own
   // prerequisite at creation time). Once set, the course's own
@@ -230,11 +288,16 @@ exports.updateCourse = async (courseId, updateBody, requestingUser = null) => {
   const { track: newTrackId, ...restOfUpdate } = updateBody;
 
   if (hasTrackChange) {
-    const current = await Course.findById(courseId).select('track');
+    const current = await Course.findById(courseId).select('track instructor');
     if (!current) {
       throw new AppError('No course found with that ID', 404);
     }
-    const currentTrackId = current.track ? current.track.toString() : null;
+    const currentTrackId = current.track
+      ? (current.track._id || current.track).toString()
+      : null;
+    const courseInstructorId = (
+      current.instructor?._id || current.instructor
+    )?.toString();
 
     if (currentTrackId !== (newTrackId || null)) {
       // Detach from the old track first (if any) — enforces the same
@@ -242,14 +305,24 @@ exports.updateCourse = async (courseId, updateBody, requestingUser = null) => {
       // DELETE /tracks/:id/courses/:courseId already has, and the same
       // track-ownership gate that endpoint enforces too.
       if (currentTrackId) {
-        await assertTrackOwnership(currentTrackId, requestingUser);
+        await assertTrackLinkRight(
+          currentTrackId,
+          courseInstructorId,
+          requestingUser,
+          'unlink',
+        );
         await trackService.removeCourseFromTrack(currentTrackId, courseId);
       }
       // Then attach to the new one (if any) — validates it exists,
       // confirms the requester owns it (or is admin), and enrolls its
       // current students into this course.
       if (newTrackId) {
-        await assertTrackOwnership(newTrackId, requestingUser);
+        await assertTrackLinkRight(
+          newTrackId,
+          courseInstructorId,
+          requestingUser,
+          'link',
+        );
         await trackService.addCourseToTrack(newTrackId, courseId);
       }
     }

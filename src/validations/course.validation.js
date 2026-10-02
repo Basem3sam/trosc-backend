@@ -13,8 +13,14 @@ const syllabusItemValidation = Joi.object({
   description: Joi.string().trim().allow('').optional(),
 });
 
-// ✅ Instructor is auto-assigned from req.user.id in controller, not accepted in body
+// Instructor is auto-assigned from req.user.id in the controller. Round-2
+// #2.1: an ADMIN may also set `instructor` (a user with role instructor or
+// admin - checked in course.service.js, which needs a DB lookup); the
+// controller drops it for everyone else, the same way POST /tracks does.
 exports.createCourseSchema = Joi.object({
+  instructor: objectId.messages({
+    'string.pattern.base': 'Instructor must be a valid MongoDB ID',
+  }),
   title: Joi.string().required().min(3).max(100).messages({
     'string.empty': 'Course title is required',
     'string.min': 'Course title must be at least 3 characters',
@@ -62,7 +68,11 @@ exports.updateCourseSchema = Joi.object({
   duration: Joi.number().integer().min(1),
   syllabus: Joi.array().items(syllabusItemValidation),
   attachments: attachmentValidation,
-  // instructor: REMOVED - cannot change instructor via update
+  // Admin-only (round-2 #2.1): reassigns the course immediately. The
+  // controller drops it for non-admins; the role check is in the service.
+  instructor: objectId.messages({
+    'string.pattern.base': 'Instructor must be a valid MongoDB ID',
+  }),
 })
   .min(1)
   .messages({

@@ -12,7 +12,16 @@ const resourceValidation = Joi.object({
   }),
 });
 
+// Stage 4 / rule 3: `instructor` is admin-only in practice (the controller
+// drops it for everyone else); the role check (instructor or admin) needs a
+// DB lookup, so it lives in session.service.js.
+const instructorField = Joi.string().hex().length(24).messages({
+  'string.hex': 'Instructor must be a valid MongoDB ID.',
+  'string.length': 'Instructor must be a valid MongoDB ID.',
+});
+
 const createSessionValidation = Joi.object({
+  instructor: instructorField,
   title: Joi.string().trim().min(3).required().messages({
     'string.empty': 'Session title is required.',
     'string.min': 'Session title must be at least 3 characters.',
@@ -47,6 +56,7 @@ const createSessionValidation = Joi.object({
 });
 
 const updateSessionValidation = Joi.object({
+  instructor: instructorField,
   title: Joi.string().trim().min(3).optional().messages({
     'string.min': 'Session title must be at least 3 characters.',
   }),

@@ -19,6 +19,16 @@ exports.createTrackSchema = Joi.object({
   instructor: objectId.optional().messages({
     'string.pattern.base': 'Instructor must be a valid MongoDB ID',
   }),
+  // Stage 4 / #2.2: co-instructors. Admin-only in practice, exactly like
+  // `instructor` above - the controller drops it for non-admins. The role
+  // check (instructor or admin) needs a DB lookup, so it lives in
+  // track.service.js#normalizeInstructors. Duplicates and the lead's own
+  // id are removed there rather than rejected.
+  instructors: Joi.array().items(
+    objectId.messages({
+      'string.pattern.base': 'Each co-instructor must be a valid MongoDB ID',
+    }),
+  ),
 });
 
 exports.getTrackSchema = Joi.object({
@@ -35,6 +45,12 @@ exports.updateTrackSchema = Joi.object({
   instructor: objectId.optional().messages({
     'string.pattern.base': 'Instructor must be a valid MongoDB ID',
   }),
+  // Admin-only - replaces the whole co-instructor list ([] clears it).
+  instructors: Joi.array().items(
+    objectId.messages({
+      'string.pattern.base': 'Each co-instructor must be a valid MongoDB ID',
+    }),
+  ),
   // M2: courses/sessions are intentionally NOT accepted here. Setting
   // them directly via track.set() would overwrite Track.courses/sessions
   // without updating the corresponding Course.track / Session.tracks

@@ -362,12 +362,16 @@ exports.hardDeleteUserCascade = async (userId) => {
     // while an enrollment or leave request was still pending — exactly
     // how the orphaned entry in #3.1 was created. All three are pulled
     // together in one update now.
+    // Stage 4 / #4A.7: also pull the user out of Track.instructors (a
+    // co-instructor is an array membership, unlike the required lead
+    // `instructor`, which still blocks the delete above).
     await Track.updateMany(
       {
         $or: [
           { students: userId },
           { pendingStudents: userId },
           { pendingLeaves: userId },
+          { instructors: userId },
         ],
       },
       {
@@ -375,6 +379,7 @@ exports.hardDeleteUserCascade = async (userId) => {
           students: userId,
           pendingStudents: userId,
           pendingLeaves: userId,
+          instructors: userId,
         },
       },
     ).session(session);

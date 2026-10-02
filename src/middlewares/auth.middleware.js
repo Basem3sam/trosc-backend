@@ -99,3 +99,7 @@ exports.restrictTo =
   };
 
 exports.checkOwnership = require('./ownership.middleware').checkOwnership;
+
+exports.requireManage = require('./managePolicy.middleware').requireManage;
+exports.requireTrackLink =
+  require('./managePolicy.middleware').requireTrackLink;

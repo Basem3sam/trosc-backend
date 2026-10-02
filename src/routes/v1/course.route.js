@@ -11,7 +11,7 @@
  *   post:
  *     operationId: createCourse
  *     summary: Create a new course
- *     description: Create a new course within a track (admin and instructors only). Instructor is auto-assigned from auth token.
+ *     description: Create a new course within a track (admin and instructors only). Instructor is auto-assigned from auth token; an admin may set `instructor` (a user with role instructor or admin, else 400) to create the course on that instructor's behalf. For anyone else the field is ignored. `track` may be set by an admin, or by an instructor who currently leads or co-instructs that track.
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []
@@ -134,7 +134,7 @@
  *   patch:
  *     operationId: updateCourseById
  *     summary: Update a course
- *     description: Update course information (admin and instructors only). Cannot change instructor.
+ *     description: Update course information (admin and instructors only). Only an admin can change `instructor` (reassignment takes effect immediately; non-admins' `instructor` is ignored). Allowed for the course's current instructor, a lead/co-instructor of its track, or an admin. Changing `track` also requires being lead/co-instructor of the track involved.
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []
@@ -175,7 +175,7 @@
  *   delete:
  *     operationId: deleteCourseById
  *     summary: Delete a course
- *     description: Permanently delete a course (admin and instructors only). Instructors can only delete courses they created.
+ *     description: Permanently delete a course (admin and instructors only). Instructors can only delete courses they currently manage (they are its instructor, or lead/co-instructor of its track).
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []
@@ -515,7 +515,7 @@
  *   post:
  *     operationId: createWeeklyTask
  *     summary: Create a weekly task bucket for a course
- *     description: Owner instructor or admin only. One bucket per week number per course.
+ *     description: Admin, the course's current instructor, or a lead/co-instructor of its track. One bucket per week number per course. The task's `instructor` is set to the course's current instructor; `createdBy` is the caller.
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []
@@ -613,7 +613,7 @@
  *   post:
  *     operationId: createCourseAssignment
  *     summary: Create an assignment for a course
- *     description: Owner instructor or admin only.
+ *     description: Admin, the course's current instructor, or a lead/co-instructor of its track. The assignment's `instructor` is set to the course's current instructor; `createdBy` is the caller.
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -663,9 +663,11 @@
  *     description: >
  *       Each assignment includes `mySubmission` — the requesting user's own
  *       submission, or null if they haven't submitted. Accessible to admins,
- *       any instructor, or a student enrolled in the course. Admins and the assignment's own
- *       instructor also get `submissionCount` and `ungradedCount` on each
- *       assignment (counts only - never other students' files or grades).
+ *       any instructor, or a student enrolled in the course. Everyone who can
+ *       manage the assignment (an admin, the parent's current instructor, or
+ *       a lead/co-instructor of its track) also gets `submissionCount` and
+ *       `ungradedCount` on each assignment (counts only - never other
+ *       students' files or grades).
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -832,7 +834,7 @@ const courseController = require('../../controllers/course.controller');
 const {
   protect,
   restrictTo,
-  checkOwnership,
+  requireManage,
   optionalAuth,
 } = require('../../middlewares/auth.middleware');
 const validate = require('../../middlewares/validate.middleware');
@@ -901,11 +903,7 @@ router
     protect,
     restrictTo('admin', 'instructor'),
     validate(getCourseSchema, 'params'),
-    checkOwnership({
-      model: 'Course',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
+    requireManage({ resource: 'course' }),
     validate(updateCourseSchema),
     courseController.updateCourse,
   )
@@ -913,11 +911,7 @@ router
     protect,
     restrictTo('admin', 'instructor'),
     validate(deleteCourseSchema, 'params'),
-    checkOwnership({
-      model: 'Course',
-      ownerField: 'instructor',
-      paramName: 'id',
-    }),
+    requireManage({ resource: 'course' }),
     courseController.deleteCourse,
   );
 
@@ -931,22 +925,14 @@ router
     protect,
     restrictTo('admin', 'instructor'),
     validate(manageSessionSchema, 'params'),
-    checkOwnership({
-      model: 'Course',
-      ownerField: 'instructor',
-      paramName: 'courseId',
-    }),
+    requireManage({ resource: 'course', paramName: 'courseId' }),
     courseController.addSessionToCourse,
   )
   .delete(
     protect,
     restrictTo('admin', 'instructor'),
     validate(manageSessionSchema, 'params'),
-    checkOwnership({
-      model: 'Course',
-      ownerField: 'instructor',
-      paramName: 'courseId',
-    }),
+    requireManage({ resource: 'course', paramName: 'courseId' }),
     courseController.removeSessionFromCourse,
   );
 
@@ -954,31 +940,27 @@ router
 // 👥 STUDENT ENROLLMENT ROUTES
 // ===================================================================
 
-router.route('/:id/students').post(
-  protect,
-  restrictTo('admin', 'instructor'),
-  validate(getCourseSchema, 'params'),
-  checkOwnership({
-    model: 'Course',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
-  validate(addStudentSchema),
-  courseController.addStudent,
-);
+router
+  .route('/:id/students')
+  .post(
+    protect,
+    restrictTo('admin', 'instructor'),
+    validate(getCourseSchema, 'params'),
+    requireManage({ resource: 'course' }),
+    validate(addStudentSchema),
+    courseController.addStudent,
+  );
 
-router.route('/:id/students/:studentId').delete(
-  protect,
-  restrictTo('admin', 'instructor'),
-  validate(getCourseSchema, 'params'),
-  validate(studentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Course',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
-  courseController.removeStudent,
-);
+router
+  .route('/:id/students/:studentId')
+  .delete(
+    protect,
+    restrictTo('admin', 'instructor'),
+    validate(getCourseSchema, 'params'),
+    validate(studentIdSchema, 'params'),
+    requireManage({ resource: 'course' }),
+    courseController.removeStudent,
+  );
 
 router.use('/:id/reviews', reviewRouter('course'));
 router.use('/:id/assignments', resourceAssignmentRouter('course'));

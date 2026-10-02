@@ -4,13 +4,19 @@ const catchAsync = require('../utils/catchAsync');
 
 // Create a new session
 exports.createSession = catchAsync(async (req, res, next) => {
-  // Prevent client spoofing and auto-assign from auth token
+  // Prevent client spoofing and auto-assign from auth token - EXCEPT that
+  // an admin may create a session on another instructor's behalf (stage 4,
+  // rule 3). Anyone else's `instructor` is dropped and defaults to them.
+  const { instructor: requestedInstructor } = req.body;
   delete req.body.instructor;
   delete req.body.students;
   delete req.body.course;
   delete req.body.tracks;
 
-  req.body.instructor = req.user.id;
+  req.body.instructor =
+    req.user.role === 'admin' && requestedInstructor
+      ? requestedInstructor
+      : req.user.id;
 
   const session = await sessionService.createSession(req.body, req.user.id);
 
@@ -54,8 +60,11 @@ exports.getSession = catchAsync(async (req, res, next) => {
 
 // Update session
 exports.updateSession = catchAsync(async (req, res, next) => {
-  // Prevent changing instructor via update (security)
-  delete req.body.instructor;
+  // Prevent changing instructor via update (security), EXCEPT for admins
+  // (stage 4, rule 3). Reassigning revokes the old instructor immediately.
+  if (req.user.role !== 'admin') {
+    delete req.body.instructor;
+  }
   delete req.body.students;
   delete req.body.course;
   delete req.body.tracks;

@@ -72,7 +72,7 @@
  *   patch:
  *     operationId: gradeSubmission
  *     summary: Grade a student's submission for an assignment
- *     description: Owner instructor (the assignment's own instructor) or admin only.
+ *     description: Admin, the parent course/session's current instructor, or a lead/co-instructor of the course's/session's track. Never based on who created the assignment.
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -132,7 +132,7 @@
  *   get:
  *     operationId: getAssignment
  *     summary: Get a single assignment with its submissions
- *     description: Owner instructor (the assignment's own instructor) or admin only. Each submission's `file` is stripped in favor of a `hasFile` boolean — use the dedicated file endpoint below to actually access it.
+ *     description: Admin, the parent course/session's current instructor, or a lead/co-instructor of the course's/session's track. Never based on who created the assignment. Each submission's `file` is stripped in favor of a `hasFile` boolean — use the dedicated file endpoint below to actually access it.
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -170,7 +170,7 @@
  *     operationId: getSubmissionFile
  *     summary: Open a student's submitted file
  *     description: >
- *       Owner instructor (the assignment's own instructor) or admin only.
+ *       Admin, the parent course/session's current instructor, or a lead/co-instructor of the course's/session's track. Never based on who created the assignment.
  *       Redirects (302) to the submission's file. This is the only path
  *       that ever exposes the raw file URL — students never receive it
  *       for anyone but themselves, and GET /assignments/{id} strips it
@@ -204,7 +204,7 @@
  *   patch:
  *     operationId: updateAssignment
  *     summary: Update an assignment's title, description, deadline, and/or attachments
- *     description: Owner instructor (the assignment's own instructor) or admin only.
+ *     description: Admin, the parent course/session's current instructor, or a lead/co-instructor of the course's/session's track. Never based on who created the assignment.
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -245,7 +245,7 @@
  *   delete:
  *     operationId: deleteAssignment
  *     summary: Delete an assignment
- *     description: Owner instructor or admin only. Also deletes all of its submissions.
+ *     description: Admin, the parent course/session's current instructor, or a lead/co-instructor of its track. Also deletes all of its submissions.
  *     tags: [Assignments]
  *     security:
  *       - bearerAuth: []
@@ -275,7 +275,7 @@ const {
 const {
   protect,
   restrictTo,
-  checkOwnership,
+  requireManage,
 } = require('../../middlewares/auth.middleware');
 const validate = require('../../middlewares/validate.middleware');
 const {
@@ -295,11 +295,7 @@ router.get(
   protect,
   restrictTo('admin', 'instructor'),
   validate(assignmentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Assignment',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'assignment' }),
   assignmentController.getAssignment,
 );
 
@@ -308,11 +304,7 @@ router.get(
   protect,
   restrictTo('admin', 'instructor'),
   validate(assignmentStudentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Assignment',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'assignment' }),
   assignmentSubmissionController.getSubmissionFile,
 );
 
@@ -330,11 +322,7 @@ router.patch(
   restrictTo('admin', 'instructor'),
   validate(assignmentStudentIdSchema, 'params'),
   validate(gradeSubmissionSchema),
-  checkOwnership({
-    model: 'Assignment',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'assignment' }),
   assignmentSubmissionController.gradeSubmission,
 );
 
@@ -343,11 +331,7 @@ router.patch(
   protect,
   restrictTo('admin', 'instructor'),
   validate(assignmentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Assignment',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'assignment' }),
   validate(updateAssignmentSchema),
   assignmentController.updateAssignment,
 );
@@ -357,11 +341,7 @@ router.delete(
   protect,
   restrictTo('admin', 'instructor'),
   validate(assignmentIdSchema, 'params'),
-  checkOwnership({
-    model: 'Assignment',
-    ownerField: 'instructor',
-    paramName: 'id',
-  }),
+  requireManage({ resource: 'assignment' }),
   assignmentController.deleteAssignment,
 );
 

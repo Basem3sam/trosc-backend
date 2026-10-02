@@ -3,6 +3,7 @@ const Track = require('../models/track.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
+const policy = require('./policy.service');
 const { logActivity } = require('./activityLog.service');
 
 // Each directly-reviewable/assignable resource type: its Mongoose model,
@@ -37,16 +38,17 @@ function assertCanView(resource, label, requestingUser) {
   // matching how course/track creation is gated by role only elsewhere.
 }
 
-// Staff for a given assignment = an admin, or the assignment's own
-// instructor (the same people who can open GET /assignments/:id and grade
-// it today). Deliberately NOT "any instructor": an instructor who does not
-// manage this assignment gets no submission information about it, the same
-// as before. Stage 4 will swap this one check for the policy-service
-// management rule without touching anything else in this helper.
-function isAssignmentStaff(plain, requestingUser) {
-  if (requestingUser.role === 'admin') return true;
-  const instructorId = plain.instructor?._id || plain.instructor;
-  return !!instructorId && instructorId.toString() === requestingUser.id;
+// Staff for a given assignment = everyone who can manage it under the
+// stage-4 policy (policy.service.js): an admin, the current instructor of
+// its parent course/session, or a lead/co-instructor of the parent's
+// track - the same people who can open GET /assignments/:id and grade it.
+// Deliberately NOT "any instructor", and NOT the assignment's stored
+// `instructor` or `createdBy`: an instructor who does not manage this
+// assignment gets no submission information about it. `authority` comes
+// from policy.resolveManageableParents(), computed once per request for
+// all of a list's parents (no query per assignment).
+function isAssignmentStaff(plain, authority) {
+  return policy.isStaffOfAssignmentParent(authority, plain);
 }
 
 // Strip every student's raw `submissions` from every caller and attach
@@ -60,7 +62,12 @@ function isAssignmentStaff(plain, requestingUser) {
 // per assignment. Counts only - never identities, files or grades.
 //   submissionCount - how many students have submitted
 //   ungradedCount   - how many of those have no grade yet
-function shapeAssignmentsForCaller(assignments, requestingUser) {
+async function shapeAssignmentsForCaller(assignments, requestingUser) {
+  const authority = await policy.resolveManageableParents({}, requestingUser, {
+    courseIds: assignments.map((a) => a.course).filter(Boolean),
+    sessionIds: assignments.map((a) => a.session).filter(Boolean),
+  });
+
   return assignments.map((assignment) => {
     const plain = assignment.toObject();
     const submissions = plain.submissions || [];
@@ -74,7 +81,7 @@ function shapeAssignmentsForCaller(assignments, requestingUser) {
       mySubmission,
     };
 
-    if (isAssignmentStaff(plain, requestingUser)) {
+    if (isAssignmentStaff(plain, authority)) {
       shaped.submissionCount = submissions.length;
       shaped.ungradedCount = submissions.filter(
         (s) => s.grade === undefined || s.grade === null,
@@ -87,8 +94,9 @@ function shapeAssignmentsForCaller(assignments, requestingUser) {
 
 /**
  * Get all assignments directly attached to a single course or session.
- * Each assignment includes `mySubmission`; staff of that assignment (admin
- * or its instructor) also get `submissionCount` / `ungradedCount` (#3.2).
+ * Each assignment includes `mySubmission`; staff of that assignment (admin,
+ * the parent's current instructor, or its track's lead/co-instructors) also
+ * get `submissionCount` / `ungradedCount` (#3.2).
  * @param {'course'|'session'} resourceType
  * @param {string} resourceId
  * @param {Object} requestingUser - req.user (id, role)
@@ -155,7 +163,7 @@ exports.getTrackAssignments = async (trackId, requestingUser) => {
  * Create a new assignment for a course or session.
  * @param {'course'|'session'} resourceType
  * @param {string} resourceId
- * @param {string} instructorId - req.user.id (auto-assigned owner)
+ * @param {string} instructorId - req.user.id (the caller; becomes createdBy)
  * @param {Object} data - { title, description, deadline, attachments }
  * @returns {Promise<Assignment>}
  */
@@ -167,15 +175,23 @@ exports.createAssignment = async (
 ) => {
   const { Model, field, label } = getConfig(resourceType);
 
-  const resource = await Model.findById(resourceId).select('_id');
+  const resource = await Model.findById(resourceId).select('instructor');
   if (!resource) {
     throw new AppError(`No ${label} found with that ID`, 404);
   }
 
+  // Stage 4 (#4A.5): `instructor` is the PARENT's current instructor, so it
+  // stays meaningful for display when an admin or a track co-instructor
+  // creates the assignment on someone else's course/session. (It is not
+  // used for authorization - that comes from the parent, see
+  // policy.service.js.) `createdBy` below is the caller. `instructorId`
+  // (the caller) is the fallback if the parent has no resolvable instructor.
+  const parentInstructor = resource.instructor?._id || resource.instructor;
+
   const assignment = await Assignment.create({
     ...data,
     [field]: resourceId,
-    instructor: instructorId,
+    instructor: parentInstructor || instructorId,
     // Q6: set once, at creation, and never touched again by any update
     // path — pure historical attribution, distinct from `instructor`
     // (the current-authority field) even though they start out equal.
@@ -193,9 +209,9 @@ exports.createAssignment = async (
 };
 
 /**
- * #1.5: single assignment with its submissions, for staff. Ownership
- * (instructor === requester, or admin) is enforced by the checkOwnership
- * middleware before this runs — students never reach this.
+ * #1.5: single assignment with its submissions, for staff. Management
+ * rights (admin / parent's instructor / track lead or co-instructor) are
+ * enforced by the requireManage middleware before this runs — students never reach this.
  * @param {string} assignmentId
  * @returns {Promise<Object>} the assignment, submissions populated (student
  *   name/email/photo), with each submission's raw `file` URL stripped —
@@ -225,8 +241,8 @@ exports.getAssignmentById = async (assignmentId) => {
 
 /**
  * Update an assignment's title, description, deadline, and/or attachments.
- * Ownership (instructor === requester, or admin) is enforced by the
- * checkOwnership middleware before this runs.
+ * Management rights are enforced by the requireManage middleware before
+ * this runs.
  * @param {string} assignmentId
  * @param {Object} data
  * @returns {Promise<Assignment>}
@@ -251,9 +267,8 @@ exports.updateAssignment = async (assignmentId, data, requestingUserId) => {
 };
 
 /**
- * Delete an assignment (and all of its submissions with it). Ownership
- * (instructor === requester, or admin) is enforced by the checkOwnership
- * middleware before this runs.
+ * Delete an assignment (and all of its submissions with it). Management
+ * rights are enforced by the requireManage middleware before this runs.
  * @param {string} assignmentId
  */
 exports.deleteAssignment = async (assignmentId, requestingUserId) => {
