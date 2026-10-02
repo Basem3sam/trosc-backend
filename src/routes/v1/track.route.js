@@ -467,7 +467,9 @@
  *     operationId: getTrackSessionCatalog
  *     summary: Public catalog of a track's sessions
  *     description: |
- *       Public endpoint, no authentication required. Returns just enough
+ *       Public endpoint, no authentication required. Only published
+ *       sessions of a published track are listed (404 for a draft track).
+ *       Returns just enough
  *       for a visitor to see what the track covers before enrolling —
  *       no `url`, `embedUrl`, or `resources`.
  *     tags: [Tracks]
@@ -543,7 +545,7 @@
  *   get:
  *     operationId: getTracksByStudent
  *     summary: Get tracks by student enrollment
- *     description: Returns tracks a student is enrolled in. Admin can view any student; students can only view themselves.
+ *     description: Returns tracks a student is enrolled in. Admin can view any student; students can only view themselves. A track that was unpublished after enrolling is hidden unless the caller manages it or is an admin; the Q7 redaction applies.
  *     tags: [Tracks]
  *     security: [{ bearerAuth: [] }]
  *     parameters:

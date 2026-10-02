@@ -178,6 +178,7 @@ exports.getCoursesByInstructor = catchAsync(async (req, res, next) => {
     await courseService.getCoursesByInstructor(
       req.params.instructorId,
       req.query,
+      req.user,
     );
 
   res.status(200).json({
@@ -195,6 +196,7 @@ exports.getCoursesByTrack = catchAsync(async (req, res, next) => {
   const { courses, total, pagination } = await courseService.getCoursesByTrack(
     req.params.trackId,
     req.query,
+    req.user,
   );
 
   res.status(200).json({
@@ -210,7 +212,11 @@ exports.getCoursesByTrack = catchAsync(async (req, res, next) => {
 
 exports.getCoursesByStudent = catchAsync(async (req, res, next) => {
   const { courses, total, pagination } =
-    await courseService.getCoursesByStudent(req.params.studentId, req.query);
+    await courseService.getCoursesByStudent(
+      req.params.studentId,
+      req.query,
+      req.user,
+    );
 
   res.status(200).json({
     status: 'success',

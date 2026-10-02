@@ -229,9 +229,27 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 > `isEnrolled`/`isPending`/`isPendingLeave` (booleans about the requesting
 > user's own status) instead. This applies to every list and detail
 > endpoint below except the explicitly self/admin-scoped ones
-> (`/student/:studentId`, `/pending`, `/leaves`) and the manual
+> (`/pending`, `/leaves`) and the manual
 > enroll/remove-student action endpoints, which already required
 > authorization to call and are unaffected.
+
+> **⚠️ Breaking changes (Package 2 - carry-over sub-lists):**
+> - `GET /courses/instructor/:id` and `GET /courses/track/:id` no longer
+>   return the raw `students` array to non-staff (use `studentCount` /
+>   `isEnrolled`) and no longer return drafts to non-staff. They now accept
+>   an optional token, so staff see the drafts they manage.
+> - `GET /courses/student/:id`, `GET /tracks/student/:id` and
+>   `GET /sessions/student/:id` hide unpublished content and apply the same
+>   redaction (`students`, `pendingStudents`, `pendingLeaves`, `progress`
+>   are replaced by `studentCount` / `isEnrolled` / `isPending` /
+>   `isPendingLeave`). **Rule:** a student's enrolled-but-since-unpublished
+>   content is hidden from lists (like the detail endpoint's 404) unless the
+>   caller manages it or is an admin; enrollment never grants visibility.
+> - `GET /users/me/enrollments` omits unpublished track/courses/sessions
+>   (admins excepted).
+> - `GET /tracks/:id/session-catalog` omits draft sessions and returns 404
+>   for a draft track.
+> - `trackService.getTracksByInstructor` (no route) follows the same rules.
 
 ### Tracks
 
@@ -243,8 +261,8 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `POST`   | `/v1/tracks`                                 | Admin                                                 | Create track (admin only). `instructor` (lead) and `instructors` (co-instructors) assign it to instructor/admin users |
 | `PATCH`  | `/v1/tracks/:id`                             | Admin / Instructor                                    | Update track (admin, lead or co-instructor). `instructor` and `instructors` changes are admin only (dropped for others) |
 | `DELETE` | `/v1/tracks/:id`                             | Admin                                                 | Delete track (courses orphaned, sessions become standalone)                                         |
-| `GET`    | `/v1/tracks/:id/session-catalog`             | Public                                                | Sessions in this track, stripped to `{ _id, title, description, startDate, duration }` — no media/URLs |
-| `GET`    | `/v1/tracks/student/:studentId`              | Self / Admin                                          | Track a student is enrolled in (returns array; system enforces one track)                           |
+| `GET`    | `/v1/tracks/:id/session-catalog`             | Public                                                | Sessions in this track, stripped to `{ _id, title, description, startDate, duration }` — no media/URLs. Published sessions of a published track only (404 for a draft track) |
+| `GET`    | `/v1/tracks/student/:studentId`              | Self / Admin                                          | Track a student is enrolled in (returns array). Unpublished tracks are hidden; redacted like `GET /tracks` |
 | `GET`    | `/v1/tracks/:id/analytics`                   | Admin / track lead / co-instructor                    | Track stats                                                                                         |
 | `GET`    | `/v1/tracks/:id/pending`                     | Admin / Instructor                                    | Pending enrollment requests (`pendingStudents`) *and* pending leave requests (`pendingLeaves`), in one call (owning instructor or admin only) |
 | `POST`   | `/v1/tracks/:id/enroll-me`                   | Protected                                             | Self-enroll (pending approval; rejected if already in another track; rate limited)                  |
@@ -275,9 +293,9 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `POST`   | `/v1/courses`                               | Admin / Instructor                                    | Create course. Optional `track` attaches it immediately — requester must own that track (or be admin); keeps `Track.courses` in sync |
 | `PATCH`  | `/v1/courses/:id`                           | Admin / Instructor                                    | Update course (owner only; admin bypass). `track` can be reassigned or set to `null` to detach — each side requires owning that track (or admin), and detaching enforces the same "track needs ≥1 course or session" rule `DELETE /tracks/:id/courses/:courseId` has |
 | `DELETE` | `/v1/courses/:id`                           | Admin / Instructor                                    | Delete course (sessions become standalone; owner only; admin bypass)                         |
-| `GET`    | `/v1/courses/instructor/:instructorId`      | Public                                                | Courses by instructor. ⚠️ Not yet covered by the Q7 fix below — still returns the raw `students` array to any caller (stage 3+ candidate) |
-| `GET`    | `/v1/courses/track/:trackId`                | Public                                                | Courses in a track. Same ⚠️ caveat as the row above                                          |
-| `GET`    | `/v1/courses/student/:studentId`            | Self / Admin                                          | Courses a student is enrolled in                                                             |
+| `GET`    | `/v1/courses/instructor/:instructorId`      | Public                                                | Courses by instructor. Published only for the public; staff also get drafts they manage; admins all. Non-staff get `studentCount`/`isEnrolled` instead of `students` |
+| `GET`    | `/v1/courses/track/:trackId`                | Public                                                | Courses in a track. Same draft filter + redaction as the row above                           |
+| `GET`    | `/v1/courses/student/:studentId`            | Self / Admin                                          | Courses a student is enrolled in. Unpublished courses are hidden (admins and managers excepted); `isEnrolled` instead of `students` |
 | `POST`   | `/v1/courses/:id/enroll-me`                 | Protected                                             | Self-enroll (prerequisites + access rules enforced: public/track-only/private; rate limited) |
 | `DELETE` | `/v1/courses/:id/leave-me`                  | Protected                                             | Leave course (rate limited)                                                                  |
 | `POST`   | `/v1/courses/:id/students`                  | Admin / Instructor                                    | Manually enroll student                                                                      |
@@ -303,7 +321,7 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `DELETE` | `/v1/sessions/:id`                      | Admin / Instructor                                    | Delete session (owner only; admin bypass)                                       |
 | `GET`    | `/v1/sessions/instructor/:instructorId` | Protected                                             | Sessions by instructor. Same draft-exclusion + field redaction as `GET /v1/sessions` |
 | `GET`    | `/v1/sessions/track/:trackId`           | Protected                                             | Sessions in a track. Same draft-exclusion + field redaction as `GET /v1/sessions` |
-| `GET`    | `/v1/sessions/student/:studentId`       | Self / Admin                                          | Sessions a student is enrolled in                                               |
+| `GET`    | `/v1/sessions/student/:studentId`       | Self / Admin                                          | Sessions a student is enrolled in. Unpublished sessions are hidden; `students`/`progress` replaced by `isEnrolled`/`studentCount` |
 | `POST`   | `/v1/sessions/:id/enroll-me`            | Protected                                             | Self-enroll in session (track-only/private access rules enforced; rate limited) |
 | `DELETE` | `/v1/sessions/:id/leave-me`             | Protected                                             | Leave session (rate limited)                                                    |
 | `PUT`    | `/v1/sessions/:id/progress`             | Protected (enrolled student)                          | Mark the session as watched for the current user (`{ "status": "watched" }`)     |

@@ -397,6 +397,7 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
 
   describe('getTracksByInstructor (service)', () => {
     it('returns tracks scoped to the given instructor', async () => {
+      await Track.updateOne({ _id: track._id }, { published: true });
       const otherInstructor = (await createTestUser({ role: 'instructor' }))
         .user;
       await Track.create({
@@ -531,6 +532,7 @@ describe('Track <-> Course/Session/Student management (service + routes)', () =>
 
   describe('getTracksByInstructor (controller, direct invocation — no route is wired to it)', () => {
     it('responds with tracks, total, and pagination for the given instructor', async () => {
+      await Track.updateOne({ _id: track._id }, { published: true });
       const req = {
         params: { instructorId: instructor._id.toString() },
         query: {},

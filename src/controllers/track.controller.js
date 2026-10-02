@@ -278,6 +278,7 @@ exports.getTracksByInstructor = catchAsync(async (req, res, next) => {
     await trackService.getTracksByInstructor(
       req.params.instructorId,
       req.query,
+      req.user,
     );
 
   res.status(200).json({
@@ -295,6 +296,7 @@ exports.getTracksByStudent = catchAsync(async (req, res, next) => {
   const { tracks, total, pagination } = await trackService.getTracksByStudent(
     req.params.studentId,
     req.query,
+    req.user,
   );
 
   res.status(200).json({

@@ -311,14 +311,17 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
  * @throws {AppError} 404 if the track doesn't exist
  */
 exports.getSessionCatalog = async (trackId) => {
-  const track = await Track.findById(trackId).select('_id');
-  if (!track) {
+  // Package 2: public endpoint - a draft track, and draft sessions inside
+  // a published track, are not part of the public catalog (Q2/Q5).
+  const track = await Track.findById(trackId).select('_id published');
+  if (!track || !track.published) {
     throw new AppError('No track found with that ID', 404);
   }
 
-  const sessions = await Session.find({ tracks: trackId }).select(
-    'title description startDate duration',
-  );
+  const sessions = await Session.find({
+    tracks: trackId,
+    published: true,
+  }).select('title description startDate duration');
 
   return sessions;
 };
@@ -684,15 +687,17 @@ exports.removeSessionFromTrack = async (trackId, sessionId) => {
 // 🔍 ADVANCED QUERIES & ANALYTICS
 // ===================================================================
 
-/**
- * Get all tracks created by a specific instructor
- * @param {string} instructorId - MongoDB user ID (instructor)
- * @param {Object} query - Filtering and pagination options
- * @returns {Promise<{tracks: Array, total: Number}>} Instructor's tracks
- */
-exports.getTracksByInstructor = async (instructorId, query) => {
+// Package 2: shared by the two track sub-lists below. The Q5 draft rule
+// (published only; staff also get the drafts they manage; admins all) plus
+// the Q7 redaction, the same as getAllTracks.
+async function runTrackSubList(query, requestingUser, extra) {
   const features = new APIFeatures(Track.find(), query, Track)
-    .filter({ instructor: instructorId })
+    .filter(
+      policy.andFilters(
+        policy.manageableListFilter(requestingUser, null, 'track'),
+        extra,
+      ),
+    )
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -701,36 +706,46 @@ exports.getTracksByInstructor = async (instructorId, query) => {
 
   const tracks = await features.query;
 
+  const sanitized = tracks.map((t) => {
+    const obj = t.toObject();
+    const isStaff = policy.canManageTrack(requestingUser, obj);
+    return policy.redactMembership(obj, requestingUser, isStaff, {
+      isEnrolled: 'students',
+      isPending: 'pendingStudents',
+      isPendingLeave: 'pendingLeaves',
+    });
+  });
+
   return {
-    tracks,
+    tracks: sanitized,
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
-};
+}
+
+/**
+ * Get all tracks created by a specific instructor
+ * @param {string} instructorId - MongoDB user ID (instructor)
+ * @param {Object} query - Filtering and pagination options
+ * @param {Object|null} requestingUser - caller (null = anonymous)
+ * @returns {Promise<{tracks: Array, total: Number}>} Instructor's tracks
+ */
+exports.getTracksByInstructor = (instructorId, query, requestingUser = null) =>
+  runTrackSubList(query, requestingUser, { instructor: instructorId });
 
 /**
  * Get all tracks a student is enrolled in
  * @param {string} studentId - MongoDB user ID (student)
  * @param {Object} query - Filtering and pagination options
+ * @param {Object|null} requestingUser - caller (null = anonymous)
  * @returns {Promise<{tracks: Array, total: Number}>} Student's enrolled tracks
+ *
+ * A track the student is enrolled in that was later unpublished is hidden
+ * from this list (same as every list and the detail endpoint), unless the
+ * caller manages it or is an admin.
  */
-exports.getTracksByStudent = async (studentId, query) => {
-  const features = new APIFeatures(Track.find(), query, Track)
-    .filter({ students: studentId })
-    .search(['title', 'description'])
-    .sort()
-    .limitFields();
-
-  await features.paginate();
-
-  const tracks = await features.query;
-
-  return {
-    tracks,
-    total: features.totalDocs || 0,
-    pagination: features.pagination,
-  };
-};
+exports.getTracksByStudent = (studentId, query, requestingUser = null) =>
+  runTrackSubList(query, requestingUser, { students: studentId });
 
 /**
  * Get most popular tracks based on student enrollment count

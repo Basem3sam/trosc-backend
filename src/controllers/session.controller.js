@@ -190,7 +190,11 @@ exports.leaveMe = catchAsync(async (req, res, next) => {
 
 exports.getSessionsByStudent = catchAsync(async (req, res, next) => {
   const { sessions, total, pagination } =
-    await sessionService.getSessionsByStudent(req.params.studentId, req.query);
+    await sessionService.getSessionsByStudent(
+      req.params.studentId,
+      req.query,
+      req.user,
+    );
 
   res.status(200).json({
     status: 'success',

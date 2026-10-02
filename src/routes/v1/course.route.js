@@ -366,7 +366,7 @@
  *     security: []
  *     operationId: getCoursesByInstructor
  *     summary: Get courses by instructor
- *     description: Retrieve all courses taught by a specific instructor
+ *     description: Retrieve all courses taught by a specific instructor. Published only for the public; staff who manage a draft (and admins) also get it. Non-staff get `studentCount`/`isEnrolled` instead of `students`. An optional bearer token is honoured.
  *     tags: [Courses]
  *     parameters:
  *       - name: instructorId
@@ -403,7 +403,7 @@
  *     security: []
  *     operationId: getCoursesByTrack
  *     summary: Get courses by track
- *     description: Retrieve all courses within a specific track
+ *     description: Retrieve all courses within a specific track. Published only for the public; staff who manage a draft (and admins) also get it. Non-staff get `studentCount`/`isEnrolled` instead of `students`. An optional bearer token is honoured.
  *     tags: [Courses]
  *     parameters:
  *       - name: trackId
@@ -439,7 +439,7 @@
  *   get:
  *     operationId: getCoursesByStudent
  *     summary: Get courses by student enrollment
- *     description: Returns courses a student is enrolled in. Admin can view any student; students can only view themselves.
+ *     description: Returns courses a student is enrolled in. Admin can view any student; students can only view themselves. A course that was unpublished after enrolling is hidden unless the caller manages it or is an admin; non-staff get `isEnrolled` instead of `students`.
  *     tags: [Courses]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -871,10 +871,11 @@ router
 
 router.get(
   '/instructor/:instructorId',
+  optionalAuth,
   courseController.getCoursesByInstructor,
 );
 
-router.get('/track/:trackId', courseController.getCoursesByTrack);
+router.get('/track/:trackId', optionalAuth, courseController.getCoursesByTrack);
 
 router.get(
   '/student/:studentId',

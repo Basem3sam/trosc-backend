@@ -598,15 +598,44 @@ exports.removeStudentFromCourse = async (courseId, studentId) => {
 // 🔍 ADVANCED QUERIES
 // ===================================================================
 
+// Package 2: shared Q7 redaction for the course sub-lists below (by
+// instructor / track / student). "Staff" = can manage the course under the
+// stage-4 policy, computed from the caller's loaded staff scope.
+function redactCourseList(courses, requestingUser, scope) {
+  return courses.map((c) => {
+    const obj = c.toObject();
+    const isStaff = policy.isCourseStaffByScope(obj, requestingUser, scope);
+    return policy.redactMembership(obj, requestingUser, isStaff, {
+      isEnrolled: 'students',
+    });
+  });
+}
+
+// Package 2: the Q5 draft rule + `extra` conditions, shared by the three
+// sub-lists. Published only for the public; staff also get the drafts they
+// manage; admins get everything.
+function subListFilter(requestingUser, scope, extra) {
+  return policy.andFilters(
+    policy.manageableListFilter(requestingUser, scope, 'course'),
+    extra,
+  );
+}
+
 /**
  * Get all courses by instructor
  * @param {string} instructorId - MongoDB user ID
  * @param {Object} query - Filtering options
+ * @param {Object|null} requestingUser - caller (null = anonymous)
  * @returns {Promise<{courses: Array, total: Number}>}
  */
-exports.getCoursesByInstructor = async (instructorId, query) => {
+exports.getCoursesByInstructor = async (
+  instructorId,
+  query,
+  requestingUser = null,
+) => {
+  const scope = await policy.loadStaffScope({}, requestingUser);
   const features = new APIFeatures(Course.find(), query, Course)
-    .filter({ instructor: instructorId })
+    .filter(subListFilter(requestingUser, scope, { instructor: instructorId }))
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -616,7 +645,7 @@ exports.getCoursesByInstructor = async (instructorId, query) => {
   const courses = await features.query;
 
   return {
-    courses,
+    courses: redactCourseList(courses, requestingUser, scope),
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -626,11 +655,13 @@ exports.getCoursesByInstructor = async (instructorId, query) => {
  * Get all courses by track
  * @param {string} trackId - MongoDB track ID
  * @param {Object} query - Filtering options
+ * @param {Object|null} requestingUser - caller (null = anonymous)
  * @returns {Promise<{courses: Array, total: Number}>}
  */
-exports.getCoursesByTrack = async (trackId, query) => {
+exports.getCoursesByTrack = async (trackId, query, requestingUser = null) => {
+  const scope = await policy.loadStaffScope({}, requestingUser);
   const features = new APIFeatures(Course.find(), query, Course)
-    .filter({ track: trackId })
+    .filter(subListFilter(requestingUser, scope, { track: trackId }))
     .search(['title', 'description'])
     .sort()
     .limitFields();
@@ -640,7 +671,7 @@ exports.getCoursesByTrack = async (trackId, query) => {
   const courses = await features.query;
 
   return {
-    courses,
+    courses: redactCourseList(courses, requestingUser, scope),
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -652,9 +683,17 @@ exports.getCoursesByTrack = async (trackId, query) => {
  * @param {Object} query - Filtering options
  * @returns {Promise<{courses: Array, total: Number}>}
  */
-exports.getCoursesByStudent = async (studentId, query) => {
+exports.getCoursesByStudent = async (
+  studentId,
+  query,
+  requestingUser = null,
+) => {
+  // Rule for a student's own enrolled content that was later unpublished:
+  // it is hidden from this list (like every other list and the detail
+  // endpoint) - unless the caller manages it or is an admin.
+  const scope = await policy.loadStaffScope({}, requestingUser);
   const features = new APIFeatures(Course.find(), query, Course)
-    .filter({ students: studentId })
+    .filter(subListFilter(requestingUser, scope, { students: studentId }))
     .sort()
     .limitFields();
 
@@ -663,7 +702,7 @@ exports.getCoursesByStudent = async (studentId, query) => {
   const courses = await features.query;
 
   return {
-    courses,
+    courses: redactCourseList(courses, requestingUser, scope),
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };

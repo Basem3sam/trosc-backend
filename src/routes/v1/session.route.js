@@ -311,7 +311,7 @@
  *   get:
  *     operationId: getSessionsByStudent
  *     summary: Get sessions by student enrollment
- *     description: Returns sessions a student is enrolled in. Admin can view any student; students can only view themselves.
+ *     description: Returns sessions a student is enrolled in. Admin can view any student; students can only view themselves. A session that was unpublished after enrolling is hidden unless the caller manages it or is an admin; `students`/`progress` are replaced by `isEnrolled`/`studentCount`.
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []

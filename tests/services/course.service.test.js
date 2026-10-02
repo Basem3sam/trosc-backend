@@ -401,11 +401,17 @@ describe('Course Service', () => {
   describe('getCoursesByInstructor, getCoursesByTrack, getCoursesByStudent', () => {
     it('returns courses filtered by instructor', async () => {
       await Course.create([
-        { title: 'InstructorA', description: '1', instructor: instructor._id },
+        {
+          title: 'InstructorA',
+          description: '1',
+          instructor: instructor._id,
+          published: true,
+        },
         {
           title: 'InstructorB',
           description: '2',
           instructor: otherInstructor._id,
+          published: true,
         },
       ]);
       const result = await courseService.getCoursesByInstructor(

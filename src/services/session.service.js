@@ -519,20 +519,27 @@ exports.setSessionProgress = async (sessionId, requestingUser, status) => {
   return { status: myEntry.status, watchedAt: myEntry.watchedAt };
 };
 
-exports.getSessionsByStudent = async (studentId, query) => {
+exports.getSessionsByStudent = async (
+  studentId,
+  query,
+  requestingUser = null,
+) => {
   // Route-level guard (session.route.js) already restricts the caller to
-  // the student themselves or an admin, so `students: studentId` alone
-  // already implies the caller is authorized to see this session's own
-  // content in full — unlike getAllSessions/getSessionsByTrack/
-  // getSessionsByInstructor, url/embedUrl/resources/students are NOT
-  // redacted here (the shared sanitizeSessionList() would incorrectly
-  // strip `students`, which the frontend legitimately reads off this
-  // endpoint to confirm the caller's own enrollment). The one thing still
-  // stripped is the raw `progress` array — a session can have several
-  // enrolled students, and that array would otherwise leak every other
-  // student's watch status to this caller (#1.2).
+  // the student themselves or an admin. Package 2: this list now goes
+  // through the same Q5 draft filter and sanitizeSessionList() (Q7, #1.2)
+  // as every other session list - a session the student is enrolled in
+  // that was later unpublished is hidden (unless the caller manages it or
+  // is an admin), and `students`/`progress` are replaced by `isEnrolled`
+  // / `studentCount`. url/embedUrl/resources stay visible to the enrolled
+  // student (sanitizeSessionList keeps them for direct students).
+  const scope = await policy.loadStaffScope({}, requestingUser);
   const features = new APIFeatures(Session.find(), query, Session)
-    .filter({ students: studentId })
+    .filter(
+      policy.andFilters(
+        policy.manageableListFilter(requestingUser, scope, 'session'),
+        { students: studentId },
+      ),
+    )
     .sort()
     .limitFields();
 
@@ -543,14 +550,8 @@ exports.getSessionsByStudent = async (studentId, query) => {
     'name email role',
   );
 
-  const sanitized = sessions.map((s) => {
-    const obj = s.toObject();
-    delete obj.progress;
-    return obj;
-  });
-
   return {
-    sessions: sanitized || [],
+    sessions: sanitizeSessionList(sessions, requestingUser, scope) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
