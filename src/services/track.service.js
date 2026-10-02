@@ -32,6 +32,17 @@ async function assertValidInstructor(instructorId) {
   }
 }
 
+// The raw id stored in `doc[path]`, as a string (or null). Needed because
+// Course.track is auto-populated by a pre-find hook, and Mongoose then
+// returns the populated document - whose toString() is NOT its id, which
+// made the old `course.track.toString() !== trackId` comparison always
+// true.
+function refId(doc, path) {
+  const raw = doc.populated(path) || doc.get(path);
+  if (!raw) return null;
+  return (raw._id || raw).toString();
+}
+
 // ids stored at `path` of a (possibly populated) document, as strings.
 function refIds(doc, path) {
   const raw = doc.populated(path) || doc.get(path) || [];
@@ -417,17 +428,6 @@ exports.deleteTrack = async (trackId, requestingUserId) => {
 function listHasId(list, id) {
   const target = id.toString();
   return (list || []).some((item) => item.toString() === target);
-}
-
-// The raw id stored in `doc[path]`, as a string (or null). Needed because
-// Course.track is auto-populated by a pre-find hook, and Mongoose then
-// returns the populated document - whose toString() is NOT its id, which
-// made the old `course.track.toString() !== trackId` comparison always
-// true.
-function refId(doc, path) {
-  const raw = doc.populated(path) || doc.get(path);
-  if (!raw) return null;
-  return (raw._id || raw).toString();
 }
 
 // A student added to / removed from a track is (un)enrolled in its content

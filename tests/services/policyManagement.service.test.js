@@ -209,18 +209,20 @@ describe('policy.service management rule', () => {
       const adminAuth = await run('admin');
       expect(adminAuth.all).toBe(true);
 
-      const co = await run('co');
-      expect([...co.courses]).toEqual([f.course.id]);
-      expect([...co.sessions]).toEqual([f.session.id]);
+      const coAuth = await run('co');
+      expect([...coAuth.courses]).toEqual([f.course.id]);
+      expect([...coAuth.sessions]).toEqual([f.session.id]);
 
-      const stranger = await run('stranger');
-      expect([...stranger.courses]).toEqual([f.standaloneCourse.id]);
-      expect([...stranger.sessions]).toEqual([f.standaloneSession.id]);
+      const strangerAuth = await run('stranger');
+      expect([...strangerAuth.courses]).toEqual([f.standaloneCourse.id]);
+      expect([...strangerAuth.sessions]).toEqual([f.standaloneSession.id]);
 
       const none = await run('student');
       expect(none.courses.size + none.sessions.size).toBe(0);
       expect(
-        policy.isStaffOfAssignmentParent(co, { course: { _id: f.course._id } }),
+        policy.isStaffOfAssignmentParent(coAuth, {
+          course: { _id: f.course._id },
+        }),
       ).toBe(true);
     });
   });
