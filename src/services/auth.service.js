@@ -4,6 +4,7 @@ const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
 const signToken = require('../utils/generateToken');
 const runInBackground = require('../utils/runInBackground');
+const metrics = require('../config/metrics.config');
 const { recordActivity } = require('./activityLog.service');
 
 // Long/short session durations used by login's "remember me" option.
@@ -59,6 +60,7 @@ exports.signUp = async (data, url) => {
 
   // Create user with ONLY allowed fields
   const newUser = await User.create(allowedData);
+  metrics.inc('signups');
 
   // Welcome email: started but not awaited, so a slow or failing mail
   // provider can neither delay nor fail signup. A failure is only logged.

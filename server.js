@@ -24,6 +24,7 @@ require('./src/config/env.config')();
 
 const app = require('./src/app');
 const connectDB = require('./src/config/db.config');
+const metrics = require('./src/config/metrics.config');
 
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -65,6 +66,8 @@ const shutdown = async (server, reason, exitCode = 0) => {
   forceExit.unref(); // don't keep the event loop alive just for the timer
 
   try {
+    metrics.stop();
+
     await new Promise((resolve) => {
       server.close(resolve);
     });
@@ -93,6 +96,7 @@ const shutdown = async (server, reason, exitCode = 0) => {
     const server = app.listen(PORT, () => {
       logger.info(`Server running in ${NODE_ENV} mode on port ${PORT}`);
     });
+    metrics.start();
 
     // Swap the bootstrap rejection handler for one that shuts the server
     // down gracefully. Remove only OUR handler — not every listener — so we

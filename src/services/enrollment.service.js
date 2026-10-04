@@ -5,6 +5,7 @@ const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
 const runInBackground = require('../utils/runInBackground');
+const metrics = require('../config/metrics.config');
 const cascade = require('./cascade.service');
 const { recordActivity } = require('./activityLog.service');
 
@@ -78,6 +79,7 @@ exports.enrollMeInTrack = async (trackId, userId) => {
 
   track.pendingStudents.push(userId);
   await track.save();
+  metrics.inc('enrollments', { type: 'track' });
 
   recordActivity({
     userId,
@@ -261,6 +263,7 @@ exports.enrollInCourse = async (userId, courseId) => {
   if (!updatedCourse) {
     throw new AppError('You are already enrolled in this course', 400);
   }
+  metrics.inc('enrollments', { type: 'course' });
 
   const user = await User.findByIdAndUpdate(userId, {
     $addToSet: { enrolledCourses: courseId },
@@ -358,6 +361,7 @@ exports.enrollInSession = async (userId, sessionId) => {
   if (!updatedSession) {
     throw new AppError('You are already enrolled in this session', 400);
   }
+  metrics.inc('enrollments', { type: 'session' });
 
   await User.findByIdAndUpdate(userId, {
     $addToSet: { enrolledSessions: sessionId },

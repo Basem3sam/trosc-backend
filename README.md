@@ -35,6 +35,7 @@
 - [Security](#-security)
 - [Cost Strategy](#-cost-strategy)
 - [Scripts & Utilities](#-scripts--utilities)
+- [Monitoring](#-monitoring)
 - [Deployment Guide](#-deployment-guide)
 - [Testing](#-testing)
 - [Roadmap](#-roadmap)
@@ -438,6 +439,7 @@ open http://localhost:5000/api-docs
 | `EMAIL_FROM`                | ❌       | `Trosc Club <noreply@trosc.club>` | Sender address                                                                           |
 | `EMAIL_SERVICE`             | ❌       | `Gmail`                           | Used in production instead of host/port                                                  |
 | `ADMIN_EMAIL`               | ❌       | —                                 | Inbox notified on new contact form submissions                                           |
+| `METRICS_TOKEN`             | ❌       | —                                 | Enables `GET /metrics` (bearer token, min 16 chars advised). Unset = `/metrics` is a 404. See [Monitoring](#-monitoring) |
 | `TEST_EMAIL`                | ❌       | —                                 | Recipient used by `testEmail.js` when no address is passed on the command line           |
 
 \* Required if sending emails (password reset, welcome). Not required for basic API operation.
@@ -709,12 +711,25 @@ Draft (`published: false`) visibility rules — "an admin or the resource's curr
 | `npm run lint`                                                                  | Run ESLint                                                               |
 | `npm run lint:fix`                                                              | Fix ESLint issues automatically                                          |
 | `npm run lint:check`                                                            | Run ESLint with `--max-warnings=0` (fails on any warning — what CI runs) |
+| `npm run indexes:sync` / `indexes:sync:prod` | Index diff, dry run by default; add `-- --apply` to apply (see below) |
 | `node testEmail.js <email>`                                                     | Diagnose SMTP configuration and send a test email                        |
 | `node scripts/createAdmin.js <email>`                                           | Promote a user to admin                                                  |
 | `node scripts/cleanupOrphanedTrackReferences.js [--dry-run]`                    | One-off/repeatable maintenance: removes references to deleted users from `Track.students`/`pendingStudents`/`pendingLeaves` |
 | `node scripts/reconcileTrackCourses.js [--dry-run]`                              | One-off/repeatable maintenance: recomputes each track's `courses` array from the courses that actually point at it (`Course.track` is the source of truth) |
 | `node scripts/reconcileTrackSessions.js [--dry-run]`                             | One-off/repeatable maintenance: recomputes each track's `sessions` array from the sessions that actually point at it (`Session.tracks` is the source of truth) and fixes `Session.isStandalone` |
 | `node scripts/generateDashboardSnapshot.js <daily\|weekly\|monthly> [ISO date]` | Generate/refresh a dashboard-stats snapshot — meant to be cron-triggered |
+
+### Database indexes: the process
+
+`autoIndex` is off, so indexes only change when you run the sync script. It is a **dry run by default** and refuses to run unless `NODE_ENV` is set, so you always know which database it touches.
+
+1. **Dry run** (changes nothing): `npm run indexes:sync` (development) or `npm run indexes:sync:prod` (production). It lists, per collection, the indexes it would **CREATE** and **DROP**. For a unique index it also counts duplicate groups already in the data, because the build would fail on them.
+2. **Review** the output. `syncIndexes()` drops every index that no schema declares, including ones another tool or person created by hand. Fix any duplicates first.
+3. **Apply**: `npm run indexes:sync:prod -- --apply` (or `npm run indexes:sync -- --apply` for development). It prints a loud warning, then runs `syncIndexes()` for every model and reports what was dropped.
+
+**When:** run it after deploying a release that changes indexes (a new, removed or changed `schema.index(...)`). Old code and the old indexes keep working until you do.
+
+**Startup check:** every normal start (not in tests) logs a `WARNING` that lists declared indexes missing from the database. It only reads; it never creates or drops anything and never blocks startup. The existing `SYNC_INDEXES=true` startup behaviour is unchanged. The script ignores `SYNC_INDEXES`; only `--apply` applies.
 
 ### Email Diagnostic Tool
 
@@ -813,6 +828,41 @@ The same result is also reachable on-demand via `POST /v1/dashboard-stats/snapsh
 
 ---
 
+## 📈 Monitoring
+
+`GET /metrics` serves Prometheus-format metrics. It sits **outside** `/v1`.
+
+- **Off by default.** It returns `404` unless the environment variable `METRICS_TOKEN` is set. When set, send `Authorization: Bearer <METRICS_TOKEN>`; a missing or wrong token gets `401`. The token is compared in constant time. Use a long random value (the server warns at startup if it is shorter than 16 characters).
+- Metrics are never collected under `NODE_ENV=test`.
+- Everything is in-process and free: no extra service is required. Point any Prometheus-compatible scraper (for example Grafana Cloud's free tier) at `/metrics` with the bearer token.
+- Labels are bounded on purpose: the `route` label is the route **pattern** (`/v1/courses/:id`), never the raw URL, and every unmatched URL shares one `unmatched` label.
+
+| Metric                                   | Type      | Labels                        | Meaning                                                                      |
+| ---------------------------------------- | --------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `http_request_duration_seconds`          | histogram | `method`, `route`, `status_class` | Time to send each response. Use it for request rate, latency percentiles and error ratio. |
+| `http_errors_total`                      | counter   | `method`, `route`             | Responses with a 5xx status.                                                 |
+| `event_loop_delay_seconds`               | gauge     | `stat` (`mean`, `p99`, `max`) | Event-loop delay since the previous scrape. High values mean the process is blocked by CPU work. |
+| `signups_total`                          | counter   | none                          | Accounts created.                                                            |
+| `enrollments_total`                      | counter   | `type` (`track`, `course`, `session`) | Successful enrollments (a track request counts when it is submitted). |
+| `email_send_failures_total`              | counter   | none                          | Emails that failed to send (any kind).                                       |
+| `rate_limit_rejections_total`            | counter   | `limiter` (`global`, `auth`)  | Requests answered with 429.                                                  |
+
+Counters reset when the process restarts; scrapers handle this with `rate()`.
+
+### Recommended alert thresholds
+
+These are starting points to tune once you have a week of real data. They are documentation only; nothing in the app enforces them.
+
+| Alert                  | Suggested condition (PromQL)                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 5xx rate               | `sum(rate(http_errors_total[5m])) / sum(rate(http_request_duration_seconds_count[5m])) > 0.01` for 5 minutes (more than 1% of requests) |
+| p95 latency per route  | `histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket[5m]))) > 1` for 10 minutes (1 s; use a higher value for known slow routes) |
+| Email failures         | `increase(email_send_failures_total[1h]) > 5`, and page on any increase if signups depend on email                              |
+| Event-loop lag         | `event_loop_delay_seconds{stat="p99"} > 0.1` for 5 minutes (100 ms)                                                             |
+| Rate-limit rejections  | `sum(rate(rate_limit_rejections_total[5m])) > 1`, a sustained burst of 429s (attack or a client bug)                            |
+
+---
+
 ## 🚀 Deployment Guide
 
 ### Render (Recommended)
@@ -844,7 +894,7 @@ The same result is also reachable on-demand via `POST /v1/dashboard-stats/snapsh
 - [ ] `JWT_COOKIE_EXPIRES_IN` matches your security policy
 - [ ] Rate limits are appropriate for your traffic
 - [ ] Database indexes exist. `autoIndex` is off, and Mongoose `syncIndexes()` runs at startup **only** when `SYNC_INDEXES=true` (and never when `NODE_ENV=test`). With the flag unset or `false`, no index is built or dropped, so declared indexes (including the `unique` ones) exist only if someone synced them earlier. `syncIndexes()` also **drops** any index not declared in a schema, so review the plan on a copy first.
-- [ ] **Stage 2 index changes need an index sync.** Removing the `Course`/`Track` text indexes and replacing the activity-log `{ createdAt: -1 }` index with a 180-day TTL index only change the *code*. MongoDB itself changes when the index sync runs (`syncIndexes()`: the index sync script once it exists, until then one start with `SYNC_INDEXES=true`). Until then the text indexes stay in the database (harmless), and the TTL index is not created. MongoDB refuses two indexes on the same key with different options, so the sync must drop the old `createdAt_-1` index before creating the TTL one. `syncIndexes()` handles that, and it drops every other undeclared index too. The TTL then deletes rows older than 180 days (background task, about once a minute); the manual prune endpoint keeps working.
+- [ ] **Stage 2 index changes need an index sync.** Removing the `Course`/`Track` text indexes and replacing the activity-log `{ createdAt: -1 }` index with a 180-day TTL index only change the *code*. MongoDB itself changes when the index sync runs (`npm run indexes:sync:prod`, review, then `-- --apply`; see [Database indexes: the process](#database-indexes-the-process)). Until then the text indexes stay in the database (harmless), and the TTL index is not created. MongoDB refuses two indexes on the same key with different options, so the sync must drop the old `createdAt_-1` index before creating the TTL one. `syncIndexes()` handles that, and it drops every other undeclared index too. The TTL then deletes rows older than 180 days (background task, about once a minute); the manual prune endpoint keeps working.
 
 ---
 

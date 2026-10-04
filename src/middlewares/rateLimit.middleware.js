@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const metrics = require('../config/metrics.config');
 
 // Stricter rate limit for auth / enrollment / RSVP endpoints
 const authLimiter = rateLimit({
@@ -8,6 +9,10 @@ const authLimiter = rateLimit({
   message:
     'Too many auth attempts from this IP, please try again in 15 minutes',
   skipSuccessfulRequests: true, // Don't count successful requests
+  handler: (req, res, next, options) => {
+    metrics.inc('rateLimitRejections', { limiter: 'auth' });
+    res.status(options.statusCode).send(options.message);
+  },
 });
 
 module.exports = { authLimiter };

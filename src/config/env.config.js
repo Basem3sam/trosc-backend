@@ -69,6 +69,14 @@ const validateEnv = () => {
     );
   }
 
+  // METRICS_TOKEN is optional (GET /metrics is a 404 without it). A short
+  // token is easy to guess, so say so, without ever printing the value.
+  if (process.env.METRICS_TOKEN && process.env.METRICS_TOKEN.length < 16) {
+    logger.warn(
+      'METRICS_TOKEN is shorter than 16 characters. Use a longer random token.',
+    );
+  }
+
   // RATE_LIMIT_MAX / AUTH_RATE_LIMIT_MAX have no upper bound elsewhere —
   // .env.test intentionally sets both to 100000 so test suites aren't
   // throttled. If that value (or anything like it) ever ends up in a

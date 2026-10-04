@@ -2,6 +2,7 @@ const { convert } = require('html-to-text');
 const createTransporter = require('../config/mailer.config');
 const { logger } = require('./logger');
 const escapeHtml = require('./escapeHtml');
+const metrics = require('../config/metrics.config');
 
 // Singleton transporter
 let transporter = null;
@@ -69,6 +70,7 @@ class Email {
       logger.info(`Email sent to ${this.to}: ${info.messageId}`);
       return info;
     } catch (error) {
+      metrics.inc('emailFailures');
       logger.error(`Failed to send email to ${this.to}:`, error.message);
       throw new Error(`Email sending failed: ${error.message}`);
     }

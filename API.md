@@ -465,6 +465,7 @@ Admin-only platform analytics. `live` is computed on the fly and never persisted
 | `GET`  | `/v1/feed`   | Public | Dashboard feed (pinned + upcoming events) |
 | `GET`  | `/health`    | Public | Server & database health check            |
 | `GET`  | `/v1/health` | Public | Health check (Swagger consistency)        |
+| `GET`  | `/metrics`   | Bearer `METRICS_TOKEN` | Prometheus metrics. **Not under `/v1`.** `404` when `METRICS_TOKEN` is not set on the server, `401` for a missing or wrong token, `200` with `text/plain` Prometheus output otherwise. Never enabled under `NODE_ENV=test`. See the README "Monitoring" section. |
 
 ---
 

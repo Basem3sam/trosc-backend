@@ -14,6 +14,11 @@ const swaggerSpec = require('./config/swagger.config');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./controllers/error.controller');
 const { logger, asyncLocalStorage } = require('./utils/logger');
+const metrics = require('./config/metrics.config');
+const {
+  requestMetrics,
+  metricsEndpoint,
+} = require('./middlewares/metrics.middleware');
 
 const v1Router = require('./routes/v1/index');
 
@@ -41,6 +46,11 @@ app.use((req, res, next) => {
 
   asyncLocalStorage.run({ requestId }, () => next());
 });
+
+// ---------------------------------------------------------------------------
+//    Request metrics (no-op unless metrics are enabled; see metrics.config)
+// ---------------------------------------------------------------------------
+app.use(requestMetrics(metrics));
 
 // ---------------------------------------------------------------------------
 //    HTTP request logging
@@ -164,11 +174,17 @@ const limiter = rateLimit({
   limit: parsePositiveInt(process.env.RATE_LIMIT_MAX, 300),
   windowMs: parsePositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
   message: 'Too many requests from this IP, please try again in 15 minutes',
+  // Same response as the default handler, plus a metrics counter.
+  handler: (req, res, next, options) => {
+    metrics.inc('rateLimitRejections', { limiter: 'global' });
+    res.status(options.statusCode).send(options.message);
+  },
   // Hosts poll /health frequently; Swagger UI loads many assets per view.
   // Neither is real traffic, so don't count them against the limit.
   skip: (req) =>
     req.path === '/health' ||
     req.path === '/v1/health' ||
+    req.path === '/metrics' ||
     req.path.startsWith('/api-docs'),
 });
 
@@ -267,6 +283,31 @@ const healthHandler = (req, res) => {
 
 app.get('/health', healthHandler);
 app.get('/v1/health', healthHandler);
+
+/**
+ * @swagger
+ * /metrics:
+ *   get:
+ *     tags: [Health]
+ *     operationId: getMetrics
+ *     summary: Prometheus metrics
+ *     description: >
+ *       Not under /v1. Returns 404 unless the METRICS_TOKEN environment
+ *       variable is set on the server; when set, requires
+ *       `Authorization: Bearer <METRICS_TOKEN>`.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Metrics in the Prometheus text format
+ *         content:
+ *           text/plain:
+ *             schema: { type: string }
+ *       401:
+ *         description: Missing or wrong bearer token
+ *       404:
+ *         description: Metrics are not enabled (METRICS_TOKEN is not set)
+ */
+app.get('/metrics', metricsEndpoint(metrics));
 
 // ---------------------------------------------------------------------------
 //    Swagger UI

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { logger } = require('../utils/logger');
+const { getIndexDiff, describeDeclared } = require('../utils/indexSync');
 
 // Register ONCE at module load. mongoose.connection is a singleton,
 // so these fire for every connection (including reconnects).
@@ -14,7 +15,38 @@ mongoose.connection.on('disconnected', () => {
   logger.info('MongoDB disconnected');
 });
 
-const connectDB = async () => {
+// Startup check: logs a WARNING listing declared indexes that are missing
+// from the database (or differ from the schema). It only reads: it never
+// creates or drops anything and it never throws, so it cannot block or fail
+// startup. Fix what it reports with scripts/syncIndexes.js.
+const checkDeclaredIndexes = async () => {
+  try {
+    const missing = [];
+    // Sequential on purpose: one listIndexes at a time at startup.
+    // eslint-disable-next-line no-restricted-syntax
+    for (const name of mongoose.modelNames()) {
+      // eslint-disable-next-line no-await-in-loop
+      const diff = await getIndexDiff(mongoose.model(name));
+      diff.toCreate.forEach((entry) => {
+        missing.push(describeDeclared(diff.collection, entry));
+      });
+    }
+    if (missing.length) {
+      logger.warn(
+        `${missing.length} declared database index(es) are missing: ` +
+          `${missing.join('; ')}. Run scripts/syncIndexes.js (dry run first).`,
+        { missingIndexes: missing },
+      );
+    }
+    return missing;
+  } catch (err) {
+    logger.warn(`Index check skipped: ${err.message}`);
+    return null;
+  }
+};
+
+// `checkIndexes: false` is for scripts that report on indexes themselves.
+const connectDB = async ({ checkIndexes = true } = {}) => {
   try {
     // DATABASE_URL is already fully resolved by env.config.js
     // (placeholder substitution + validation happen there). Do not
@@ -70,6 +102,9 @@ const connectDB = async () => {
       }
 
       logger.info('Database indexes sync completed.');
+    } else if (checkIndexes && process.env.NODE_ENV !== 'test') {
+      // Not awaited: startup never waits for this check.
+      checkDeclaredIndexes();
     }
   } catch (err) {
     // M19: intentional fast-fail, no retry loop. In a container/orchestrator
@@ -86,3 +121,4 @@ const connectDB = async () => {
 };
 
 module.exports = connectDB;
+module.exports.checkDeclaredIndexes = checkDeclaredIndexes;
