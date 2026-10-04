@@ -96,6 +96,27 @@ describe('indexSync - diff logic (mocked model)', () => {
     await expect(getIndexDiff(model)).rejects.toThrow('connection lost');
   });
 
+  it('turns the bare key objects from diffIndexes() into [fields, options]', async () => {
+    const model = {
+      collection: { collectionName: 'things' },
+      schema: {
+        indexes: () => [
+          [{ code: 1 }, { unique: true }],
+          [{ at: 1 }, { expireAfterSeconds: 60 }],
+        ],
+      },
+      listIndexes: async () => [],
+      diffIndexes: async () => ({ toCreate: [{ code: 1 }], toDrop: [] }),
+    };
+
+    const diff = await getIndexDiff(model);
+
+    expect(diff.toCreate).toEqual([[{ code: 1 }, { unique: true }]]);
+    expect(describeDeclared(diff.collection, diff.toCreate[0])).toBe(
+      'things: code:1 (unique)',
+    );
+  });
+
   it('describes indexes with names and options only', () => {
     expect(keySignature({ a: 1, b: -1 })).toBe('a:1,b:-1');
     expect(describeDeclared('users', [{ email: 1 }, { unique: true }])).toBe(

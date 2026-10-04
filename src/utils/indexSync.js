@@ -64,6 +64,20 @@ const fallbackDiff = async (Model) => {
   };
 };
 
+// Model.diffIndexes() returns bare key objects ({ code: 1 }) by default
+// and [fields, options] pairs only when asked to. Always hand back pairs,
+// taking the options from the schema.
+const withOptions = (Model, entries) => {
+  const declared = Model.schema.indexes();
+  return entries.map((entry) => {
+    if (Array.isArray(entry)) return entry;
+    const match = declared.find(
+      ([fields]) => keySignature(fields) === keySignature(entry),
+    );
+    return [entry, match ? match[1] : {}];
+  });
+};
+
 /**
  * What a sync would do for one model, without doing it.
  * @param {import('mongoose').Model} Model
@@ -85,7 +99,7 @@ const getIndexDiff = async (Model) => {
     }
     return {
       collection,
-      toCreate: diff.toCreate,
+      toCreate: withOptions(Model, diff.toCreate),
       toDrop: diff.toDrop,
       existing,
     };
