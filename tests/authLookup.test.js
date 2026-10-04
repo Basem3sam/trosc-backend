@@ -169,7 +169,7 @@ describe('auth lookup - photo is not loaded', () => {
     const { token } = await createTestUser();
 
     const res = await request(app)
-      .patch('/v1/users/me')
+      .patch('/v1/users/updateMe')
       .set('Authorization', `Bearer ${token}`)
       .send({ photo: PHOTO_URL });
 

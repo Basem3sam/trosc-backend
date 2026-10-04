@@ -74,6 +74,7 @@ describe('emails are sent in the background', () => {
         title: 'Background Course',
         description: 'For background email tests',
         instructor: instructor._id,
+        access: 'public',
         published: true,
       });
       return course;

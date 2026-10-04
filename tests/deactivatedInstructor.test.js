@@ -109,8 +109,8 @@ describe('deactivated users cannot be assigned as instructors', () => {
 
     it('rejects update', async () => {
       const course = await Course.create({
-        title: 'C2',
-        description: 'd',
+        title: 'Course Two',
+        description: 'Course description',
         instructor: activeInstructor._id,
       });
       await expect400(
