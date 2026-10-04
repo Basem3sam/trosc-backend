@@ -1,7 +1,7 @@
 const Announcement = require('../models/announcement.model');
 const AppError = require('../utils/AppError');
 const APIFeatures = require('../utils/APIFeatures');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 // ===================================================================
 // 🎯 AUDIENCE TARGETING
@@ -96,7 +96,7 @@ const canViewAnnouncement = (announcement, requestingUser) => {
 
 exports.createAnnouncement = async (data, requestingUserId) => {
   const ann = await Announcement.create(data);
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'created_announcement',
     targetModel: 'Announcement',
@@ -152,7 +152,7 @@ exports.updateAnnouncement = async (id, data, requestingUserId) => {
 
   if (!ann) throw new AppError('Announcement not found', 404);
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'updated_announcement',
     targetModel: 'Announcement',
@@ -166,7 +166,7 @@ exports.deleteAnnouncement = async (id, requestingUserId) => {
   const ann = await Announcement.findByIdAndDelete(id);
   if (!ann) throw new AppError('Announcement not found', 404);
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'deleted_announcement',
     targetModel: 'Announcement',

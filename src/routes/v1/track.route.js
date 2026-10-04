@@ -17,7 +17,8 @@
  *       `instructor` (the lead) and `instructors` (co-instructors); for
  *       anyone else both are ignored. A co-instructor list never repeats
  *       the lead or a duplicate id, and every id must be a user with role
- *       instructor or admin (400 otherwise).
+ *       instructor or admin (400 otherwise). A deactivated user is also
+ *       rejected with 400, as lead or as co-instructor.
  *     tags: [Tracks]
  *     security:
  *       - bearerAuth: []
@@ -146,7 +147,7 @@
  *   patch:
  *     operationId: updateTrackById
  *     summary: Update a track
- *     description: Update track information (admin and instructors only)
+ *     description: Update track information (admin and instructors only). A deactivated user cannot be set as `instructor` or in `instructors` (400).
  *     tags: [Tracks]
  *     security:
  *       - bearerAuth: []

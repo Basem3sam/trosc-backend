@@ -3,8 +3,8 @@ const User = require('../models/user.model');
 const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
 const signToken = require('../utils/generateToken');
-const { logger } = require('../utils/logger');
-const { logActivity } = require('./activityLog.service');
+const runInBackground = require('../utils/runInBackground');
+const { recordActivity } = require('./activityLog.service');
 
 // Long/short session durations used by login's "remember me" option.
 // Kept in one place so the JWT and the cookie (set in auth.controller.js)
@@ -60,14 +60,13 @@ exports.signUp = async (data, url) => {
   // Create user with ONLY allowed fields
   const newUser = await User.create(allowedData);
 
-  // send email (fire-and-forget; don't fail the HTTP request if SMTP breaks)
-  try {
-    await new Email(newUser, url).sendWelcome();
-  } catch (err) {
-    logger.error('Welcome email failed:', err.message);
-  }
+  // Welcome email: started but not awaited, so a slow or failing mail
+  // provider can neither delay nor fail signup. A failure is only logged.
+  runInBackground('Welcome email', { userId: newUser.id }, () =>
+    new Email(newUser, url).sendWelcome(),
+  );
 
-  await logActivity({ userId: newUser._id, action: 'signed_up' });
+  recordActivity({ userId: newUser._id, action: 'signed_up' });
 
   const token = createSendToken(newUser);
   return { token, user: newUser };
@@ -97,7 +96,7 @@ exports.login = async (email, password, rememberMe = false) => {
   user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
 
-  await logActivity({ userId: user._id, action: 'login' });
+  recordActivity({ userId: user._id, action: 'login' });
 
   // rememberMe=true -> long-lived (~30d) session; otherwise (false or
   // omitted) -> the short (~1d) session. This intentionally does not use
@@ -134,7 +133,7 @@ exports.forgotPassword = async (email) => {
   const resetToken = user.createPasswordResetToken();
   await user.save({ validateBeforeSave: false });
 
-  await logActivity({ userId: user._id, action: 'requested_password_reset' });
+  recordActivity({ userId: user._id, action: 'requested_password_reset' });
 
   const resetURL = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
@@ -174,7 +173,7 @@ exports.resetPassword = async (token, password, passwordConfirm) => {
   user.passwordResetExpires = undefined;
   await user.save();
 
-  await logActivity({ userId: user._id, action: 'reset_password' });
+  recordActivity({ userId: user._id, action: 'reset_password' });
 
   // 3) Log user in, send JWT
   const jwtToken = createSendToken(user);
@@ -209,7 +208,7 @@ exports.updatePassword = async (
   user.passwordConfirm = passwordConfirm;
   await user.save();
 
-  await logActivity({ userId: user._id, action: 'updated_password' });
+  recordActivity({ userId: user._id, action: 'updated_password' });
 
   // 4) Log user in, send JWT
   const token = createSendToken(user);

@@ -1,7 +1,18 @@
+// Server-side time limit for the list/search queries built here (the page
+// query and its count). MongoDB aborts the operation after this long
+// instead of letting it hold a pool connection for the full socket timeout.
+const LIST_QUERY_MAX_TIME_MS = 10000;
+
 class APIFeatures {
   constructor(query, queryString, model) {
     if (!query) {
       throw new Error('Query cannot be undefined');
+    }
+
+    // Query#maxTimeMS (Mongoose 8). The guard keeps hand-made query
+    // objects without it (unit tests) working.
+    if (typeof query.maxTimeMS === 'function') {
+      query.maxTimeMS(LIST_QUERY_MAX_TIME_MS);
     }
 
     this.query = query;
@@ -162,24 +173,62 @@ class APIFeatures {
     );
     const skip = (page - 1) * limit;
 
-    // Count total documents for pagination metadata
-    if (this.model) {
-      this.totalDocs = await this.model.countDocuments(this.conditions);
-    }
-
     this.query = this.query.skip(skip).limit(limit);
 
-    this.pagination = {
-      page,
-      limit,
-      totalPages: this.totalDocs
-        ? Math.ceil(this.totalDocs / limit)
-        : undefined,
-      totalResults: this.totalDocs || undefined,
-      hasNext: this.totalDocs
-        ? page < Math.ceil(this.totalDocs / limit)
-        : undefined,
-      hasPrev: page > 1,
+    const applyTotal = (totalDocs) => {
+      this.totalDocs = totalDocs;
+      this.pagination = {
+        page,
+        limit,
+        totalPages: this.totalDocs
+          ? Math.ceil(this.totalDocs / limit)
+          : undefined,
+        totalResults: this.totalDocs || undefined,
+        hasNext: this.totalDocs
+          ? page < Math.ceil(this.totalDocs / limit)
+          : undefined,
+        hasPrev: page > 1,
+      };
+    };
+
+    // Count total documents for pagination metadata
+    if (!this.model) {
+      applyTotal(this.totalDocs);
+      return this;
+    }
+
+    const countQuery = this.model.countDocuments(this.conditions);
+    if (typeof countQuery.maxTimeMS === 'function') {
+      countQuery.maxTimeMS(LIST_QUERY_MAX_TIME_MS);
+    }
+
+    if (
+      typeof countQuery.exec !== 'function' ||
+      typeof this.query.exec !== 'function'
+    ) {
+      // Not real Mongoose queries (hand-made objects in unit tests): count
+      // first, as before.
+      applyTotal(await countQuery);
+      return this;
+    }
+
+    // Real queries: start the count now and run it together with the page
+    // query. Callers chain more on `this.query` (populate, ...) and run it
+    // themselves, so the page query cannot be started here; instead the
+    // count is awaited alongside it when the caller runs the query, and
+    // `totalDocs` / `pagination` are filled in at that point. Every caller
+    // reads them only after running the query.
+    applyTotal(this.totalDocs);
+    const countPromise = countQuery.exec();
+    countPromise.catch(() => {}); // surfaced below if the page query runs
+    const execPage = this.query.exec.bind(this.query);
+    this.query.exec = async (...args) => {
+      const [docs, total] = await Promise.all([
+        execPage(...args),
+        countPromise,
+      ]);
+      applyTotal(total);
+      return docs;
     };
 
     return this;

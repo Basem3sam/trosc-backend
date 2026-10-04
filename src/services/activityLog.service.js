@@ -54,6 +54,19 @@ exports.logActivity = async ({
   }
 };
 
+/**
+ * Same write as `logActivity`, but the caller does not wait for it. This
+ * is what request handlers use: the audit row is a side effect, so a slow
+ * insert (it updates four indexes) should not add to the response time.
+ * `logActivity` never rejects, so there is nothing to handle here.
+ * The row may be missing for a moment after the response, or not written
+ * at all if the process exits first.
+ * @param {Object} params - same as logActivity
+ */
+exports.recordActivity = (params) => {
+  exports.logActivity(params);
+};
+
 // ==============================
 // 🔸 Read path
 // ==============================

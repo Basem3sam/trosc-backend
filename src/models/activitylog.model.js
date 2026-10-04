@@ -79,6 +79,9 @@
 const mongoose = require('mongoose');
 const { ACTIVITY_ACTIONS } = require('../utils/activityActions');
 
+// Audit rows older than this are deleted automatically (180 days).
+const ACTIVITY_LOG_RETENTION_SECONDS = 60 * 60 * 24 * 180;
+
 const activityLogSchema = new mongoose.Schema(
   {
     user: {
@@ -130,8 +133,17 @@ activityLogSchema.index({ user: 1, createdAt: -1 });
 activityLogSchema.index({ action: 1, createdAt: -1 });
 activityLogSchema.index({ targetModel: 1, targetId: 1 });
 
-// Straight chronological admin listing / date-range reports / pruning.
-activityLogSchema.index({ createdAt: -1 });
+// Straight chronological admin listing / date-range reports / pruning, and
+// retention: MongoDB deletes a row once it is this old (a background task
+// runs about once a minute). The manual prune endpoint still works for a
+// shorter cut-off. This replaces the old `{ createdAt: -1 }` index: MongoDB
+// refuses two indexes on the same key with different options, so the old
+// one must be dropped when the index sync script runs. Sorts by
+// `-createdAt` read this index backwards.
+activityLogSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: ACTIVITY_LOG_RETENTION_SECONDS },
+);
 
 const ActivityLog = mongoose.model('ActivityLog', activityLogSchema);
 module.exports = ActivityLog;

@@ -66,6 +66,11 @@ function getPeriodBounds(periodName, referenceDate) {
 // 🔸 Computation
 // ==============================
 
+// The snapshot computation runs full-collection counts and aggregations, so
+// it gets a much higher server-side time limit than ordinary list queries
+// (APIFeatures uses 10 s).
+const DASHBOARD_QUERY_MAX_TIME_MS = 60000;
+
 /**
  * Compute every stat field as of `cutoff`, with `newUsers` scoped to
  * [rangeStart, cutoff). Pure — reads from the live collections, never
@@ -90,13 +95,19 @@ async function computeStats(cutoff, rangeStart) {
     completionAgg,
     topTrack,
   ] = await Promise.all([
-    User.countDocuments(createdBefore),
-    User.countDocuments({ createdAt: { $gte: rangeStart, $lt: cutoff } }),
-    Track.countDocuments(createdBefore),
-    Course.countDocuments(createdBefore),
-    Assignment.countDocuments(createdBefore),
-    Event.countDocuments(createdBefore),
-    Announcement.countDocuments(createdBefore),
+    User.countDocuments(createdBefore).maxTimeMS(DASHBOARD_QUERY_MAX_TIME_MS),
+    User.countDocuments({
+      createdAt: { $gte: rangeStart, $lt: cutoff },
+    }).maxTimeMS(DASHBOARD_QUERY_MAX_TIME_MS),
+    Track.countDocuments(createdBefore).maxTimeMS(DASHBOARD_QUERY_MAX_TIME_MS),
+    Course.countDocuments(createdBefore).maxTimeMS(DASHBOARD_QUERY_MAX_TIME_MS),
+    Assignment.countDocuments(createdBefore).maxTimeMS(
+      DASHBOARD_QUERY_MAX_TIME_MS,
+    ),
+    Event.countDocuments(createdBefore).maxTimeMS(DASHBOARD_QUERY_MAX_TIME_MS),
+    Announcement.countDocuments(createdBefore).maxTimeMS(
+      DASHBOARD_QUERY_MAX_TIME_MS,
+    ),
 
     // Total submissions: only count submissions that existed by `cutoff`
     // (a resubmission after the cutoff shouldn't retroactively appear in
@@ -117,7 +128,7 @@ async function computeStats(cutoff, rangeStart) {
         },
       },
       { $group: { _id: null, total: { $sum: '$count' } } },
-    ]),
+    ]).option({ maxTimeMS: DASHBOARD_QUERY_MAX_TIME_MS }),
 
     // Average completion rate: for each assignment, (submissions as of
     // cutoff) / (current roster size of its course or session), as a
@@ -201,7 +212,7 @@ async function computeStats(cutoff, rangeStart) {
         },
       },
       { $group: { _id: null, avgRate: { $avg: '$completionRate' } } },
-    ]),
+    ]).option({ maxTimeMS: DASHBOARD_QUERY_MAX_TIME_MS }),
 
     // Most active track as of cutoff: the track (that existed by then)
     // with the largest current student roster.
@@ -210,7 +221,7 @@ async function computeStats(cutoff, rangeStart) {
       { $project: { studentCount: { $size: { $ifNull: ['$students', []] } } } },
       { $sort: { studentCount: -1 } },
       { $limit: 1 },
-    ]),
+    ]).option({ maxTimeMS: DASHBOARD_QUERY_MAX_TIME_MS }),
   ]);
 
   const totalSubmissions = submissionAgg[0]?.total || 0;

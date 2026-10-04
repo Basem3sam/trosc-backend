@@ -11,7 +11,7 @@
  *   post:
  *     operationId: createCourse
  *     summary: Create a new course
- *     description: Create a new course within a track (admin and instructors only). Instructor is auto-assigned from auth token; an admin may set `instructor` (a user with role instructor or admin, else 400) to create the course on that instructor's behalf. For anyone else the field is ignored. `track` may be set by an admin, or by an instructor who currently leads or co-instructs that track.
+ *     description: Create a new course within a track (admin and instructors only). Instructor is auto-assigned from auth token; an admin may set `instructor` (an active user with role instructor or admin, else 400) to create the course on that instructor's behalf. For anyone else the field is ignored. `track` may be set by an admin, or by an instructor who currently leads or co-instructs that track.
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []
@@ -134,7 +134,7 @@
  *   patch:
  *     operationId: updateCourseById
  *     summary: Update a course
- *     description: Update course information (admin and instructors only). Only an admin can change `instructor` (reassignment takes effect immediately; non-admins' `instructor` is ignored). Allowed for the course's current instructor, a lead/co-instructor of its track, or an admin. Changing `track` also requires being lead/co-instructor of the track involved.
+ *     description: Update course information (admin and instructors only). Only an admin can change `instructor` (an active instructor or admin, else 400; reassignment takes effect immediately; non-admins' `instructor` is ignored). Allowed for the course's current instructor, a lead/co-instructor of its track, or an admin. Changing `track` also requires being lead/co-instructor of the track involved.
  *     tags: [Courses]
  *     security:
  *       - bearerAuth: []

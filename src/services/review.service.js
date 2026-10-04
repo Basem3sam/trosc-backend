@@ -4,7 +4,7 @@ const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
 const APIFeatures = require('../utils/APIFeatures');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 // Each reviewable resource type: its Mongoose model, the field on Review
 // that stores the reference, and a human label for error messages.
@@ -59,7 +59,7 @@ exports.createReview = async (resourceType, resourceId, userId, data) => {
     content: data.content,
   });
 
-  await logActivity({
+  recordActivity({
     userId,
     action: 'created_review',
     targetModel: 'Review',
@@ -115,7 +115,7 @@ exports.deleteReview = async (reviewId, requestingUserId) => {
     throw new AppError('No review found with that ID', 404);
   }
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'deleted_review',
     targetModel: 'Review',

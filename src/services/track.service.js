@@ -6,7 +6,7 @@ const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
 const policy = require('./policy.service');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 // ===================================================================
 // 🎯 TRACK CRUD OPERATIONS
@@ -20,7 +20,8 @@ const { logActivity } = require('./activityLog.service');
  * @throws {AppError} 400 if the user doesn't exist or has the wrong role
  */
 async function assertValidInstructor(instructorId) {
-  const user = await User.findById(instructorId).select('role');
+  // `active` is select:false, so it has to be asked for explicitly.
+  const user = await User.findById(instructorId).select('role +active');
   if (!user) {
     throw new AppError('No user found with that instructor ID', 400);
   }
@@ -29,6 +30,9 @@ async function assertValidInstructor(instructorId) {
       'Instructor must be a user with role "instructor" or "admin"',
       400,
     );
+  }
+  if (user.active === false) {
+    throw new AppError('The selected instructor account is deactivated', 400);
   }
 }
 
@@ -64,8 +68,14 @@ async function normalizeInstructors(ids, leadId) {
   );
   if (!unique.length) return [];
 
-  const users = await User.find({ _id: { $in: unique } }).select('role');
+  // `active` is select:false, so it has to be asked for explicitly.
+  const users = await User.find({ _id: { $in: unique } }).select(
+    'role +active',
+  );
   const roleById = new Map(users.map((u) => [u.id, u.role]));
+  const deactivatedIds = new Set(
+    users.filter((u) => u.active === false).map((u) => u.id),
+  );
 
   unique.forEach((id) => {
     if (!roleById.has(id)) {
@@ -74,6 +84,12 @@ async function normalizeInstructors(ids, leadId) {
     if (!['instructor', 'admin'].includes(roleById.get(id))) {
       throw new AppError(
         'Co-instructors must be users with role "instructor" or "admin"',
+        400,
+      );
+    }
+    if (deactivatedIds.has(id)) {
+      throw new AppError(
+        'A selected co-instructor account is deactivated',
         400,
       );
     }
@@ -132,7 +148,7 @@ exports.createTrack = async (trackBody, requestingUserId) => {
   }
 
   const track = await Track.create(trackBody);
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'created_track',
     targetModel: 'Track',
@@ -360,7 +376,7 @@ exports.updateTrack = async (trackId, updateBody, requestingUserId) => {
     { path: 'instructors', select: 'name photo' },
   ]);
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'updated_track',
     targetModel: 'Track',
@@ -383,7 +399,7 @@ exports.deleteTrack = async (trackId, requestingUserId) => {
   // and every enrolled student's user document, so it needs to be all-or-
   // nothing rather than a sequence of independent writes.
   await cascade.deleteTrackCascade(trackId);
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'deleted_track',
     targetModel: 'Track',

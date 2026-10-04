@@ -255,9 +255,7 @@ describe('GET /v1/sessions - populate removed, response unchanged', () => {
       title: 'Intro Webinar',
       instructor: instructor._id,
       url: 'https://drive.google.com/file/d/abc',
-      resources: [
-        { title: 'res', url: 'https://drive.google.com/file/d/xyz' },
-      ],
+      resources: [{ title: 'res', url: 'https://drive.google.com/file/d/xyz' }],
       students: [enrolled._id, other._id],
       published: true,
     });

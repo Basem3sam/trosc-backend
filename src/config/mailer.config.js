@@ -13,6 +13,11 @@ function parseFromAddress(fromString) {
   return { email: fromString.trim() };
 }
 
+// Hard deadline for the whole Brevo request (connect, response and body).
+// Without it a stalled provider holds the request until the platform proxy
+// gives up with a 502.
+const BREVO_TIMEOUT_MS = 5000;
+
 // Render blocks outbound SMTP (ports 25/465/587) on free-tier services as
 // of Sept 2025, so nodemailer -> Gmail hangs until the platform proxy times
 // out and returns 502. Brevo's API runs over HTTPS (443), which isn't
@@ -20,30 +25,42 @@ function parseFromAddress(fromString) {
 // uses, so Email.js needs no changes.
 const createBrevoTransport = () => ({
   async sendMail({ from, to, subject, html, text, replyTo }) {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': process.env.BREVO_API_KEY,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        sender: parseFromAddress(from),
-        to: [{ email: to }],
-        subject,
-        htmlContent: html,
-        textContent: text,
-        ...(replyTo && { replyTo: { email: replyTo } }),
-      }),
-    });
+    try {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': process.env.BREVO_API_KEY,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          sender: parseFromAddress(from),
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+          textContent: text,
+          ...(replyTo && { replyTo: { email: replyTo } }),
+        }),
+        signal: AbortSignal.timeout(BREVO_TIMEOUT_MS),
+      });
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`Brevo API error ${res.status}: ${body}`);
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Brevo API error ${res.status}: ${body}`);
+      }
+
+      const data = await res.json();
+      return { messageId: data.messageId };
+    } catch (err) {
+      // A timeout surfaces as a DOMException; turn it into a plain Error
+      // so callers handle it like any other failed send.
+      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+        throw new Error(
+          `Brevo API request timed out after ${BREVO_TIMEOUT_MS} ms`,
+        );
+      }
+      throw err;
     }
-
-    const data = await res.json();
-    return { messageId: data.messageId };
   },
 });
 

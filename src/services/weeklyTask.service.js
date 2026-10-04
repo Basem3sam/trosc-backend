@@ -2,7 +2,7 @@ const WeeklyTask = require('../models/weeklytask.model');
 const Course = require('../models/course.model');
 const Track = require('../models/track.model');
 const AppError = require('../utils/AppError');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 function assertCanView(resource, label, requestingUser) {
   if (requestingUser.role === 'student') {
@@ -84,7 +84,7 @@ exports.createWeeklyTask = async (courseId, instructorId, data) => {
     items: data.items,
   });
 
-  await logActivity({
+  recordActivity({
     userId: instructorId,
     action: 'created_weekly_task',
     targetModel: 'WeeklyTask',
@@ -196,7 +196,7 @@ exports.updateWeeklyTask = async (taskId, data, requestingUserId) => {
 
   await task.save();
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'updated_weekly_task',
     targetModel: 'WeeklyTask',
@@ -218,7 +218,7 @@ exports.deleteWeeklyTask = async (taskId, requestingUserId) => {
     throw new AppError('No weekly task found with that ID', 404);
   }
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'deleted_weekly_task',
     targetModel: 'WeeklyTask',
@@ -307,7 +307,7 @@ exports.setItemCompletion = async (
       },
     ]);
 
-    await logActivity({
+    recordActivity({
       userId: requestingUser.id,
       action: 'completed_weekly_task_item',
       targetModel: 'WeeklyTask',

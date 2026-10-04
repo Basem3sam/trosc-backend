@@ -11,7 +11,7 @@
  *   post:
  *     operationId: createSession
  *     summary: Create a new learning session
- *     description: Create a new session (admin and instructors only)
+ *     description: Create a new session (admin and instructors only). An admin may set `instructor`; it must be an active user with role instructor or admin (400 otherwise).
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []
@@ -112,7 +112,7 @@
  *   patch:
  *     operationId: updateSessionById
  *     summary: Update a session
- *     description: Update session information (admin and instructors only)
+ *     description: Update session information (admin and instructors only). A new `instructor` must be an active user with role instructor or admin (400 otherwise).
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []

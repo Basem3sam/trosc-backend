@@ -12,7 +12,7 @@ const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
 const policy = require('./policy.service');
 const trackService = require('./track.service');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 // ===================================================================
 // 🎯 COURSE CRUD OPERATIONS
@@ -63,7 +63,8 @@ async function assertTrackLinkRight(
  * @throws {AppError} 400 if the user doesn't exist or has the wrong role
  */
 async function assertValidInstructor(instructorId) {
-  const user = await User.findById(instructorId).select('role');
+  // `active` is select:false, so it has to be asked for explicitly.
+  const user = await User.findById(instructorId).select('role +active');
   if (!user) {
     throw new AppError('No user found with that instructor ID', 400);
   }
@@ -72,6 +73,9 @@ async function assertValidInstructor(instructorId) {
       'Instructor must be a user with role "instructor" or "admin"',
       400,
     );
+  }
+  if (user.active === false) {
+    throw new AppError('The selected instructor account is deactivated', 400);
   }
 }
 
@@ -116,7 +120,7 @@ exports.createCourse = async (courseBody, requestingUser = null) => {
     }
   }
 
-  await logActivity({
+  recordActivity({
     userId: requestingUser?.id,
     action: 'created_course',
     targetModel: 'Course',
@@ -342,7 +346,7 @@ exports.updateCourse = async (courseId, updateBody, requestingUser = null) => {
     { path: 'track', select: 'title description' },
   ]);
 
-  await logActivity({
+  recordActivity({
     userId: requestingUser?.id,
     action: 'updated_course',
     targetModel: 'Course',
@@ -431,7 +435,7 @@ exports.deleteCourse = async (courseId, requestingUserId) => {
     );
   }
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'deleted_course',
     targetModel: 'Course',

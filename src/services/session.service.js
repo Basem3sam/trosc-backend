@@ -8,7 +8,7 @@ const APIFeatures = require('../utils/APIFeatures');
 const AppError = require('../utils/AppError');
 const cascade = require('./cascade.service');
 const policy = require('./policy.service');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 // #1.1/#1.2/Q2: the ONE place every session LIST endpoint (getAllSessions,
 // getSessionsByInstructor, getSessionsByTrack, getSessionsByStudent) runs
@@ -61,7 +61,8 @@ function sanitizeSessionList(sessions, requestingUser, scope) {
 // Stage 4 / rule 3: an admin may set `instructor` to someone else - that
 // user must exist and be an instructor or admin (400 otherwise).
 async function assertValidInstructor(instructorId) {
-  const user = await User.findById(instructorId).select('role');
+  // `active` is select:false, so it has to be asked for explicitly.
+  const user = await User.findById(instructorId).select('role +active');
   if (!user) {
     throw new AppError('No user found with that instructor ID', 400);
   }
@@ -71,6 +72,9 @@ async function assertValidInstructor(instructorId) {
       400,
     );
   }
+  if (user.active === false) {
+    throw new AppError('The selected instructor account is deactivated', 400);
+  }
 }
 
 exports.createSession = async (sessionData, requestingUserId) => {
@@ -78,7 +82,7 @@ exports.createSession = async (sessionData, requestingUserId) => {
     await assertValidInstructor(sessionData.instructor);
   }
   const session = await Session.create(sessionData);
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'created_session',
     targetModel: 'Session',
@@ -260,7 +264,7 @@ exports.updateSession = async (sessionId, updateData, requestingUserId) => {
     { path: 'tracks', select: 'title description' },
   ]);
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'updated_session',
     targetModel: 'Session',
@@ -301,7 +305,7 @@ exports.deleteSession = async (sessionId, requestingUserId) => {
     );
   }
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'deleted_session',
     targetModel: 'Session',
@@ -510,7 +514,7 @@ exports.setSessionProgress = async (sessionId, requestingUser, status) => {
     },
   ]);
 
-  await logActivity({
+  recordActivity({
     userId,
     action: 'marked_session_watched',
     targetModel: 'Session',

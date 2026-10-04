@@ -405,7 +405,6 @@ courseSchema.index({ instructor: 1 });
 courseSchema.index({ students: 1 });
 courseSchema.index({ track: 1 });
 courseSchema.index({ published: 1, level: 1 });
-courseSchema.index({ title: 'text', description: 'text' });
 
 // Populate instructor and track on every query
 courseSchema.pre(/^find/, function populateInstructorAndTrack(next) {

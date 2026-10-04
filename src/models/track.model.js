@@ -355,7 +355,6 @@ trackSchema.index({ students: 1 });
 // index above, just for the pending-approval array instead of the approved one.
 trackSchema.index({ pendingStudents: 1 });
 trackSchema.index({ published: 1, level: 1 });
-trackSchema.index({ title: 'text', description: 'text' }); // For search
 
 // Virtual for enrolled students count
 trackSchema.virtual('studentCount').get(function studentCount() {

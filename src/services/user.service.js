@@ -2,7 +2,7 @@ const APIFeatures = require('../utils/APIFeatures');
 const User = require('../models/user.model');
 const Track = require('../models/track.model');
 const AppError = require('../utils/AppError');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 const cascade = require('./cascade.service');
 
 const filterObj = (obj, ...allowedFields) => {
@@ -81,7 +81,7 @@ exports.createUser = async (userData, requestingUserId) => {
 
   newUser.password = undefined;
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'created_user',
     targetModel: 'User',
@@ -129,7 +129,7 @@ exports.deleteUser = async (id, requestingUserId) => {
 
   await cascade.hardDeleteUserCascade(id);
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'deleted_user',
     targetModel: 'User',
@@ -199,14 +199,14 @@ exports.updateMe = async (userId, data) => {
 
   if (!updatedUser) throw new AppError('User not found', 404);
 
-  await logActivity({ userId, action: 'updated_profile' });
+  recordActivity({ userId, action: 'updated_profile' });
 
   return updatedUser;
 };
 
 exports.deleteMe = async (userId) => {
   await User.findByIdAndUpdate(userId, { active: false });
-  await logActivity({ userId, action: 'deactivated_account' });
+  recordActivity({ userId, action: 'deactivated_account' });
   return null;
 };
 
@@ -253,7 +253,7 @@ exports.bulkUserAction = async (userIds, action, requestingUserId) => {
     }
   }
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'bulk_user_action',
     metadata: { targetUserIds: userIds, bulkAction: action },

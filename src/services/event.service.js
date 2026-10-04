@@ -1,11 +1,11 @@
 const Event = require('../models/event.model');
 const AppError = require('../utils/AppError');
 const APIFeatures = require('../utils/APIFeatures');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 exports.createEvent = async (data, requestingUserId) => {
   const event = await Event.create(data);
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'created_event',
     targetModel: 'Event',
@@ -46,7 +46,7 @@ exports.updateEvent = async (id, data, requestingUserId) => {
 
   if (!event) throw new AppError('Event not found', 404);
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'updated_event',
     targetModel: 'Event',
@@ -60,7 +60,7 @@ exports.deleteEvent = async (id, requestingUserId) => {
   const event = await Event.findByIdAndDelete(id);
   if (!event) throw new AppError('Event not found', 404);
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'deleted_event',
     targetModel: 'Event',
@@ -97,7 +97,7 @@ exports.rsvpEvent = async (eventId, userId) => {
     throw new AppError('You have already RSVPd to this event', 400);
   }
 
-  await logActivity({
+  recordActivity({
     userId,
     action: 'rsvped_to_event',
     targetModel: 'Event',
@@ -118,7 +118,7 @@ exports.cancelRsvp = async (eventId, userId) => {
   event.attendees.pull(userId);
   await event.save();
 
-  await logActivity({
+  recordActivity({
     userId,
     action: 'cancelled_event_rsvp',
     targetModel: 'Event',

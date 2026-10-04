@@ -2,7 +2,7 @@ const Assignment = require('../models/assignment.model');
 const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 /**
  * Check whether a user is enrolled in the course or session an assignment
@@ -71,7 +71,7 @@ exports.submitAssignment = async (assignmentId, studentId, data) => {
     (s) => s.student.toString() === studentId,
   );
 
-  await logActivity({
+  recordActivity({
     userId: studentId,
     action: 'submitted_assignment',
     targetModel: 'Assignment',
@@ -163,7 +163,7 @@ exports.gradeSubmission = async (
   }
   await assignment.save();
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'graded_assignment',
     targetModel: 'Assignment',

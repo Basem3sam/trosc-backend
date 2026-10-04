@@ -1,6 +1,6 @@
 const catchAsync = require('../utils/catchAsync');
 const authService = require('../services/auth.service');
-const { logActivity } = require('../services/activityLog.service');
+const { recordActivity } = require('../services/activityLog.service');
 
 const { REMEMBER_ME_SESSION_DAYS, DEFAULT_SESSION_DAYS } = authService;
 
@@ -59,7 +59,7 @@ exports.logout = catchAsync(async (req, res, next) => {
   authService.logoutUser(res);
 
   if (req.user) {
-    await logActivity({ userId: req.user.id, action: 'logout' });
+    recordActivity({ userId: req.user.id, action: 'logout' });
   }
 
   res.status(200).json({

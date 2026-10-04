@@ -4,7 +4,7 @@ const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
 const policy = require('./policy.service');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 // Each directly-reviewable/assignable resource type: its Mongoose model,
 // the field on Assignment that stores the reference, and a label for
@@ -198,7 +198,7 @@ exports.createAssignment = async (
     createdBy: instructorId,
   });
 
-  await logActivity({
+  recordActivity({
     userId: instructorId,
     action: 'created_assignment',
     targetModel: 'Assignment',
@@ -256,7 +256,7 @@ exports.updateAssignment = async (assignmentId, data, requestingUserId) => {
     throw new AppError('No assignment found with that ID', 404);
   }
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'updated_assignment',
     targetModel: 'Assignment',
@@ -277,7 +277,7 @@ exports.deleteAssignment = async (assignmentId, requestingUserId) => {
     throw new AppError('No assignment found with that ID', 404);
   }
 
-  await logActivity({
+  recordActivity({
     userId: requestingUserId,
     action: 'deleted_assignment',
     targetModel: 'Assignment',

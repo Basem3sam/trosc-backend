@@ -227,6 +227,20 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 > request`. Split larger batches into several requests. Requests with 1 to
 > 100 IDs behave exactly as before.
 
+> **Behaviour changes (Stage 2, no request or response shapes changed):**
+>
+> - Assigning a **deactivated** user as `instructor` (Track, Course, Session,
+>   create or update) or in a Track's `instructors` list now returns `400`
+>   (`The selected instructor account is deactivated` /
+>   `A selected co-instructor account is deactivated`).
+> - Welcome, enrollment-confirmation and contact-notification emails are sent
+>   in the background: the response no longer waits for the mail provider, and
+>   a failed send is only logged. The password reset email is still awaited
+>   (a failed send returns `500` and clears the reset token).
+> - Activity-log rows are written after the response is sent, and rows older
+>   than 180 days are deleted automatically.
+> - List endpoints abort a database query that runs longer than 10 seconds.
+
 > **⚠️ Breaking change (Q7 — public membership-array reduction):** for any
 > caller who isn't a resource's current instructor or an admin, Track,
 > Course, and Session responses no longer include the raw `students`

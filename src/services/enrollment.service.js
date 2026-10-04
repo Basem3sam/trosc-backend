@@ -4,9 +4,9 @@ const Course = require('../models/course.model');
 const Session = require('../models/session.model');
 const AppError = require('../utils/AppError');
 const Email = require('../utils/Email');
-const { logger } = require('../utils/logger');
+const runInBackground = require('../utils/runInBackground');
 const cascade = require('./cascade.service');
-const { logActivity } = require('./activityLog.service');
+const { recordActivity } = require('./activityLog.service');
 
 exports.enrollStudentInTrack = async (trackId, studentId) => {
   const track = await Track.findById(trackId);
@@ -79,7 +79,7 @@ exports.enrollMeInTrack = async (trackId, userId) => {
   track.pendingStudents.push(userId);
   await track.save();
 
-  await logActivity({
+  recordActivity({
     userId,
     action: 'requested_track_enrollment',
     targetModel: 'Track',
@@ -115,7 +115,7 @@ exports.approveStudentInTrack = async (trackId, studentId) => {
 
   await cascade.syncUserEnrollments(studentId, trackId);
 
-  await logActivity({
+  recordActivity({
     userId: studentId,
     action: 'approved_track_enrollment',
     targetModel: 'Track',
@@ -266,17 +266,14 @@ exports.enrollInCourse = async (userId, courseId) => {
     $addToSet: { enrolledCourses: courseId },
   });
 
-  // Fire-and-forget confirmation email; don't fail enrollment if SMTP breaks
-  try {
-    const courseUrl = `${process.env.FRONTEND_URL}/courses/${courseId}`;
-    await new Email(user, courseUrl).sendEnrollmentConfirmation(
-      updatedCourse.title,
-    );
-  } catch (err) {
-    logger.error('Enrollment confirmation email failed:', err.message);
-  }
+  // Confirmation email: started but not awaited, so a slow or failing mail
+  // provider can neither delay nor fail enrollment. A failure is only logged.
+  const courseUrl = `${process.env.FRONTEND_URL}/courses/${courseId}`;
+  runInBackground('Enrollment confirmation email', { userId, courseId }, () =>
+    new Email(user, courseUrl).sendEnrollmentConfirmation(updatedCourse.title),
+  );
 
-  await logActivity({
+  recordActivity({
     userId,
     action: 'enrolled_in_course',
     targetModel: 'Course',
@@ -299,7 +296,7 @@ exports.leaveCourse = async (userId, courseId) => {
     $pull: { enrolledCourses: courseId },
   });
 
-  await logActivity({
+  recordActivity({
     userId,
     action: 'left_course',
     targetModel: 'Course',
@@ -366,7 +363,7 @@ exports.enrollInSession = async (userId, sessionId) => {
     $addToSet: { enrolledSessions: sessionId },
   });
 
-  await logActivity({
+  recordActivity({
     userId,
     action: 'enrolled_in_session',
     targetModel: 'Session',
@@ -389,7 +386,7 @@ exports.leaveSession = async (userId, sessionId) => {
     $pull: { enrolledSessions: sessionId },
   });
 
-  await logActivity({
+  recordActivity({
     userId,
     action: 'left_session',
     targetModel: 'Session',
