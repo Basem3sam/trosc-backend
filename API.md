@@ -219,7 +219,13 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 | `GET`    | `/v1/users/:id`            | Admin     | Get user by ID                                                                                                                                                                    |
 | `PATCH`  | `/v1/users/:id`            | Admin     | Update user (including role)                                                                                                                                                      |
 | `DELETE` | `/v1/users/:id`            | Admin     | Hard-delete user (409 if they're still the required instructor/creator of a Course, Track, Event, Announcement, Session, Assignment, or WeeklyTask — reassign that content first) |
-| `POST`   | `/v1/users/bulk`           | Admin     | Bulk activate / deactivate / delete                                                                                                                                               |
+| `POST`   | `/v1/users/bulk`           | Admin     | Bulk activate / deactivate / delete (`userIds`: 1 to 100 IDs per request)                                                                                                                                               |
+
+> **⚠️ Breaking change (bulk user actions are capped):** `POST /v1/users/bulk`
+> now accepts at most **100** entries in `userIds`. A request with 101 or more
+> returns `400` with the message `You can act on at most 100 users per
+> request`. Split larger batches into several requests. Requests with 1 to
+> 100 IDs behave exactly as before.
 
 > **⚠️ Breaking change (Q7 — public membership-array reduction):** for any
 > caller who isn't a resource's current instructor or an admin, Track,

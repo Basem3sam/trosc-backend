@@ -6,6 +6,11 @@ const AppError = require('../utils/AppError');
 const User = require('../models/user.model');
 
 exports.protect = catchAsync(async (req, res, next) => {
+  // Already authenticated earlier in this request (a router-level protect
+  // or optionalAuth ran first, and both apply the same checks): do not
+  // verify the token or read the user a second time.
+  if (req.user) return next();
+
   // 1) Getting token and check of it's there
   let token;
   if (
@@ -27,8 +32,10 @@ exports.protect = catchAsync(async (req, res, next) => {
   const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
 
   // 3) Check if user still exists
+  // `photo` can hold a large inline base64 image and no auth consumer
+  // reads it, so it is excluded from this per-request lookup.
   const currentUser = await User.findById(decoded.id).select(
-    '+active +passwordChangedAt',
+    '+active +passwordChangedAt -photo',
   );
 
   if (!currentUser || !currentUser.active) {
@@ -53,6 +60,11 @@ exports.protect = catchAsync(async (req, res, next) => {
 // students). Populates req.user on a valid token; on a missing or
 // invalid token it falls through as anonymous instead of rejecting.
 exports.optionalAuth = catchAsync(async (req, res, next) => {
+  // Already authenticated earlier in this request: protect applies the
+  // same checks (user exists, is active, password not changed after the
+  // token was issued), so there is nothing left to verify.
+  if (req.user) return next();
+
   let token;
   if (
     req.headers.authorization &&
@@ -68,7 +80,7 @@ exports.optionalAuth = catchAsync(async (req, res, next) => {
   try {
     const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
     const currentUser = await User.findById(decoded.id).select(
-      '+active +passwordChangedAt',
+      '+active +passwordChangedAt -photo',
     );
 
     if (

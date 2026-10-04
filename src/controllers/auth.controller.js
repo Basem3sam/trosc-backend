@@ -15,7 +15,10 @@ const setAuthCookie = (res, token, days) => {
     expires: new Date(Date.now() + resolvedDays * 24 * 60 * 60 * 1000),
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // for CSRF protection
+    // 'none' in production lets a cross-site frontend send the cookie. It
+    // does NOT protect against CSRF (that is the weakest setting); 'lax'
+    // is used in development where the frontend is same-site.
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   };
 
   res.cookie('jwt', token, cookieOptions);

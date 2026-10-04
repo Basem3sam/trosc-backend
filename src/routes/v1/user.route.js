@@ -501,6 +501,9 @@
  *             properties:
  *               userIds:
  *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 100
+ *                 description: User IDs to act on (1 to 100 per request; more than 100 returns 400)
  *                 items:
  *                   type: string
  *                   example: "507f1f77bcf86cd799439011"

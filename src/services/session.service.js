@@ -52,7 +52,7 @@ function sanitizeSessionList(sessions, requestingUser, scope) {
     // reuses the direct-enrollment check above so list views get the
     // same studentCount/isEnrolled shape the detail endpoints do.
     obj.isEnrolled = !!isDirectStudent;
-    delete obj.students; // was only populated for the gating check above
+    delete obj.students; // raw ids, only used for the gating check above
     delete obj.progress; // internal — never expose the full watched-list here
     return obj;
   });
@@ -112,9 +112,10 @@ exports.getAllSessions = async (query, requestingUser = null) => {
 
   await features.paginate();
 
-  const sessions = await features.query
-    .populate('instructor', 'name email role')
-    .populate('students', 'role');
+  const sessions = await features.query.populate(
+    'instructor',
+    'name email role',
+  );
 
   // M16/#1.1/#1.2: field-level redaction (url/embedUrl/resources/progress)
   // for whichever documents made it past the visibility filter above.
@@ -395,9 +396,10 @@ exports.getSessionsByInstructor = async (
 
   await features.paginate();
 
-  const sessions = await features.query
-    .populate('instructor', 'name email role')
-    .populate('students', 'role');
+  const sessions = await features.query.populate(
+    'instructor',
+    'name email role',
+  );
 
   return {
     sessions: sanitizeSessionList(sessions, requestingUser, scope) || [],
@@ -424,9 +426,10 @@ exports.getSessionsByTrack = async (trackId, query, requestingUser = null) => {
 
   await features.paginate();
 
-  const sessions = await features.query
-    .populate('instructor', 'name email role')
-    .populate('students', 'role');
+  const sessions = await features.query.populate(
+    'instructor',
+    'name email role',
+  );
 
   return {
     sessions: sanitizeSessionList(sessions, requestingUser, scope) || [],

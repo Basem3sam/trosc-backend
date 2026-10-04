@@ -152,9 +152,9 @@ app.use(cors(corsOptions));
 // ---------------------------------------------------------------------------
 // Rate limiting
 // ---------------------------------------------------------------------------
-// NOTE: express-rate-limit@8 removed the `max` option (deprecated in v7).
-// Using `max` here silently falls back to the library default limit (5),
-// which is far stricter than intended. Use `limit` instead.
+// NOTE: `limit` is the current express-rate-limit option name. The older
+// `max` alias is still honoured in v8 (checked on 8.1.0 and 8.7.0), so
+// using `limit` is a naming choice, not a workaround for a bug.
 const parsePositiveInt = (value, fallback) => {
   const n = parseInt(value, 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;

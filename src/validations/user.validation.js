@@ -170,9 +170,11 @@ exports.bulkUserActionSchema = Joi.object({
   userIds: Joi.array()
     .items(Joi.string().hex().length(24).required())
     .min(1)
+    .max(100)
     .required()
     .messages({
       'array.min': 'At least one user ID must be provided',
+      'array.max': 'You can act on at most 100 users per request',
       'string.hex': 'All user IDs must be valid MongoDB IDs',
     }),
   action: Joi.string().valid('activate', 'deactivate', 'delete').required(),
