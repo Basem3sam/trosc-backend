@@ -622,6 +622,17 @@ Common HTTP status codes:
 
 Instead of S3/Cloudinary storage costs, all media is referenced by URL. The system validates URLs against a single, shared whitelist of trusted hosts (`src/utils/trustedHosts.js` — YouTube, Drive, Dropbox, GitHub, Cloudinary, Imgur, Discord CDN), used consistently by both the Mongoose-level and Joi-level attachment validators, and served as-is at `GET /v1/config/trusted-hosts` so a form can warn about an untrusted host before submitting. Cloudinary is documented here as a possible **future, optional** enhancement (authenticated/private delivery + backend-generated signed URLs, never a permanent public URL, and the API secret never reaches the frontend) — it is not implemented and nothing in the current stages requires it. Google Drive/other trusted-host links remain the free, always-available fallback. **Assignment submissions follow the same design: a submission is a link (`POST /assignments/:id/submissions` with JSON `{ "file": "<https link>" }`), not a file upload — multipart is rejected with a message saying so, and the error for an untrusted host lists every allowed host.**
 
+### 1b. Rosters are counted by the database, not loaded
+
+Track, Course and Session documents hold their `students` (and, on a Track, `pendingStudents` / `pendingLeaves`) as arrays, and Session holds `progress`. Reads used to load a parent's whole arrays to answer "how many students?" or "is this user enrolled?" and then delete them before responding. They now ask the narrow question instead (Stage 3B), in the style of `policy.service.js`:
+
+- **Membership flag:** `Model.exists({ _id, students: userId })`.
+- **Count and flags for a page or a detail:** `policy.loadMembership(Model, ids, user, flags)`, one projection-only aggregation (`$size`, `$in`) for the whole batch.
+- **Lists:** for callers who can never be staff (anonymous, students), and for session lists for everyone, the arrays are excluded in the query projection. Admins and instructors on track/course lists, and any `?fields=` request, keep the previous path.
+- **Assignments:** the list is read without `submissions`; one aggregation returns the caller's own submission and the `submissionCount` / `ungradedCount`.
+
+Write paths that must hold the document to push/pull and save (enroll in a track, approve, leave, admin add/remove) still load it. `photo` is no longer populated on lists of users (pending lists, event attendees, submission students, activity-log rows); a single instructor/creator keeps it.
+
 ### 2. Cascade Enrollment Service with Transactions
 
 Instead of scattering enrollment logic across controllers, a dedicated `cascade.service.js` handles the many-to-many synchronization between `User` and `Track`/`Course`/`Session`. This prevents bugs where a user is in a track but not its courses. Deleting a course or track similarly cascades to clean up its assignments, reviews, and weekly tasks rather than leaving them orphaned. The same guarantee holds for a narrower operation: detaching a course or session from a track (without deleting the track) unenrolls that track's current students from it too, so nobody stays enrolled in content that's no longer reachable through the track that gated it.

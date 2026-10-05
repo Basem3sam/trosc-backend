@@ -241,6 +241,31 @@ This is separate from the `JWT_EXPIRES_IN`/`JWT_COOKIE_EXPIRES_IN` env vars, whi
 >   than 180 days are deleted automatically.
 > - List endpoints abort a database query that runs longer than 10 seconds.
 
+> **⚠️ Stage 3B — roster loading (responses are the same, except the items
+> below):** Track, Course and Session reads no longer load whole `students`,
+> `pendingStudents`, `pendingLeaves`, `progress` or `submissions` arrays just
+> to answer "how many?" or "is this user in it?". The counts and the caller's
+> own flags (`studentCount`, `isEnrolled`, `isPending`, `isPendingLeave`,
+> `myProgress`, `mySubmission`, `submissionCount`, `ungradedCount`) are
+> computed by the database, and every role sees exactly what it saw before.
+> **Breaking changes (please check the frontend):**
+>
+> - `GET /v1/sessions/:id`: each entry of `tracks` is now
+>   `{ _id, title, description, instructor, instructors }`. It no longer
+>   carries that track's raw `students` id array (it was sent to every
+>   caller, which went against the Q7 rule above).
+> - `photo` was removed from populated users that are repeated across a list:
+>   `pendingStudents[]` / `pendingLeaves[]` (`GET /v1/tracks/:id/pending`,
+>   `/leaves`), `attendees[]` (`GET /v1/events/:id`,
+>   `POST /v1/events/:id/rsvp`), `submissions[].student`
+>   (`GET /v1/assignments/:id`, staff) and `user` in the admin
+>   `GET /v1/activity-logs` list. Their `_id`, `name` (and `email`, `role`
+>   where they were returned) are unchanged. A single instructor or creator
+>   (`instructor`, `createdBy`, `instructors`) and the track/course `students`
+>   roster shown to staff and enrolled students still carry `photo`.
+> - A `?fields=` request on track, course and session lists keeps the
+>   previous loading path.
+
 > **⚠️ Breaking change (Q7 — public membership-array reduction):** for any
 > caller who isn't a resource's current instructor or an admin, Track,
 > Course, and Session responses no longer include the raw `students`

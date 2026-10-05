@@ -185,7 +185,7 @@ exports.rejectLeaveTrack = async (trackId, studentId) => {
 
 exports.getPendingStudents = async (trackId) => {
   const track = await Track.findById(trackId)
-    .populate('pendingStudents', 'name email photo role')
+    .populate('pendingStudents', 'name email role')
     .select('pendingStudents title');
   if (!track) throw new AppError('No track found with that ID', 404);
   return track.pendingStudents;
@@ -193,7 +193,7 @@ exports.getPendingStudents = async (trackId) => {
 
 exports.getPendingLeaves = async (trackId) => {
   const track = await Track.findById(trackId)
-    .populate('pendingLeaves', 'name email photo role')
+    .populate('pendingLeaves', 'name email role')
     .select('pendingLeaves title');
   if (!track) throw new AppError('No track found with that ID', 404);
   return track.pendingLeaves;
@@ -204,14 +204,15 @@ exports.getPendingLeaves = async (trackId) => {
 // ============================
 
 exports.enrollInCourse = async (userId, courseId) => {
-  const course = await Course.findById(courseId);
+  // Stage 3B: the roster is not loaded; membership is an `exists`.
+  const course = await Course.findById(courseId).select('-students');
   if (!course) throw new AppError('Course not found', 404);
 
   // Fast-path check — not the source of truth. The atomic update below is
   // what actually closes the race between two concurrent enroll requests;
   // this just avoids running the access/prerequisite checks below for the
   // common non-racing case of "already enrolled."
-  if (course.students.some((id) => id.toString() === userId)) {
+  if (await Course.exists({ _id: courseId, students: userId })) {
     throw new AppError('You are already enrolled in this course', 400);
   }
 
@@ -226,8 +227,11 @@ exports.enrollInCourse = async (userId, courseId) => {
     if (!course.track) {
       throw new AppError('This course is not associated with any track', 400);
     }
-    const track = await Track.findById(course.track);
-    if (!track || !track.students.some((id) => id.toString() === userId)) {
+    const inParentTrack = await Track.exists({
+      _id: course.track._id || course.track,
+      students: userId,
+    });
+    if (!inParentTrack) {
       throw new AppError(
         'You must be enrolled in the parent track to access this course',
         403,
@@ -314,10 +318,11 @@ exports.leaveCourse = async (userId, courseId) => {
 // ============================
 
 exports.enrollInSession = async (userId, sessionId) => {
-  const session = await Session.findById(sessionId);
+  // Stage 3B: the roster is not loaded; membership is an `exists`.
+  const session = await Session.findById(sessionId).select('-students');
   if (!session) throw new AppError('Session not found', 404);
 
-  if (session.students.some((id) => id.toString() === userId)) {
+  if (await Session.exists({ _id: sessionId, students: userId })) {
     throw new AppError('You are already enrolled in this session', 400);
   }
 
@@ -337,8 +342,10 @@ exports.enrollInSession = async (userId, sessionId) => {
 
     let inCourse = false;
     if (session.course) {
-      const course = await Course.findById(session.course);
-      inCourse = course?.students.some((id) => id.toString() === userId);
+      inCourse = !!(await Course.exists({
+        _id: session.course,
+        students: userId,
+      }));
     }
 
     if (!inTrack && !inCourse) {

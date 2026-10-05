@@ -224,6 +224,60 @@ function toObjectId(id) {
   }
 }
 
+// ---------------------------------------------------------------------
+// Membership questions without loading the roster (Stage 3B)
+//
+// "How many students?" and "is THIS user in the array?" used to be
+// answered by loading a parent's whole `students` / `pendingStudents` /
+// `pendingLeaves` array and checking it in memory. This asks the database
+// the narrow question instead: one projection-only aggregation for a whole
+// batch of ids (no find hooks, so no populates), returning integers and
+// booleans only.
+
+const MEMBERSHIP_QUERY_MAX_TIME_MS = 10000;
+
+/**
+ * @param {import('mongoose').Model} Model - Track, Course or Session
+ * @param {Array<string|ObjectId>} ids - parents to describe (batched)
+ * @param {{ id?: string } | null | undefined} user
+ * @param {Object<string,string>} [flags] - { outputFlag: arrayField },
+ *   e.g. { isEnrolled: 'students', isPending: 'pendingStudents' }
+ * @param {Object} [extra] - extra $project expressions, by output name
+ * @returns {Promise<Map<string, Object>>} id string -> { studentCount,
+ *   ...flags, ...extra }. An id that does not exist has no entry.
+ */
+async function loadMembership(
+  Model,
+  ids,
+  user,
+  flags = { isEnrolled: 'students' },
+  extra = {},
+) {
+  const meta = new Map();
+  const objectIds = [...new Set(ids.map(idOf).filter(Boolean))]
+    .map(toObjectId)
+    .filter(Boolean);
+  if (!objectIds.length) return meta;
+
+  const userId = toObjectId(user?.id);
+  const project = {
+    studentCount: { $size: { $ifNull: ['$students', []] } },
+    ...extra,
+  };
+  Object.entries(flags).forEach(([flag, field]) => {
+    project[flag] = userId
+      ? { $in: [userId, { $ifNull: [`$${field}`, []] }] }
+      : { $literal: false };
+  });
+
+  const docs = await Model.aggregate([
+    { $match: { _id: { $in: objectIds } } },
+    { $project: project },
+  ]).option({ maxTimeMS: MEMBERSHIP_QUERY_MAX_TIME_MS });
+  docs.forEach(({ _id, ...rest }) => meta.set(_id.toString(), rest));
+  return meta;
+}
+
 // --- pure rules (operate on already-resolved plain documents) ---------
 
 /**
@@ -636,6 +690,8 @@ module.exports = {
   publishedListFilter,
   isMemberOf,
   redactMembership,
+  loadMembership,
+  toObjectId,
   // stage 4: management permissions
   DECISION,
   isInstructorRole,

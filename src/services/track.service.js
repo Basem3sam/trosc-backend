@@ -157,6 +157,50 @@ exports.createTrack = async (trackBody, requestingUserId) => {
   return track;
 };
 
+// Stage 3B: the three roster arrays a non-staff reader never receives, and
+// the flags derived from them (see policy.loadMembership).
+const ROSTER_EXCLUSION = '-students -pendingStudents -pendingLeaves';
+const MEMBERSHIP_FLAGS = {
+  isEnrolled: 'students',
+  isPending: 'pendingStudents',
+  isPendingLeave: 'pendingLeaves',
+};
+
+// Runs a prepared track list query and applies the Q7 redaction. A caller
+// who can never be staff (anonymous or a student) gets no roster arrays, so
+// they are not loaded: the page's counts and the caller's own flags come
+// from one projection-only aggregation. An admin or instructor (staff for
+// some or all rows), and any `?fields=` request, keep the original path.
+async function loadTrackList(features, queryString, requestingUser) {
+  const slim =
+    !queryString.fields &&
+    !policy.isAdmin(requestingUser) &&
+    !policy.isInstructorRole(requestingUser);
+  if (slim) features.query.select(ROSTER_EXCLUSION);
+
+  const tracks = await features.query;
+  const meta = slim
+    ? await policy.loadMembership(
+        Track,
+        tracks.map((t) => t._id),
+        requestingUser,
+        MEMBERSHIP_FLAGS,
+      )
+    : null;
+
+  return tracks.map((t) => {
+    const obj = t.toObject();
+    if (meta) return { ...obj, ...meta.get(t._id.toString()) };
+    const isStaff = policy.canManageTrack(requestingUser, obj);
+    return policy.redactMembership(
+      obj,
+      requestingUser,
+      isStaff,
+      MEMBERSHIP_FLAGS,
+    );
+  });
+}
+
 /**
  * Get all tracks with advanced filtering, sorting, and pagination
  * @param {Object} query - Express query object with filters, sort, page, limit
@@ -203,23 +247,12 @@ exports.getAllTracks = async (query, requestingUser = null) => {
   // ✅ AWAIT the async paginate method
   await features.paginate();
 
-  // Execute the query and get results
-  const tracks = await features.query;
-
   // Q7: previously returned every track's raw `students`/`pendingStudents`/
   // `pendingLeaves` ID arrays to literally any caller, including
   // anonymous — replaced with `studentCount` (already a schema virtual)
   // plus `isEnrolled`/`isPending`/`isPendingLeave` for the requester.
   // Each track's own instructor (or an admin) still gets the full arrays.
-  const sanitized = tracks.map((t) => {
-    const obj = t.toObject();
-    const isStaff = policy.canManageTrack(requestingUser, obj);
-    return policy.redactMembership(obj, requestingUser, isStaff, {
-      isEnrolled: 'students',
-      isPending: 'pendingStudents',
-      isPendingLeave: 'pendingLeaves',
-    });
-  });
+  const sanitized = await loadTrackList(features, restQuery, requestingUser);
 
   return {
     tracks: sanitized || [], // Ensure it's always an array
@@ -260,7 +293,12 @@ exports.getTrackById = async (trackId, populateSessions = false) => {
  * @throws {AppError} 404 if track not found
  */
 exports.getTrackDetails = async (trackId, requestingUser = null) => {
+  // Stage 3B: the roster arrays are not loaded with the track. Enrollment is
+  // an `exists`, the counts and pending flags come from one aggregation,
+  // and the arrays themselves are fetched only for a caller who receives
+  // them.
   const track = await Track.findById(trackId)
+    .select(ROSTER_EXCLUSION)
     .populate({
       path: 'courses',
       select: 'title description level',
@@ -279,15 +317,15 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
   // "Owner" now means lead OR co-instructor, by current role (stage 4).
   const isOwner = policy.isTrackStaff(track, requestingUser);
   const isAdmin = policy.isAdmin(requestingUser);
-  const isEnrolled = policy.isMemberOf(track.students, requestingUser);
 
   if (!track.published && !isOwner && !isAdmin) {
     throw new AppError('No track found with that ID', 404);
   }
 
-  if (isOwner || isAdmin || isEnrolled) {
-    await track.populate({ path: 'students', select: 'name email photo' });
-  }
+  const isEnrolled =
+    !!requestingUser &&
+    !!(await Track.exists({ _id: trackId, students: requestingUser.id }));
+  const isStaff = isOwner || isAdmin;
 
   // Q7: `pendingStudents`/`pendingLeaves` had NO gate at all before this —
   // anyone who could see the track (including an enrolled-but-not-staff
@@ -301,12 +339,38 @@ exports.getTrackDetails = async (trackId, requestingUser = null) => {
   // virtual, already present) + `isEnrolled: false`.
   const trackObj = track.toObject();
   trackObj.isEnrolled = isEnrolled;
-  policy.redactMembership(trackObj, requestingUser, isOwner || isAdmin, {
-    isPending: 'pendingStudents',
-    isPendingLeave: 'pendingLeaves',
-  });
-  if (!(isOwner || isAdmin || isEnrolled)) {
-    delete trackObj.students;
+
+  if (isStaff) {
+    // Staff: the roster plus the raw pending arrays.
+    const rosters = await Track.findById(trackId)
+      .select('students pendingStudents pendingLeaves')
+      .populate({ path: 'students', select: 'name email photo' });
+    const loaded = rosters ? rosters.toObject() : {};
+    trackObj.students = loaded.students || [];
+    trackObj.pendingStudents = loaded.pendingStudents || [];
+    trackObj.pendingLeaves = loaded.pendingLeaves || [];
+    trackObj.studentCount = trackObj.students.length;
+    return trackObj;
+  }
+
+  // Everyone else: counts and own-status flags only...
+  const meta = await policy.loadMembership(
+    Track,
+    [trackId],
+    requestingUser,
+    MEMBERSHIP_FLAGS,
+  );
+  const counts = meta.get(trackId.toString()) || {};
+  trackObj.studentCount = counts.studentCount || 0;
+  trackObj.isPending = !!counts.isPending;
+  trackObj.isPendingLeave = !!counts.isPendingLeave;
+
+  // ...plus the populated roster for an enrolled student.
+  if (isEnrolled) {
+    const rosters = await Track.findById(trackId)
+      .select('students')
+      .populate({ path: 'students', select: 'name email photo' });
+    trackObj.students = rosters ? rosters.toObject().students : [];
   }
 
   return trackObj;
@@ -720,17 +784,7 @@ async function runTrackSubList(query, requestingUser, extra) {
 
   await features.paginate();
 
-  const tracks = await features.query;
-
-  const sanitized = tracks.map((t) => {
-    const obj = t.toObject();
-    const isStaff = policy.canManageTrack(requestingUser, obj);
-    return policy.redactMembership(obj, requestingUser, isStaff, {
-      isEnrolled: 'students',
-      isPending: 'pendingStudents',
-      isPendingLeave: 'pendingLeaves',
-    });
-  });
+  const sanitized = await loadTrackList(features, query, requestingUser);
 
   return {
     tracks: sanitized,

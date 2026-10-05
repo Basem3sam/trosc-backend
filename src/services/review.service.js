@@ -35,14 +35,16 @@ function getConfig(resourceType) {
 exports.createReview = async (resourceType, resourceId, userId, data) => {
   const { Model, field, label } = getConfig(resourceType);
 
-  const resource = await Model.findById(resourceId).select('students');
+  // Stage 3B: an `exists` instead of loading the whole roster.
+  const resource = await Model.findById(resourceId).select('_id');
   if (!resource) {
     throw new AppError(`No ${label} found with that ID`, 404);
   }
 
-  const isEnrolled = resource.students.some(
-    (studentId) => studentId.toString() === userId,
-  );
+  const isEnrolled = !!(await Model.exists({
+    _id: resourceId,
+    students: userId,
+  }));
   if (!isEnrolled) {
     throw new AppError(`Only enrolled students can review this ${label}`, 403);
   }

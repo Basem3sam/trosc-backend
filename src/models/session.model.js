@@ -74,7 +74,11 @@
  *           description: Whether the requesting user is enrolled in this session — directly, via a parent track, or via a parent course (always present when authenticated)
  *         tracks:
  *           type: array
- *           description: Parent track IDs this session belongs to
+ *           description: >
+ *             Parent track IDs this session belongs to. In
+ *             `GET /sessions/{id}` each entry is populated as
+ *             `{ _id, title, description, instructor, instructors }`; it no
+ *             longer carries the track's own `students` array.
  *           items:
  *             type: string
  *           example: ["507f1f77bcf86cd799439021"]

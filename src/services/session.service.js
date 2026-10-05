@@ -25,7 +25,7 @@ const { recordActivity } = require('./activityLog.service');
 // `policy.publishedListFilter()` to their query so draft sessions the
 // caller isn't authorized for never reach this function in the first
 // place (Q5's "draft listing behavior" contract).
-function sanitizeSessionList(sessions, requestingUser, scope) {
+function sanitizeSessionList(sessions, requestingUser, scope, meta = null) {
   const userId = requestingUser?.id;
   const isAdmin = policy.isAdmin(requestingUser);
 
@@ -36,11 +36,16 @@ function sanitizeSessionList(sessions, requestingUser, scope) {
     // instructor, its course's instructor, or lead/co-instructor of a
     // track it belongs to), computed from the caller's loaded scope.
     const isOwner = policy.isSessionStaffByScope(obj, requestingUser, scope);
-    const isDirectStudent =
-      !!userId &&
-      obj.students?.some(
-        (student) => (student._id ?? student)?.toString() === userId,
-      );
+    // Stage 3B: with `meta` (see listMembership) enrollment and the count
+    // come from the database and the roster was never loaded; without it
+    // (a `?fields=` request) they are derived from the loaded array.
+    const m = meta?.get(obj._id.toString());
+    const isDirectStudent = m
+      ? m.isEnrolled
+      : !!userId &&
+        obj.students?.some(
+          (student) => (student._id ?? student)?.toString() === userId,
+        );
 
     if (!isAdmin && !isOwner && !isDirectStudent) {
       delete obj.url;
@@ -51,11 +56,31 @@ function sanitizeSessionList(sessions, requestingUser, scope) {
     // the live document before `students` is deleted below); isEnrolled
     // reuses the direct-enrollment check above so list views get the
     // same studentCount/isEnrolled shape the detail endpoints do.
+    if (m) obj.studentCount = m.studentCount;
     obj.isEnrolled = !!isDirectStudent;
     delete obj.students; // raw ids, only used for the gating check above
     delete obj.progress; // internal — never expose the full watched-list here
     return obj;
   });
+}
+
+// Stage 3B: session lists never send `students` or `progress`, so the
+// default list query does not load them (a `?fields=` request keeps the
+// old behaviour). The caller's enrollment and `studentCount` come from one
+// projection-only aggregation for the whole page instead.
+function excludeRosters(listQuery, queryString) {
+  return queryString?.fields
+    ? listQuery
+    : listQuery.select('-students -progress');
+}
+
+function listMembership(sessions, queryString, requestingUser) {
+  if (queryString?.fields) return null;
+  return policy.loadMembership(
+    Session,
+    sessions.map((s) => s._id),
+    requestingUser,
+  );
 }
 
 // Stage 4 / rule 3: an admin may set `instructor` to someone else - that
@@ -116,14 +141,15 @@ exports.getAllSessions = async (query, requestingUser = null) => {
 
   await features.paginate();
 
-  const sessions = await features.query.populate(
+  const sessions = await excludeRosters(features.query, query).populate(
     'instructor',
     'name email role',
   );
+  const meta = await listMembership(sessions, query, requestingUser);
 
   // M16/#1.1/#1.2: field-level redaction (url/embedUrl/resources/progress)
   // for whichever documents made it past the visibility filter above.
-  const sanitized = sanitizeSessionList(sessions, requestingUser, scope);
+  const sanitized = sanitizeSessionList(sessions, requestingUser, scope, meta);
 
   return {
     sessions: sanitized || [],
@@ -133,10 +159,15 @@ exports.getAllSessions = async (query, requestingUser = null) => {
 };
 
 exports.getSessionById = async (sessionId, requestingUser = null) => {
+  // Stage 3B: neither the roster nor the progress list is loaded here, and
+  // the tracks no longer carry their own `students` arrays. Enrollment
+  // questions are answered by the database below (one aggregation plus
+  // `exists` lookups), and the roster is fetched only for a caller who is
+  // going to receive it.
   const session = await Session.findById(sessionId)
+    .select('-students -progress')
     .populate('instructor', 'name email role')
-    .populate('students', 'name email role')
-    .populate('tracks', 'title description students');
+    .populate('tracks', 'title description');
 
   if (!session) {
     throw new AppError('Session not found', 404);
@@ -187,20 +218,51 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
   let isTrackStudent = false;
   let isCourseStudent = false;
 
-  if (userId) {
-    isDirectStudent = sessionObj.students?.some(
-      (s) => s._id?.toString() === userId || s.toString() === userId,
-    );
+  const viewerId = policy.toObjectId(userId);
+  const meta = await policy.loadMembership(
+    Session,
+    [sessionId],
+    requestingUser,
+    { isEnrolled: 'students' },
+    viewerId
+      ? {
+          myProgress: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: { $ifNull: ['$progress', []] },
+                  as: 'p',
+                  cond: { $eq: ['$$p.student', viewerId] },
+                },
+              },
+              0,
+            ],
+          },
+        }
+      : {},
+  );
+  const membership = meta.get(sessionId.toString()) || {
+    studentCount: 0,
+    isEnrolled: false,
+  };
+  sessionObj.studentCount = membership.studentCount;
 
-    isTrackStudent = sessionObj.tracks?.some((t) =>
-      t.students?.some((s) => s.toString() === userId),
-    );
+  if (userId) {
+    isDirectStudent = membership.isEnrolled;
+
+    const trackIds = (sessionObj.tracks || []).map((t) => t._id);
+    if (!isDirectStudent && trackIds.length) {
+      isTrackStudent = !!(await Track.exists({
+        _id: { $in: trackIds },
+        students: userId,
+      }));
+    }
 
     if (!isDirectStudent && !isTrackStudent && sessionObj.course) {
-      const course = await Course.findById(sessionObj.course).select(
-        'students',
-      );
-      isCourseStudent = !!course?.students.some((s) => s.toString() === userId);
+      isCourseStudent = !!(await Course.exists({
+        _id: sessionObj.course,
+        students: userId,
+      }));
     }
   }
 
@@ -225,7 +287,13 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
     // exposure (Q7) even without the names attached — replaced with
     // `studentCount` (schema virtual, already present on sessionObj)
     // + the `isEnrolled` flag set above.
-    delete sessionObj.students;
+    // (Stage 3B: `students` was never loaded for this caller.)
+  } else {
+    // Owner, admin or enrolled: the roster, loaded only now.
+    const rosterDoc = await Session.findById(sessionId)
+      .select('students')
+      .populate('students', 'name email role');
+    sessionObj.students = rosterDoc ? rosterDoc.toObject().students : [];
   }
 
   // #1.1: myProgress reflects the requesting user's own watched status.
@@ -233,9 +301,7 @@ exports.getSessionById = async (sessionId, requestingUser = null) => {
   // session they're not enrolled in has no "progress" of their own to
   // report.
   if (isEnrolled) {
-    const myEntry = (sessionObj.progress || []).find(
-      (p) => p.student?.toString() === userId,
-    );
+    const myEntry = membership.myProgress;
     sessionObj.myProgress = myEntry
       ? { status: myEntry.status, watchedAt: myEntry.watchedAt }
       : { status: 'not_started', watchedAt: null };
@@ -400,13 +466,14 @@ exports.getSessionsByInstructor = async (
 
   await features.paginate();
 
-  const sessions = await features.query.populate(
+  const sessions = await excludeRosters(features.query, query).populate(
     'instructor',
     'name email role',
   );
+  const meta = await listMembership(sessions, query, requestingUser);
 
   return {
-    sessions: sanitizeSessionList(sessions, requestingUser, scope) || [],
+    sessions: sanitizeSessionList(sessions, requestingUser, scope, meta) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -430,13 +497,14 @@ exports.getSessionsByTrack = async (trackId, query, requestingUser = null) => {
 
   await features.paginate();
 
-  const sessions = await features.query.populate(
+  const sessions = await excludeRosters(features.query, query).populate(
     'instructor',
     'name email role',
   );
+  const meta = await listMembership(sessions, query, requestingUser);
 
   return {
-    sessions: sanitizeSessionList(sessions, requestingUser, scope) || [],
+    sessions: sanitizeSessionList(sessions, requestingUser, scope, meta) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -449,17 +517,17 @@ exports.getSessionsByTrack = async (trackId, query, requestingUser = null) => {
  * @returns {Promise<{sessions: Array, total: Number}>}
  */
 exports.setSessionProgress = async (sessionId, requestingUser, status) => {
-  const session = await Session.findById(sessionId).select(
-    'students tracks course',
-  );
+  // Stage 3B: `students` is not loaded; direct enrollment is an `exists`.
+  const session = await Session.findById(sessionId).select('tracks course');
   if (!session) {
     throw new AppError('Session not found', 404);
   }
 
   const userId = requestingUser.id;
-  const isDirectStudent = session.students.some(
-    (id) => id.toString() === userId,
-  );
+  const isDirectStudent = !!(await Session.exists({
+    _id: sessionId,
+    students: userId,
+  }));
   let isEnrolled = isDirectStudent;
 
   if (!isEnrolled && session.tracks?.length) {
@@ -552,13 +620,14 @@ exports.getSessionsByStudent = async (
 
   await features.paginate();
 
-  const sessions = await features.query.populate(
+  const sessions = await excludeRosters(features.query, query).populate(
     'instructor',
     'name email role',
   );
+  const meta = await listMembership(sessions, query, requestingUser);
 
   return {
-    sessions: sanitizeSessionList(sessions, requestingUser, scope) || [],
+    sessions: sanitizeSessionList(sessions, requestingUser, scope, meta) || [],
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };

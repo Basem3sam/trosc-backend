@@ -33,7 +33,7 @@ exports.getAllEvents = async (query) => {
 exports.getEventById = async (id) => {
   const event = await Event.findById(id)
     .populate('createdBy', 'name photo role')
-    .populate('attendees', 'name photo');
+    .populate('attendees', 'name');
   if (!event) throw new AppError('Event not found', 404);
   return event;
 };
@@ -104,7 +104,7 @@ exports.rsvpEvent = async (eventId, userId) => {
     targetId: eventId,
   });
 
-  return Event.findById(eventId).populate('attendees', 'name photo');
+  return Event.findById(eventId).populate('attendees', 'name');
 };
 
 exports.cancelRsvp = async (eventId, userId) => {

@@ -87,10 +87,7 @@ exports.getAllActivityLogs = async (query) => {
     .limitFields();
 
   await features.paginate();
-  const activityLogs = await features.query.populate(
-    'user',
-    'name email photo role',
-  );
+  const activityLogs = await features.query.populate('user', 'name email role');
 
   return {
     activityLogs: activityLogs || [],

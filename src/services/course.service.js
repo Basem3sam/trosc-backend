@@ -132,6 +132,41 @@ exports.createCourse = async (courseBody, requestingUser = null) => {
   return trackId ? Course.findById(course._id) : course;
 };
 
+// Package 2: shared Q7 redaction for the course lists (all, and the
+// sub-lists by instructor / track / student). "Staff" = can manage the
+// course under the stage-4 policy, computed from the caller's loaded staff
+// scope.
+//
+// Stage 3B: a caller who can never be staff (anonymous or a student) gets
+// no roster, so `students` is not loaded: the page's counts and the
+// caller's own `isEnrolled` come from one projection-only aggregation. An
+// admin or instructor, and any `?fields=` request, keep the original path.
+async function loadCourseList(features, queryString, requestingUser, scope) {
+  const slim =
+    !queryString.fields &&
+    !policy.isAdmin(requestingUser) &&
+    !policy.isInstructorRole(requestingUser);
+  if (slim) features.query.select('-students');
+
+  const courses = await features.query;
+  const meta = slim
+    ? await policy.loadMembership(
+        Course,
+        courses.map((c) => c._id),
+        requestingUser,
+      )
+    : null;
+
+  return courses.map((c) => {
+    const obj = c.toObject();
+    if (meta) return { ...obj, ...meta.get(c._id.toString()) };
+    const isStaff = policy.isCourseStaffByScope(obj, requestingUser, scope);
+    return policy.redactMembership(obj, requestingUser, isStaff, {
+      isEnrolled: 'students',
+    });
+  });
+}
+
 /**
  * Get all courses with advanced filtering, sorting, and pagination
  * @param {Object} query - Express query object
@@ -155,20 +190,17 @@ exports.getAllCourses = async (query, requestingUser = null) => {
 
   await features.paginate();
 
-  const courses = await features.query;
-
   // Q7: previously returned every course's raw `students` ID array to
   // literally any caller, including anonymous — replaced with
   // `studentCount` (already a schema virtual) plus `isEnrolled` for the
   // requester. Each course's own instructor (or an admin) still gets the
   // full array.
-  const sanitized = courses.map((c) => {
-    const obj = c.toObject();
-    const isStaff = policy.isCourseStaffByScope(obj, requestingUser, scope);
-    return policy.redactMembership(obj, requestingUser, isStaff, {
-      isEnrolled: 'students',
-    });
-  });
+  const sanitized = await loadCourseList(
+    features,
+    query,
+    requestingUser,
+    scope,
+  );
 
   return {
     courses: sanitized || [],
@@ -209,7 +241,11 @@ exports.getCourseById = async (courseId, populateSessions = false) => {
  * @throws {AppError} 404 if course not found
  */
 exports.getCourseDetails = async (courseId, requestingUser = null) => {
+  // Stage 3B: `students` is not loaded with the course. Enrollment is an
+  // `exists`, the count comes from one aggregation, and the populated roster
+  // is fetched only for a caller who receives it.
   const course = await Course.findById(courseId)
+    .select('-students')
     .populate({
       path: 'sessions',
       select: 'title description duration level published startDate',
@@ -226,22 +262,33 @@ exports.getCourseDetails = async (courseId, requestingUser = null) => {
     policy.isInstructorRole(requestingUser) &&
     (policy.isOwnerOf(course, requestingUser, 'instructor') ||
       (await policy.canManage({}, requestingUser, 'course', courseId)));
-  const isEnrolled = policy.isMemberOf(course.students, requestingUser);
 
   if (!course.published && !isOwner && !isAdmin) {
     throw new AppError('No course found with that ID', 404);
   }
-  if (isOwner || isAdmin || isEnrolled) {
-    await course.populate({ path: 'students', select: 'name email photo' });
-  }
+  const isEnrolled =
+    !!requestingUser &&
+    !!(await Course.exists({ _id: courseId, students: requestingUser.id }));
 
   // Q7: when none of the above populated `students`, it was still the
   // raw ID array underneath — never actually hidden. Replaced with
   // `studentCount` (schema virtual, already present) + `isEnrolled: false`.
   const courseObj = course.toObject();
   courseObj.isEnrolled = isEnrolled;
-  if (!(isOwner || isAdmin || isEnrolled)) {
-    delete courseObj.students;
+
+  if (isOwner || isAdmin || isEnrolled) {
+    const rosters = await Course.findById(courseId)
+      .select('students')
+      .populate({ path: 'students', select: 'name email photo' });
+    courseObj.students = rosters ? rosters.toObject().students : [];
+    courseObj.studentCount = courseObj.students.length;
+  } else {
+    const meta = await policy.loadMembership(
+      Course,
+      [courseId],
+      requestingUser,
+    );
+    courseObj.studentCount = meta.get(courseId.toString())?.studentCount || 0;
   }
 
   return courseObj;
@@ -602,19 +649,6 @@ exports.removeStudentFromCourse = async (courseId, studentId) => {
 // 🔍 ADVANCED QUERIES
 // ===================================================================
 
-// Package 2: shared Q7 redaction for the course sub-lists below (by
-// instructor / track / student). "Staff" = can manage the course under the
-// stage-4 policy, computed from the caller's loaded staff scope.
-function redactCourseList(courses, requestingUser, scope) {
-  return courses.map((c) => {
-    const obj = c.toObject();
-    const isStaff = policy.isCourseStaffByScope(obj, requestingUser, scope);
-    return policy.redactMembership(obj, requestingUser, isStaff, {
-      isEnrolled: 'students',
-    });
-  });
-}
-
 // Package 2: the Q5 draft rule + `extra` conditions, shared by the three
 // sub-lists. Published only for the public; staff also get the drafts they
 // manage; admins get everything.
@@ -646,10 +680,10 @@ exports.getCoursesByInstructor = async (
 
   await features.paginate();
 
-  const courses = await features.query;
+  const courses = await loadCourseList(features, query, requestingUser, scope);
 
   return {
-    courses: redactCourseList(courses, requestingUser, scope),
+    courses,
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -672,10 +706,10 @@ exports.getCoursesByTrack = async (trackId, query, requestingUser = null) => {
 
   await features.paginate();
 
-  const courses = await features.query;
+  const courses = await loadCourseList(features, query, requestingUser, scope);
 
   return {
-    courses: redactCourseList(courses, requestingUser, scope),
+    courses,
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };
@@ -703,10 +737,10 @@ exports.getCoursesByStudent = async (
 
   await features.paginate();
 
-  const courses = await features.query;
+  const courses = await loadCourseList(features, query, requestingUser, scope);
 
   return {
-    courses: redactCourseList(courses, requestingUser, scope),
+    courses,
     total: features.totalDocs || 0,
     pagination: features.pagination,
   };

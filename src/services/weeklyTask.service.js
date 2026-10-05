@@ -4,11 +4,13 @@ const Track = require('../models/track.model');
 const AppError = require('../utils/AppError');
 const { recordActivity } = require('./activityLog.service');
 
-function assertCanView(resource, label, requestingUser) {
+// Stage 3B: an `exists` instead of loading the whole roster.
+async function assertCanView(Model, resourceId, label, requestingUser) {
   if (requestingUser.role === 'student') {
-    const isEnrolled = resource.students.some(
-      (studentId) => studentId.toString() === requestingUser.id,
-    );
+    const isEnrolled = !!(await Model.exists({
+      _id: resourceId,
+      students: requestingUser.id,
+    }));
     if (!isEnrolled) {
       throw new AppError(
         `Only enrolled students can view this ${label}'s weekly tasks`,
@@ -102,11 +104,11 @@ exports.createWeeklyTask = async (courseId, instructorId, data) => {
  * @returns {Promise<WeeklyTask[]>}
  */
 exports.getCourseWeeklyTasks = async (courseId, requestingUser) => {
-  const course = await Course.findById(courseId).select('students');
+  const course = await Course.findById(courseId).select('_id');
   if (!course) {
     throw new AppError('No course found with that ID', 404);
   }
-  assertCanView(course, 'course', requestingUser);
+  await assertCanView(Course, courseId, 'course', requestingUser);
 
   const tasks = await WeeklyTask.find({ course: courseId }).sort({ week: 1 });
 
@@ -127,11 +129,11 @@ exports.getCourseWeeklyTasks = async (courseId, requestingUser) => {
  * @returns {Promise<WeeklyTask[]>}
  */
 exports.getTrackWeeklyTasks = async (trackId, requestingUser) => {
-  const track = await Track.findById(trackId).select('students courses');
+  const track = await Track.findById(trackId).select('courses');
   if (!track) {
     throw new AppError('No track found with that ID', 404);
   }
-  assertCanView(track, 'track', requestingUser);
+  await assertCanView(Track, trackId, 'track', requestingUser);
 
   const tasks = await WeeklyTask.find({ course: { $in: track.courses } })
     .sort({ week: 1 })
@@ -242,7 +244,7 @@ exports.setItemCompletion = async (
 ) => {
   const task = await WeeklyTask.findById(taskId).populate({
     path: 'course',
-    select: 'students',
+    select: '_id',
   });
   if (!task) {
     throw new AppError('No weekly task found with that ID', 404);
@@ -254,9 +256,10 @@ exports.setItemCompletion = async (
   }
 
   if (requestingUser.role === 'student') {
-    const isEnrolled = task.course.students.some(
-      (studentId) => studentId.toString() === requestingUser.id,
-    );
+    const isEnrolled = !!(await Course.exists({
+      _id: task.course._id,
+      students: requestingUser.id,
+    }));
     if (!isEnrolled) {
       throw new AppError(
         'Only enrolled students can track progress on this weekly task',

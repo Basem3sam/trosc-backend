@@ -22,11 +22,13 @@ function getConfig(resourceType) {
   return config;
 }
 
-function assertCanView(resource, label, requestingUser) {
+// Stage 3B: an `exists` instead of loading the whole roster.
+async function assertCanView(Model, resourceId, label, requestingUser) {
   if (requestingUser.role === 'student') {
-    const isEnrolled = resource.students.some(
-      (studentId) => studentId.toString() === requestingUser.id,
-    );
+    const isEnrolled = !!(await Model.exists({
+      _id: resourceId,
+      students: requestingUser.id,
+    }));
     if (!isEnrolled) {
       throw new AppError(
         `Only enrolled students can view this ${label}'s assignments`,
@@ -62,30 +64,77 @@ function isAssignmentStaff(plain, authority) {
 // per assignment. Counts only - never identities, files or grades.
 //   submissionCount - how many students have submitted
 //   ungradedCount   - how many of those have no grade yet
+//
+// Stage 3B: `assignments` is loaded WITHOUT its `submissions` array
+// (`.select('-submissions')`). One projection-only aggregation over the
+// page's ids returns, per assignment, the caller's own submission and the
+// two counts, so the array is never transferred.
+const SUBMISSION_QUERY_MAX_TIME_MS = 10000;
+
+async function loadSubmissionSummaries(assignmentIds, requestingUser) {
+  const summaries = new Map();
+  if (!assignmentIds.length) return summaries;
+
+  const callerId = policy.toObjectId(requestingUser.id);
+  const submissions = { $ifNull: ['$submissions', []] };
+  const docs = await Assignment.aggregate([
+    { $match: { _id: { $in: assignmentIds } } },
+    {
+      $project: {
+        mine: callerId
+          ? {
+              $arrayElemAt: [
+                {
+                  $filter: {
+                    input: submissions,
+                    as: 's',
+                    cond: { $eq: ['$$s.student', callerId] },
+                  },
+                },
+                0,
+              ],
+            }
+          : { $literal: null },
+        submissionCount: { $size: submissions },
+        ungradedCount: {
+          $size: {
+            $filter: {
+              input: submissions,
+              as: 's',
+              cond: { $eq: [{ $ifNull: ['$$s.grade', null] }, null] },
+            },
+          },
+        },
+      },
+    },
+  ]).option({ maxTimeMS: SUBMISSION_QUERY_MAX_TIME_MS });
+  docs.forEach((doc) => summaries.set(doc._id.toString(), doc));
+  return summaries;
+}
+
 async function shapeAssignmentsForCaller(assignments, requestingUser) {
   const authority = await policy.resolveManageableParents({}, requestingUser, {
     courseIds: assignments.map((a) => a.course).filter(Boolean),
     sessionIds: assignments.map((a) => a.session).filter(Boolean),
   });
+  const summaries = await loadSubmissionSummaries(
+    assignments.map((a) => a._id),
+    requestingUser,
+  );
 
   return assignments.map((assignment) => {
     const plain = assignment.toObject();
-    const submissions = plain.submissions || [];
-    const mySubmission =
-      submissions.find((s) => s.student.toString() === requestingUser.id) ||
-      null;
+    const summary = summaries.get(assignment._id.toString()) || {};
 
     const shaped = {
       ...plain,
       submissions: undefined,
-      mySubmission,
+      mySubmission: summary.mine || null,
     };
 
     if (isAssignmentStaff(plain, authority)) {
-      shaped.submissionCount = submissions.length;
-      shaped.ungradedCount = submissions.filter(
-        (s) => s.grade === undefined || s.grade === null,
-      ).length;
+      shaped.submissionCount = summary.submissionCount || 0;
+      shaped.ungradedCount = summary.ungradedCount || 0;
     }
 
     return shaped;
@@ -109,13 +158,14 @@ exports.getResourceAssignments = async (
 ) => {
   const { Model, field, label } = getConfig(resourceType);
 
-  const resource = await Model.findById(resourceId).select('students');
+  const resource = await Model.findById(resourceId).select('_id');
   if (!resource) {
     throw new AppError(`No ${label} found with that ID`, 404);
   }
-  assertCanView(resource, label, requestingUser);
+  await assertCanView(Model, resourceId, label, requestingUser);
 
   const assignments = await Assignment.find({ [field]: resourceId })
+    .select('-submissions')
     .sort({ deadline: 1 })
     .populate('course', 'title')
     .populate('session', 'title')
@@ -137,13 +187,11 @@ exports.getResourceAssignments = async (
  * @returns {Promise<Assignment[]>}
  */
 exports.getTrackAssignments = async (trackId, requestingUser) => {
-  const track = await Track.findById(trackId).select(
-    'students courses sessions',
-  );
+  const track = await Track.findById(trackId).select('courses sessions');
   if (!track) {
     throw new AppError('No track found with that ID', 404);
   }
-  assertCanView(track, 'track', requestingUser);
+  await assertCanView(Track, trackId, 'track', requestingUser);
 
   const assignments = await Assignment.find({
     $or: [
@@ -151,6 +199,7 @@ exports.getTrackAssignments = async (trackId, requestingUser) => {
       { session: { $in: track.sessions } },
     ],
   })
+    .select('-submissions')
     .sort({ deadline: 1 })
     .populate('course', 'title')
     .populate('session', 'title')
@@ -224,7 +273,7 @@ exports.getAssignmentById = async (assignmentId) => {
     .populate('course', 'title')
     .populate('session', 'title')
     .populate('instructor', 'name photo')
-    .populate('submissions.student', 'name email photo');
+    .populate('submissions.student', 'name email');
 
   if (!assignment) {
     throw new AppError('No assignment found with that ID', 404);

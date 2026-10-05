@@ -14,7 +14,8 @@ async function assertEnrolled(assignment, userId) {
   const Model = assignment.course ? Course : Session;
   const label = assignment.course ? 'course' : 'session';
 
-  const resource = await Model.findById(resourceId).select('students');
+  // Stage 3B: an `exists` instead of loading the whole roster.
+  const resource = await Model.findById(resourceId).select('_id');
   if (!resource) {
     // Shouldn't normally happen (the parent was required to create the
     // assignment), but guards against a deleted course/session.
@@ -24,9 +25,10 @@ async function assertEnrolled(assignment, userId) {
     );
   }
 
-  const isEnrolled = resource.students.some(
-    (studentId) => studentId.toString() === userId,
-  );
+  const isEnrolled = !!(await Model.exists({
+    _id: resourceId,
+    students: userId,
+  }));
   if (!isEnrolled) {
     throw new AppError(
       `Only students enrolled in this assignment's ${label} can submit`,
