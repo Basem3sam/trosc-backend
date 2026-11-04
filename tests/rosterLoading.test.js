@@ -527,8 +527,11 @@ describe('assignments - own submission and counts without loading submissions', 
     const other = await createTestUser();
     await Assignment.updateOne(
       { _id: f.assignment._id },
+      { $set: { 'submissions.0.grade': 0 } },
+    );
+    await Assignment.updateOne(
+      { _id: f.assignment._id },
       {
-        $set: { 'submissions.0.grade': 0 },
         $push: {
           submissions: {
             student: other.user._id,
